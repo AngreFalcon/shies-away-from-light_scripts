@@ -3,7 +3,6 @@ local util = require("openmw.util")
 
 ScriptVersion = 1
 
-
 CellLoc = {}
 
 

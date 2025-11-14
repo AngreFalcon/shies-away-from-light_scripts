@@ -1,6 +1,6 @@
 local util = require("openmw.util")
 local time = require("openmw_aux.time")
-require("./common")
+require('./common')
 
 INIT_DATA = { markedPos = { cellId = "Balmora, Council Club", cellPos = util.vector3(-5, -218, -251) } }
 

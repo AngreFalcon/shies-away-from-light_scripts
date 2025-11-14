@@ -5,6 +5,7 @@ local nearby = require("openmw.nearby")
 local types = require("openmw.types")
 local core = require("openmw.core")
 local self = require("openmw.self")
+local util = require("openmw.util")
 
 local selfObj = self
 
@@ -37,6 +38,13 @@ return {
          local quest = getQuest("SAFL_ShiesFled")
          if not quest.started then
             quest:addJournalEntry(10, selfObj)
+         end
+      end,
+      ["getPos"] = function()
+         if self then
+            return self.object.position
+         else
+            return nil
          end
       end,
    },
