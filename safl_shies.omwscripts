@@ -1,0 +1,5 @@
+GLOBAL: scripts/safl_shies/global.lua
+
+PLAYER: scripts/safl_shies/player.lua
+
+CUSTOM: scripts/safl_shies/shies.lua
