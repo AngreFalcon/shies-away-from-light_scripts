@@ -5,8 +5,8 @@ local core = require('openmw.core')
 local ai = require('openmw.interfaces').AI
 local time = require('openmw_aux.time')
 local nearby = require('openmw.nearby')
-require("./shies_var")
-require("./common")
+require("scripts.safl_shies.shies_var")
+require("scripts.safl_shies.common")
 
 local health = types.Actor.stats.dynamic.health
 local selfObj = self as core.GameObject
