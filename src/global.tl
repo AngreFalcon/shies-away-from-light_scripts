@@ -3,7 +3,7 @@ local util = require("openmw.util")
 
 local shies = "safl_shies"
 
-local record TeleportData
+local interface TeleportData
    actor: core.GameObject
    cell: string
    position: util.Vector3

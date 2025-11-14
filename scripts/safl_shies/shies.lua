@@ -1,8 +1,4 @@
 
-local scriptVersion = 1
-
-
-
 local I = require('openmw.interfaces')
 local types = require('openmw.types')
 local self = require('openmw.self')
@@ -10,6 +6,7 @@ local core = require('openmw.core')
 local ai = require('openmw.interfaces').AI
 local time = require('openmw_aux.time')
 local util = require('openmw.util')
+local nearby = require('openmw.nearby')
 
 
 
@@ -25,11 +22,10 @@ local util = require('openmw.util')
 
 
 
+local scriptVersion = 1
 local INIT_DATA = { markedPos = { recallCellId = "Balmora, Council Club", recallPos = util.vector3(-5, -218, -251) } }
-local FLEE_THRESHOLD = 0.1
 local RECALL_LOC
-
-
+local FLEE_THRESHOLD = 0.1
 local RECALL_TIMEOUT = 2 * time.second
 local health = types.Actor.stats.dynamic.health
 local selfObj = self
@@ -53,7 +49,7 @@ end
 local function onLoad(data)
    if (not data) or (not data.version) or (data.version < scriptVersion) then
       print('Was saved with an old version of the script, initializing to default')
-      RECALL_LOC = { recallCellId = "Balmora, Council Club", recallPos = util.vector3(-5, -218, -251) }
+      RECALL_LOC = INIT_DATA.markedPos
       return
    elseif (data.version > scriptVersion) then
       error('Required update to a new version of the script')
@@ -66,15 +62,14 @@ end
 
 
 
+local function triggerShiesFledQuest()
+   local players = nearby.players
+   for i = 1, #players do
+      print("shies fled 0")
+      players[i]:sendEvent("shiesFled", nil)
+   end
 
-
-
-
-
-
-
-
-
+end
 
 local function getCurrentHealth()
    return health(selfObj).current
@@ -106,26 +101,15 @@ local function flee()
    function(actor)
       ai.removePackages("Combat")
       ai.removePackages("Follow")
+      if RECALL_LOC == INIT_DATA.markedPos then
+
+         triggerShiesFledQuest()
+      end
       return core.sendGlobalEvent("teleport", {
          actor = actor,
          cell = RECALL_LOC.recallCellId,
          position = RECALL_LOC.recallPos,
       })
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
    end,
    nil)
 
@@ -140,12 +124,6 @@ return {
             flee()
 
             heal()
-         end
-      end,
-      onTeleported = function()
-         if RECALL_LOC == INIT_DATA.markedPos then
-
-
          end
       end,
       onInit = onInit,

@@ -2,6 +2,17 @@ local _tl_compat; if (tonumber((_VERSION or ''):match('[%d.]*$')) or 0) < 5.3 th
 local UI = require("openmw.interfaces").UI
 local input = require("openmw.input")
 local nearby = require("openmw.nearby")
+local types = require("openmw.types")
+local core = require("openmw.core")
+local self = require("openmw.self")
+
+local selfObj = self
+
+
+
+local function getQuest(questName)
+   return (types.Player.quests(selfObj))[questName]
+end
 
 return {
    engineHandlers = {
@@ -21,6 +32,14 @@ return {
    eventHandlers = {
       ["shiesAttacked"] = function(message)
          UI.showInteractiveMessage(message, nil)
+      end,
+      ["shiesFled"] = function()
+         print("shies fled 1")
+         local quest = getQuest("SAFL_ShiesFled")
+         if not quest.started then
+            print("shies fled 2")
+            quest:addJournalEntry(10, selfObj)
+         end
       end,
    },
 }

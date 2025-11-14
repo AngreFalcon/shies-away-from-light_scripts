@@ -1,7 +1,3 @@
--- meta info
-local scriptVersion = 1 -- increment whenever onSave is changed
---
-
 -- all requires
 local I = require('openmw.interfaces')
 local types = require('openmw.types')
@@ -10,6 +6,7 @@ local core = require('openmw.core')
 local ai = require('openmw.interfaces').AI
 local time = require('openmw_aux.time')
 local util = require('openmw.util')
+local nearby = require('openmw.nearby')
 --
 
 -- custom types and interfaces
@@ -25,11 +22,10 @@ end
 --
 
 -- variables
+local scriptVersion = 1 -- increment whenever onSave is changed
 local INIT_DATA: SaveData = {markedPos = {recallCellId = "Balmora, Council Club", recallPos = util.vector3(-5, -218, -251)}}
-local FLEE_THRESHOLD = 0.1
 local RECALL_LOC: RecallLoc
---local RECALL_CELL_IDS = {"Balmora, Council Club", "Balmora, Lucky Lockup"}
---local RECALL_POSITIONS = {util.vector3(-5, -218, -251), util.vector3(-189, 267, -506)}
+local FLEE_THRESHOLD = 0.1
 local RECALL_TIMEOUT = 2 * time.second
 local health = types.Actor.stats.dynamic.health
 local selfObj = self as core.GameObject
@@ -53,7 +49,7 @@ end
 local function onLoad(data: SaveData)
 	if (not data) or (not data.version) or (data.version < scriptVersion) then
 		print('Was saved with an old version of the script, initializing to default')
-		RECALL_LOC = {recallCellId = "Balmora, Council Club", recallPos = util.vector3(-5, -218, -251)}
+		RECALL_LOC = INIT_DATA.markedPos
 		return
 	elseif (data.version > scriptVersion) then
 		error('Required update to a new version of the script')
@@ -64,17 +60,13 @@ local function onLoad(data: SaveData)
 	end
 end
 
---[[ this function relies on openmw.world, which is only available to global scripts. need to look at later
 -- used to trigger the shies fled quest. should only be triggered once
 local function triggerShiesFledQuest()
-	local players = world.players
+	local players = nearby.players
 	for i = 1, #players do
-		if types.Player.quests(players[i]) then
-
-		end
+		players[i]:sendEvent("shiesFled", nil)
 	end
-	--core.sendGlobalEvent("shiesFled", )
-end]]
+end
 
 local function getCurrentHealth(): number
     return health(selfObj).current
@@ -106,26 +98,15 @@ local function flee()
         function(actor: core.GameObject)
 			ai.removePackages("Combat")
 			ai.removePackages("Follow")
+			if RECALL_LOC == INIT_DATA.markedPos then
+				-- The player has not changed Shies' marked location. This likely means the Shies Fled quest has not been started yet; we can further check by checking the player's journal entries
+				triggerShiesFledQuest()
+			end
             return core.sendGlobalEvent("teleport", {
 				actor = actor,
 				cell = RECALL_LOC.recallCellId,
 				position = RECALL_LOC.recallPos
 			})
-			--[[
-            -- Things break if you teleport an NPC to the same cell they're already in
-			-- So we need to find the first uninhabited cell from a list of potential suitors
-            for i, cell in ipairs(RECALL_CELL_IDS) do
-                if string.lower(cell) ~= actor.cell.id then
-                    -- No distractions
-                    ai.removePackages("Combat")
-                    ai.removePackages("Follow")
-                    return core.sendGlobalEvent("teleport", {
-                        actor = actor,
-                        cell = cell,
-                        position = RECALL_POSITIONS[i]
-                    })
-                end
-            end]]
         end,
         nil
     )
@@ -142,12 +123,6 @@ return {
     			heal()
             end
         end,
-		onTeleported = function()
-			if RECALL_LOC == INIT_DATA.markedPos then
-				-- The player has not changed Shies' marked location. This likely means the Shies Fled quest has not been started yet; we can further check by checking the player's journal entries
-				--triggerShiesFledQuest()
-			end
-		end,
 		onInit = onInit,
 		onSave = onSave,
 		onLoad = onLoad,
