@@ -1,6 +1,6 @@
 local util = require("openmw.util")
 local time = require("openmw_aux.time")
-require('./common')
+require('scripts.safl_shies.common')
 
 global INIT_DATA: SaveData = {markedPos = {cellId = "Balmora, Council Club", cellPos = util.vector3(-5, -218, -251)}}
 global RECALL_LOC: CellLoc
