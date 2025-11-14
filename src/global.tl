@@ -1,5 +1,6 @@
 local core = require("openmw.core")
 local util = require("openmw.util")
+local world = require("openmw.world")
 
 local shies = "safl_shies"
 
@@ -17,6 +18,22 @@ local function disable(actor: core.GameObject)
    actor.enabled = false
 end
 
+local function fetchMWVar(data: {string, core.GameObject}): number | nil
+	local localScript = world.mwscript.getLocalScript(data[2], nil)
+	if localScript ~= nil then
+		return (localScript as world.MWScript).variables[data[1]]
+	else
+		return nil
+	end
+end
+
+local function updateMWVar(data: {string, number, core.GameObject})
+	local localScript = world.mwscript.getLocalScript(data[3], nil)
+	if localScript ~= nil then
+		(localScript as world.MWScript).variables[data[1]] = data[2]
+	end
+end
+
 return {
    engineHandlers = {
       onActorActive = function(actor: core.GameObject)
@@ -28,23 +45,7 @@ return {
    eventHandlers = {
       ["teleport"] = teleport,
       ["disable"] = disable,
+	  ["fetchMWVar"] = fetchMWVar,
+	  ["updateMWVar"] = updateMWVar,
    }
 }
-
---[[
-   ;if ( GetHealthGetRatio < 0.10 ) 
-      ;Set companion to 0
-      ;Set c_move to 0
-      ;AiWander, 0, 0, 0, 0
-      ;if ( GetCurrentAIPackage == 3 )
-      ;  return
-      ;endif
-      ;Set tempValue1 to GetHealth
-      ;Set tempValue2 to ( tempValue1 / GetHealthGetRatio )
-      ;Set tempValue1 to ( tempValue2 - tempValue1 )
-      ;ModCurrentHealth, tempValue1
-      ;PositionCell, -5, -218, -251, 0, "Balmora, Council Club"
-      ;Journal, "SAFL_ShiesFled", 5
-      ;return
-   ;endif
---]]

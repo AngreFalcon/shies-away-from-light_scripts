@@ -1,67 +1,50 @@
--- all requires
 local I = require('openmw.interfaces')
 local types = require('openmw.types')
 local self = require('openmw.self')
 local core = require('openmw.core')
 local ai = require('openmw.interfaces').AI
 local time = require('openmw_aux.time')
-local util = require('openmw.util')
 local nearby = require('openmw.nearby')
---
+require("./shies_var")
+require("./common")
 
--- custom types and interfaces
-local interface RecallLoc
-	recallCellId: string
-	recallPos: util.Vector3
-end
-
-local interface SaveData
-	version: number
-	markedPos: RecallLoc
-end
---
-
--- variables
-local scriptVersion = 1 -- increment whenever onSave is changed
-local INIT_DATA: SaveData = {markedPos = {recallCellId = "Balmora, Council Club", recallPos = util.vector3(-5, -218, -251)}}
-local RECALL_LOC: RecallLoc
-local FLEE_THRESHOLD = 0.1
-local RECALL_TIMEOUT = 2 * time.second
 local health = types.Actor.stats.dynamic.health
 local selfObj = self as core.GameObject
---
 
--- functions
--- called when the script is created but not loaded
-local function onInit()
+local function onInit() -- called when the script is created but not loaded
 	RECALL_LOC = INIT_DATA.markedPos
 end
 
--- called when the game saves, even if currently in an inactive state
-local function onSave(): SaveData
+local function onSave(): SaveData -- called when the game saves, even if currently in an inactive state
 	return {
-		version = scriptVersion,
+		version = ScriptVersion,
 		markedPos = RECALL_LOC
 	}
 end
 
--- called only when the script loads, not the saved game. will not be called if the script was not previously saved
-local function onLoad(data: SaveData)
-	if (not data) or (not data.version) or (data.version < scriptVersion) then
+local function onLoad(data: SaveData) -- called only when the script loads, not the saved game. will not be called if the script was not previously saved
+	if (not data) or (not data.version) or (data.version < ScriptVersion) then
 		print('Was saved with an old version of the script, initializing to default')
 		RECALL_LOC = INIT_DATA.markedPos
 		return
-	elseif (data.version > scriptVersion) then
+	elseif (data.version > ScriptVersion) then
 		error('Required update to a new version of the script')
-	elseif (data.version == scriptVersion) then
+	elseif (data.version == ScriptVersion) then
 		RECALL_LOC = data.markedPos
 	else
 
 	end
 end
 
--- used to trigger the shies fled quest. should only be triggered once
-local function triggerShiesFledQuest()
+local function retrieveMWVar(varName: string): number
+	return core.sendGlobalEvent("fetchMWVar", {varName, selfObj})
+end
+
+local function updateMWVar(data: {string, number})
+	core.sendGlobalEvent("updateMWVar", {data, selfObj})
+end
+
+local function triggerShiesFledQuest() -- used to trigger the shies fled quest. should only be triggered once
 	local players = nearby.players
 	for i = 1, #players do
 		players[i]:sendEvent("shiesFled", nil)
@@ -81,8 +64,7 @@ local function heal()
 end
 
 local function flee()
-    -- Trigger the Recall vfx
-    local vfx = core.magic.effects.records["recall"]
+    local vfx = core.magic.effects.records["recall"] -- Trigger the Recall vfx
     selfObj:sendEvent('AddVfx', {
         model = types.Static.record(vfx.hitStatic).model,
         options = {
@@ -92,20 +74,18 @@ local function flee()
         }
     })
     
-    -- Teleport away after RECALL_TIMEOUT seconds
-    local cb = time.registerTimerCallback(
+    local cb = time.registerTimerCallback( -- Teleport away after RECALL_TIMEOUT seconds
         selfObj.id .. "_FleeCallback",
         function(actor: core.GameObject)
 			ai.removePackages("Combat")
 			ai.removePackages("Follow")
 			if RECALL_LOC == INIT_DATA.markedPos then
-				-- The player has not changed Shies' marked location. This likely means the Shies Fled quest has not been started yet; we can further check by checking the player's journal entries
-				triggerShiesFledQuest()
+				triggerShiesFledQuest() -- The player has not changed Shies' marked location. This likely means the Shies Fled quest has not been started yet; we can further check by checking the player's journal entries
 			end
             return core.sendGlobalEvent("teleport", {
 				actor = actor,
-				cell = RECALL_LOC.recallCellId,
-				position = RECALL_LOC.recallPos
+				cell = RECALL_LOC.cellId,
+				position = RECALL_LOC.cellPos
 			})
         end,
         nil
@@ -117,10 +97,10 @@ return {
     engineHandlers = {
         onUpdate = function()
             if getCurrentHealth() / getMaxHealth() < FLEE_THRESHOLD then
-				-- Teleport Shies away from combat to whatever position he has marked
-                flee()
-				-- Heal Shies to avoid the script triggering again, and also to ensure the player doesn't have to restore his health upon recovering him
-    			heal()
+				updateMWVar({"companion", 0})
+				updateMWVar({"c_move", 0})
+                flee() -- Teleport Shies away from combat to whatever position he has marked
+    			heal() -- Heal Shies to avoid the script triggering again, and also to ensure the player doesn't have to restore his health upon recovering him
             end
         end,
 		onInit = onInit,
@@ -128,13 +108,11 @@ return {
 		onLoad = onLoad,
     },
     eventHandlers = {
-        -- example of sending an event (with a message) back to the player that hit him
-        ["Hit"] = function(attack: I.Combat.AttackInfo)
+        ["Hit"] = function(attack: I.Combat.AttackInfo) -- example of sending an event (with a message) back to the player that hit him
             local attackerObj = attack.attacker as core.GameObject
             attackerObj:sendEvent("shiesAttacked", "Why did you do that :(\nincremdibly rude...")
         end,
-        -- for testing the "Recall away at low health" feature - this event is sent from the player script
-        ["hurtShies"] = function()
+        ["hurtShies"] = function() -- for testing the "Recall away at low health" feature - this event is sent from the player script
             health(selfObj).current = 1
         end,
     }

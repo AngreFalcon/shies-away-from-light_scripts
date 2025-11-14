@@ -1,74 +1,54 @@
-
 local I = require('openmw.interfaces')
 local types = require('openmw.types')
 local self = require('openmw.self')
 local core = require('openmw.core')
 local ai = require('openmw.interfaces').AI
 local time = require('openmw_aux.time')
-local util = require('openmw.util')
 local nearby = require('openmw.nearby')
+require("./shies_var")
+require("./common")
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-local scriptVersion = 1
-local INIT_DATA = { markedPos = { recallCellId = "Balmora, Council Club", recallPos = util.vector3(-5, -218, -251) } }
-local RECALL_LOC
-local FLEE_THRESHOLD = 0.1
-local RECALL_TIMEOUT = 2 * time.second
 local health = types.Actor.stats.dynamic.health
 local selfObj = self
-
-
-
 
 local function onInit()
    RECALL_LOC = INIT_DATA.markedPos
 end
 
-
 local function onSave()
    return {
-      version = scriptVersion,
+      version = ScriptVersion,
       markedPos = RECALL_LOC,
    }
 end
 
-
 local function onLoad(data)
-   if (not data) or (not data.version) or (data.version < scriptVersion) then
+   if (not data) or (not data.version) or (data.version < ScriptVersion) then
       print('Was saved with an old version of the script, initializing to default')
       RECALL_LOC = INIT_DATA.markedPos
       return
-   elseif (data.version > scriptVersion) then
+   elseif (data.version > ScriptVersion) then
       error('Required update to a new version of the script')
-   elseif (data.version == scriptVersion) then
+   elseif (data.version == ScriptVersion) then
       RECALL_LOC = data.markedPos
    else
 
    end
 end
 
+local function retrieveMWVar(varName)
+   return core.sendGlobalEvent("fetchMWVar", { varName, selfObj })
+end
 
+local function updateMWVar(data)
+   core.sendGlobalEvent("updateMWVar", { data, selfObj })
+end
 
 local function triggerShiesFledQuest()
    local players = nearby.players
    for i = 1, #players do
-      print("shies fled 0")
       players[i]:sendEvent("shiesFled", nil)
    end
-
 end
 
 local function getCurrentHealth()
@@ -84,7 +64,6 @@ local function heal()
 end
 
 local function flee()
-
    local vfx = core.magic.effects.records["recall"]
    selfObj:sendEvent('AddVfx', {
       model = types.Static.record(vfx.hitStatic).model,
@@ -95,20 +74,18 @@ local function flee()
       },
    })
 
-
    local cb = time.registerTimerCallback(
    selfObj.id .. "_FleeCallback",
    function(actor)
       ai.removePackages("Combat")
       ai.removePackages("Follow")
       if RECALL_LOC == INIT_DATA.markedPos then
-
          triggerShiesFledQuest()
       end
       return core.sendGlobalEvent("teleport", {
          actor = actor,
-         cell = RECALL_LOC.recallCellId,
-         position = RECALL_LOC.recallPos,
+         cell = RECALL_LOC.cellId,
+         position = RECALL_LOC.cellPos,
       })
    end,
    nil)
@@ -120,9 +97,9 @@ return {
    engineHandlers = {
       onUpdate = function()
          if getCurrentHealth() / getMaxHealth() < FLEE_THRESHOLD then
-
+            updateMWVar({ "companion", 0 })
+            updateMWVar({ "c_move", 0 })
             flee()
-
             heal()
          end
       end,
@@ -131,12 +108,10 @@ return {
       onLoad = onLoad,
    },
    eventHandlers = {
-
       ["Hit"] = function(attack)
          local attackerObj = attack.attacker
          attackerObj:sendEvent("shiesAttacked", "Why did you do that :(\nincremdibly rude...")
       end,
-
       ["hurtShies"] = function()
          health(selfObj).current = 1
       end,

@@ -34,10 +34,8 @@ return {
          UI.showInteractiveMessage(message, nil)
       end,
       ["shiesFled"] = function()
-         print("shies fled 1")
          local quest = getQuest("SAFL_ShiesFled")
          if not quest.started then
-            print("shies fled 2")
             quest:addJournalEntry(10, selfObj)
          end
       end,
