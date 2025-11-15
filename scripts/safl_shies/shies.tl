@@ -6,9 +6,22 @@ local ai = require('openmw.interfaces').AI
 local time = require('openmw_aux.time')
 local nearby = require('openmw.nearby')
 local util = require('openmw.util')
-require("scripts.safl_shies.shies_var")
-require("scripts.safl_shies.common")
 
+local interface CellLoc
+	cellId: string
+	cellPos: util.Vector3
+end
+
+local interface SaveData
+	version: number
+	markedPos: CellLoc
+end
+
+local ScriptVersion = 1 -- increment whenever onSave is changed
+local INIT_DATA: SaveData = {markedPos = {cellId = "Balmora, Council Club", cellPos = util.vector3(-5, -218, -251)}}
+local RECALL_LOC: CellLoc
+local FLEE_THRESHOLD = 0.1
+local RECALL_TIMEOUT = 2 * time.second
 local health = types.Actor.stats.dynamic.health
 local selfObj = self as core.GameObject
 
@@ -74,14 +87,11 @@ local function getPlayerCellPos(): CellLoc
 end
 
 local function getCoDist(vector1:util.Vector3, vector2: util.Vector3): number
-	local tempVar1: number
-	local tempVar2: number
-	tempVar1 = vector1.x - vector2.x
+	local tempVar1 = vector1.x - vector2.x
+	local tempVar2 = vector1.y - vector2.y
 	tempVar1 = tempVar1 * tempVar1
-	tempVar2 = vector1.y - vector2.y
 	tempVar2 = tempVar2 * tempVar2
-	tempVar1 = tempVar1 + tempVar2
-	return math.sqrt(tempVar1)
+	return math.sqrt(tempVar1 + tempVar2)
 end
 
 local posA: CellLoc
@@ -102,7 +112,7 @@ local function warpToPlayer() -- If the player gets too far from shies, teleport
 			doOnce = true
 		end
 
-		coDist = getCoDist(posA, posB)
+		coDist = getCoDist(posA.cellPos, posB.cellPos)
 		if coDist > 360 then
 			doOnce = false
 		end
@@ -114,7 +124,7 @@ local function warpToPlayer() -- If the player gets too far from shies, teleport
 			end
 		end
 
-		coDist2 = getCoDist(posA, posC)
+		coDist2 = getCoDist(posA.cellPos, posC.cellPos)
 		if coDist2 > 360 then
 			doOnce2 = false
 		end

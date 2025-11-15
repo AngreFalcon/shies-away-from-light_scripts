@@ -1,6 +1,6 @@
-local core = require("openmw.core")
-local util = require("openmw.util")
-local world = require("openmw.world")
+local core = require('openmw.core')
+local util = require('openmw.util')
+local world = require('openmw.world')
 
 local shies = "safl_shies"
 

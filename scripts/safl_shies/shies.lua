@@ -5,9 +5,23 @@ local core = require('openmw.core')
 local ai = require('openmw.interfaces').AI
 local time = require('openmw_aux.time')
 local nearby = require('openmw.nearby')
-require("scripts.safl_shies.shies_var")
-require("scripts.safl_shies.common")
+local util = require('openmw.util')
 
+
+
+
+
+
+
+
+
+
+
+local ScriptVersion = 1
+local INIT_DATA = { markedPos = { cellId = "Balmora, Council Club", cellPos = util.vector3(-5, -218, -251) } }
+local RECALL_LOC
+local FLEE_THRESHOLD = 0.1
+local RECALL_TIMEOUT = 2 * time.second
 local health = types.Actor.stats.dynamic.health
 local selfObj = self
 
@@ -63,24 +77,21 @@ local function heal()
    health(selfObj).current = getMaxHealth()
 end
 
-local function getPlayerPos()
+local function getPlayerCellPos()
    local players = nearby.players
    for i = 1, #players do
       if (players[i]) then
-         return players[i].position
+         return { cellId = players[i].cell.name, cellPos = players[i].position }
       end
    end
 end
 
 local function getCoDist(vector1, vector2)
-   local tempVar1
-   local tempVar2
-   tempVar1 = vector1.x - vector2.x
+   local tempVar1 = vector1.x - vector2.x
+   local tempVar2 = vector1.y - vector2.y
    tempVar1 = tempVar1 * tempVar1
-   tempVar2 = vector1.y - vector2.y
    tempVar2 = tempVar2 * tempVar2
-   tempVar1 = tempVar1 + tempVar2
-   return math.sqrt(tempVar1)
+   return math.sqrt(tempVar1 + tempVar2)
 end
 
 local posA
@@ -94,42 +105,47 @@ local coDist2
 local function warpToPlayer()
    if ai.getActivePackage().type == "Follow" then
       local warpVar = retrieveMWVar("warp")
-
-      posA = getPlayerPos()
+      posA = getPlayerCellPos()
 
       if doOnce == false then
-         posB = getPlayerPos()
+         posB = getPlayerCellPos()
          doOnce = true
       end
 
-      coDist = getCoDist(posA, posB)
+      coDist = getCoDist(posA.cellPos, posB.cellPos)
       if coDist > 360 then
          doOnce = false
       end
 
       if coDist > 180 then
          if doOnce2 == false then
-            posC = getPlayerPos()
+            posC = getPlayerCellPos()
             doOnce2 = true
          end
       end
 
-      coDist2 = getCoDist(posA, posC)
+      coDist2 = getCoDist(posA.cellPos, posC.cellPos)
       if coDist2 > 360 then
          doOnce2 = false
       end
 
       if warpVar == 0 then
-
-
-
-
-
-
-
+         if getCoDist(self.object.position, getPlayerCellPos().cellPos) > 680 then
+            if coDist > 350 then
+               core.sendGlobalEvent("teleport", {
+                  actor = selfObj,
+                  cell = posC.cellId,
+                  position = posC.cellPos,
+               })
+            elseif coDist2 > 350 then
+               core.sendGlobalEvent("teleport", {
+                  actor = selfObj,
+                  cell = posB.cellId,
+                  position = posB.cellPos,
+               })
+            end
+         end
       end
-
-      print("we got em")
    end
 end
 
