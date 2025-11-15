@@ -5,26 +5,19 @@ local world = require('openmw.world')
 local shies = "safl_shies"
 
 local interface TeleportData
-   actor: core.GameObject
-   cell: string
-   position: util.Vector3
+   	actor: core.GameObject
+   	cell: string
+   	position: util.Vector3
 end
 
+local shiesObj: core.GameObject
+
 local function teleport(data: TeleportData)
-   data.actor:teleport(data.cell, data.position, {onGround=true, rotation = util.transform.identity})
+   	data.actor:teleport(data.cell, data.position, {onGround=true, rotation = util.transform.identity})
 end
 
 local function disable(actor: core.GameObject)
-   actor.enabled = false
-end
-
-local function fetchMWVar(data: {string, core.GameObject}): number | nil
-	local localScript = world.mwscript.getLocalScript(data[2], nil)
-	if localScript ~= nil then
-		return (localScript as world.MWScript).variables[data[1]]
-	else
-		return nil
-	end
+   	actor.enabled = false
 end
 
 local function updateMWVar(data: {string, number, core.GameObject})
@@ -34,18 +27,42 @@ local function updateMWVar(data: {string, number, core.GameObject})
 	end
 end
 
+local function syncMWVars(actor: core.GameObject)
+	if actor ~= nil then
+		local localScript: world.MWScript = world.mwscript.getLocalScript(actor, nil)
+		if localScript ~= nil then
+			local varTable: {string: number} = {}
+			for k, v in pairs((localScript.variables as {string: number})) do
+				varTable[k] = v
+			end
+			actor:sendEvent("fetchMWVars", varTable)
+		end
+	end
+end
+
 return {
-   engineHandlers = {
-      onActorActive = function(actor: core.GameObject)
-         if actor.recordId == shies then
-            actor:addScript('scripts/safl_shies/shies.lua', nil)
-         end
-      end
-   },
-   eventHandlers = {
-      ["teleport"] = teleport,
-      ["disable"] = disable,
-	  ["fetchMWVar"] = fetchMWVar,
-	  ["updateMWVar"] = updateMWVar,
-   }
+   	engineHandlers = {
+      	onActorActive = function(actor: core.GameObject)
+         	if actor.recordId == shies then
+				shiesObj = actor
+				syncMWVars(shiesObj)
+            	actor:addScript('scripts/safl_shies/shies.lua', nil)
+         	end
+      	end,
+	  	onActivate = function(object: core.GameObject, actor: core.GameObject)
+			if object.recordId == shies then
+				object:sendEvent("shiesActivated", actor)
+			end
+		end,
+		onUpdate = function()
+			if shiesObj ~= nil and shiesObj.recordId == shies then
+				syncMWVars(shiesObj)
+			end
+		end,
+   	},
+   	eventHandlers = {
+      	["teleport"] = teleport,
+      	["disable"] = disable,
+	  	["updateMWVar"] = updateMWVar,
+   	}
 }

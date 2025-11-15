@@ -4,7 +4,6 @@ local self = require('openmw.self')
 local core = require('openmw.core')
 local ai = require('openmw.interfaces').AI
 local time = require('openmw_aux.time')
-local nearby = require('openmw.nearby')
 local util = require('openmw.util')
 
 
@@ -17,51 +16,69 @@ local util = require('openmw.util')
 
 
 
+
+
 local ScriptVersion = 1
-local INIT_DATA = { markedPos = { cellId = "Balmora, Council Club", cellPos = util.vector3(-5, -218, -251) } }
-local RECALL_LOC
-local FLEE_THRESHOLD = 0.1
-local RECALL_TIMEOUT = 2 * time.second
 local health = types.Actor.stats.dynamic.health
 local selfObj = self
 
+
+
+local FLEE_THRESHOLD = 0.1
+local RECALL_TIMEOUT = 2 * time.second
+local INIT_DATA = { recallLoc = { cellId = "Balmora, Council Club", cellPos = util.vector3(-5, -218, -251) } }
+
+
+
+local RECALL_LOC
+local PlayerLeader = nil
+
+
+
+local posA
+local posB
+local posC
+local doOnce = false
+local doOnce2 = false
+
+
+local MWVars
+
+
 local function onInit()
-   RECALL_LOC = INIT_DATA.markedPos
+   RECALL_LOC = INIT_DATA.recallLoc
 end
 
 local function onSave()
    return {
       version = ScriptVersion,
-      markedPos = RECALL_LOC,
+      recallLoc = RECALL_LOC,
+      playerLeader = PlayerLeader,
    }
 end
 
 local function onLoad(data)
    if (not data) or (not data.version) or (data.version < ScriptVersion) then
       print('Was saved with an old version of the script, initializing to default')
-      RECALL_LOC = INIT_DATA.markedPos
+      RECALL_LOC = INIT_DATA.recallLoc
       return
    elseif (data.version > ScriptVersion) then
       error('Required update to a new version of the script')
    elseif (data.version == ScriptVersion) then
-      RECALL_LOC = data.markedPos
+      RECALL_LOC = data.recallLoc
+      PlayerLeader = data.playerLeader
    else
 
    end
 end
 
-local function retrieveMWVar(varName)
-   return core.sendGlobalEvent("fetchMWVar", { varName, selfObj })
-end
-
-local function updateMWVar(data)
-   core.sendGlobalEvent("updateMWVar", { data, selfObj })
+local function updateMWVar(varName, varData)
+   core.sendGlobalEvent("updateMWVar", { varName, varData, selfObj })
 end
 
 local function triggerShiesFledQuest()
-   local players = nearby.players
-   for i = 1, #players do
-      players[i]:sendEvent("shiesFled", nil)
+   if PlayerLeader ~= nil then
+      (PlayerLeader):sendEvent("shiesFled", nil)
    end
 end
 
@@ -78,95 +95,69 @@ local function heal()
 end
 
 local function getPlayerCellPos()
-   local players = nearby.players
-   for i = 1, #players do
-      if (players[i]) then
-         return { cellId = players[i].cell.name, cellPos = players[i].position }
-      end
+   if PlayerLeader == nil then
+      return nil
+   elseif (PlayerLeader) then
+      return { cellId = (PlayerLeader).cell.name, cellPos = (PlayerLeader).position }
    end
 end
 
 local function getCoDist(vector1, vector2)
    local tempVar1 = vector1.x - vector2.x
    local tempVar2 = vector1.y - vector2.y
-   tempVar1 = tempVar1 * tempVar1
-   tempVar2 = tempVar2 * tempVar2
-   return math.sqrt(tempVar1 + tempVar2)
+   return math.sqrt((tempVar1 * tempVar1) + (tempVar2 * tempVar2))
 end
 
-local posA
-local posB
-local posC
-local doOnce = false
-local doOnce2 = false
-local coDist
-local coDist2
-
 local function warpToPlayer()
-   if ai.getActivePackage().type == "Follow" then
-      local warpVar = retrieveMWVar("warp")
-      posA = getPlayerCellPos()
+   posA = getPlayerCellPos()
+   if posA == nil then
+      return
+   end
 
-      if doOnce == false then
-         posB = getPlayerCellPos()
-         doOnce = true
-      end
+   if doOnce == false then
+      posB = getPlayerCellPos()
+      doOnce = true
+   end
 
-      coDist = getCoDist(posA.cellPos, posB.cellPos)
-      if coDist > 360 then
-         doOnce = false
-      end
+   local coDist = getCoDist((posA).cellPos, posB.cellPos)
+   if coDist > 360 then
+      doOnce = false
+   end
 
-      if coDist > 180 then
-         if doOnce2 == false then
-            posC = getPlayerCellPos()
-            doOnce2 = true
-         end
-      end
+   if (coDist > 180 and doOnce2 == false) or posC == nil then
+      posC = getPlayerCellPos()
+      doOnce2 = true
+   end
 
-      coDist2 = getCoDist(posA.cellPos, posC.cellPos)
-      if coDist2 > 360 then
-         doOnce2 = false
-      end
+   local coDist2 = getCoDist((posA).cellPos, (posC).cellPos)
+   if coDist2 > 360 then
+      doOnce2 = false
+   end
 
-      if warpVar == 0 then
-         if getCoDist(self.object.position, getPlayerCellPos().cellPos) > 680 then
-            if coDist > 350 then
-               core.sendGlobalEvent("teleport", {
-                  actor = selfObj,
-                  cell = posC.cellId,
-                  position = posC.cellPos,
-               })
-            elseif coDist2 > 350 then
-               core.sendGlobalEvent("teleport", {
-                  actor = selfObj,
-                  cell = posB.cellId,
-                  position = posB.cellPos,
-               })
-            end
-         end
+   if MWVars["warp"] == 0 and getCoDist(self.object.position, (getPlayerCellPos()).cellPos) > 680 then
+      if coDist > 350 then
+         core.sendGlobalEvent("teleport", {
+            actor = selfObj,
+            cell = (posC).cellId,
+            position = (posC).cellPos,
+         })
+         ai.startPackage({
+            type = "Follow",
+            target = PlayerLeader,
+         })
+      elseif coDist2 > 350 then
+         core.sendGlobalEvent("teleport", {
+            actor = selfObj,
+            cell = posB.cellId,
+            position = posB.cellPos,
+         })
+         ai.startPackage({
+            type = "Follow",
+            target = PlayerLeader,
+         })
       end
    end
 end
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 local function flee()
    local vfx = core.magic.effects.records["recall"]
@@ -184,7 +175,7 @@ local function flee()
    function(actor)
       ai.removePackages("Combat")
       ai.removePackages("Follow")
-      if RECALL_LOC == INIT_DATA.markedPos then
+      if RECALL_LOC == INIT_DATA.recallLoc then
          triggerShiesFledQuest()
       end
       return core.sendGlobalEvent("teleport", {
@@ -201,12 +192,15 @@ end
 return {
    engineHandlers = {
       onUpdate = function()
-         warpToPlayer()
+         local currentPackage = ai.getActivePackage()
          if getCurrentHealth() / getMaxHealth() < FLEE_THRESHOLD then
-            updateMWVar({ "companion", 0 })
-            updateMWVar({ "c_move", 0 })
+            updateMWVar("companion", 0)
+            updateMWVar("c_move", 0)
             flee()
             heal()
+         end
+         if currentPackage ~= nil and currentPackage.type == "Follow" then
+            warpToPlayer()
          end
       end,
       onInit = onInit,
@@ -214,12 +208,19 @@ return {
       onLoad = onLoad,
    },
    eventHandlers = {
+      ["fetchMWVars"] = function(data)
+         MWVars = data
+      end,
       ["Hit"] = function(attack)
          local attackerObj = attack.attacker
          attackerObj:sendEvent("shiesAttacked", "Why did you do that :(\nincremdibly rude...")
       end,
       ["hurtShies"] = function()
          health(selfObj).current = 1
+      end,
+      ["shiesActivated"] = function(player)
+         print("shies activated")
+         PlayerLeader = player
       end,
    },
 }
