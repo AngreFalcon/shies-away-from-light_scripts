@@ -64,11 +64,11 @@ local function heal()
     health(selfObj).current = getMaxHealth()
 end
 
-local function getPlayerPos(): util.Vector3
+local function getPlayerCellPos(): CellLoc
 	local players = nearby.players
 	for i = 1, #players do
 		if (players[i]) then
-			return players[i].position
+			return {cellId = players[i].cell.name, cellPos = players[i].position}
 		end
 	end
 end
@@ -84,9 +84,9 @@ local function getCoDist(vector1:util.Vector3, vector2: util.Vector3): number
 	return math.sqrt(tempVar1)
 end
 
-local posA: util.Vector3
-local posB: util.Vector3
-local posC: util.Vector3
+local posA: CellLoc
+local posB: CellLoc
+local posC: CellLoc
 local doOnce = false
 local doOnce2 = false
 local coDist: number
@@ -95,11 +95,10 @@ local coDist2: number
 local function warpToPlayer() -- If the player gets too far from shies, teleport shies closer to the player
 	if ai.getActivePackage().type == "Follow" then
 		local warpVar = retrieveMWVar("warp")
-		-- the state of the below variables should persist between function calls for the function to behave as intended
-		posA = getPlayerPos()
+		posA = getPlayerCellPos()
 
 		if doOnce == false then
-			posB = getPlayerPos()
+			posB = getPlayerCellPos()
 			doOnce = true
 		end
 
@@ -110,7 +109,7 @@ local function warpToPlayer() -- If the player gets too far from shies, teleport
 
 		if coDist > 180 then
 			if doOnce2 == false then
-				posC = getPlayerPos()
+				posC = getPlayerCellPos()
 				doOnce2 = true
 			end
 		end
@@ -121,16 +120,22 @@ local function warpToPlayer() -- If the player gets too far from shies, teleport
 		end
 
 		if warpVar == 0 then
-			--[[if (dist > 680) then
+			if getCoDist(self.object.position, getPlayerCellPos().cellPos) > 680 then
 				if coDist > 350 then
-
+					core.sendGlobalEvent("teleport", {
+						actor = selfObj,
+						cell = posC.cellId,
+						position = posC.cellPos
+					})
 				elseif coDist2 > 350 then
-
+					core.sendGlobalEvent("teleport", {
+						actor = selfObj,
+						cell = posB.cellId,
+						position = posB.cellPos
+					})
 				end
-			end]]
+			end
 		end
-
-		print("we got em")
 	end
 end
 --[[
