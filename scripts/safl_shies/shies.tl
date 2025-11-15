@@ -45,11 +45,18 @@ local doOnce2: boolean = false
 local MWVars: {string: number}
 --
 
+local function updateMWVar(varName: string, varData: number)
+	core.sendGlobalEvent("updateMWVar", {varName, varData, selfObj})
+end
+
 local function onInit() -- called when the script is created but not loaded
 	RECALL_LOC = INIT_DATA.recallLoc
 end
 
 local function onSave(): SaveData -- called when the game saves, even if currently in an inactive state
+	for k, v in pairs(MWVars) do
+		updateMWVar(k, v)
+	end
 	return {
 		version = ScriptVersion,
 		recallLoc = RECALL_LOC,
@@ -70,10 +77,6 @@ local function onLoad(data: SaveData) -- called only when the script loads, not 
 	else
 
 	end
-end
-
-local function updateMWVar(varName: string, varData: number)
-	core.sendGlobalEvent("updateMWVar", {varName, varData, selfObj})
 end
 
 local function triggerShiesFledQuest() -- used to trigger the shies fled quest. should only be triggered once
@@ -107,6 +110,29 @@ local function getCoDist(vector1: util.Vector3, vector2: util.Vector3): number
 	local tempVar2 = vector1.y - vector2.y
 	return math.sqrt((tempVar1 * tempVar1) + (tempVar2 * tempVar2))
 end
+
+--[[
+; if the NPC is following and they've been told to keep their distance
+; they will wander away from the player if they get to within 70 units of the player
+if ( GetCurrentAIPackage == 3 )
+  if ( compMove == 1 )
+    if ( c_move == 0 )
+      if ( GetDistance Player < 70 )
+        AiWander, 300, 0, 0, 0, 0
+        Set c_move to 1
+      endif
+    endif
+  endif
+endif
+
+; if the previous block executes and c_move is toggled true, the NPC will stop wandering
+; and will begin following the player again if they are over 100 units away
+if ( c_move == 1 )
+  if ( GetDistance Player > 100 )
+    AiFollow, Player, 0, 0, 0, 0
+    Set c_move to 0
+  endif
+endif]]
 
 local function warpToPlayer() -- If the player gets too far from shies, teleport shies closer to the player
 	posA = getPlayerCellPos()

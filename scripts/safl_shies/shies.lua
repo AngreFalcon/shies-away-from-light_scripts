@@ -1,4 +1,4 @@
-local _tl_compat; if (tonumber((_VERSION or ''):match('[%d.]*$')) or 0) < 5.3 then local p, m = pcall(require, 'compat53.module'); if p then _tl_compat = m end end; local math = _tl_compat and _tl_compat.math or math; local I = require('openmw.interfaces')
+local _tl_compat; if (tonumber((_VERSION or ''):match('[%d.]*$')) or 0) < 5.3 then local p, m = pcall(require, 'compat53.module'); if p then _tl_compat = m end end; local math = _tl_compat and _tl_compat.math or math; local pairs = _tl_compat and _tl_compat.pairs or pairs; local I = require('openmw.interfaces')
 local types = require('openmw.types')
 local self = require('openmw.self')
 local core = require('openmw.core')
@@ -45,11 +45,18 @@ local doOnce2 = false
 local MWVars
 
 
+local function updateMWVar(varName, varData)
+   core.sendGlobalEvent("updateMWVar", { varName, varData, selfObj })
+end
+
 local function onInit()
    RECALL_LOC = INIT_DATA.recallLoc
 end
 
 local function onSave()
+   for k, v in pairs(MWVars) do
+      updateMWVar(k, v)
+   end
    return {
       version = ScriptVersion,
       recallLoc = RECALL_LOC,
@@ -70,10 +77,6 @@ local function onLoad(data)
    else
 
    end
-end
-
-local function updateMWVar(varName, varData)
-   core.sendGlobalEvent("updateMWVar", { varName, varData, selfObj })
 end
 
 local function triggerShiesFledQuest()
@@ -107,6 +110,29 @@ local function getCoDist(vector1, vector2)
    local tempVar2 = vector1.y - vector2.y
    return math.sqrt((tempVar1 * tempVar1) + (tempVar2 * tempVar2))
 end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 local function warpToPlayer()
    posA = getPlayerCellPos()
