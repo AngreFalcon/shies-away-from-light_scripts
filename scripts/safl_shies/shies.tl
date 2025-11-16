@@ -127,6 +127,33 @@ local function getCoDist(vector1: util.Vector3, vector2: util.Vector3): number -
 	return math.sqrt((tempVar1 * tempVar1) + (tempVar2 * tempVar2))
 end
 
+local function combatCheck()
+	if types.Actor.getStance(selfObj) == types.Actor.STANCE.Weapon then
+		if MWVars["flycheck"] == 0 then
+			updateMWVar("combatcheck", 1)
+		else
+			updateMWVar("combatdone", 1)
+		end
+		updateMWVar("timer", 0)
+		updateMWVar("warp", 1)
+	end
+end
+
+local function forceZLevel()
+	local playerPos: CellLoc = (getPlayerCellPos() as CellLoc)
+	local shiesPos = selfObj.position
+	if playerPos == nil then
+		return
+	end
+	if MWVars["flycheck"] and types.Actor.getStance(selfObj) == types.Actor.STANCE.Weapon then
+		core.sendGlobalEvent("teleport", {
+			actor = selfObj,
+			cell = selfObj.cell.name,
+			position = util.vector3(shiesPos.x, shiesPos.y, playerPos.cellPos.z)
+		})
+	end
+end
+
 local function maintainDistance() -- Toggles shies between wandering and following the player in order to maintain a small window of distance from the player. works only if the player activates it from dialogue by updating the "compmove" variable
 	local shiesPos = selfObj.position
 	local playerPos: CellLoc = (getPlayerCellPos() as CellLoc)
@@ -242,6 +269,8 @@ return {
     			heal() -- Heal Shies to avoid the script triggering again, and also to ensure the player doesn't have to restore his health upon recovering him
             end
 			if isShiesFollowing() then
+				combatCheck()
+				forceZLevel()
 				warpToPlayer()
 			end
 			maintainDistance()

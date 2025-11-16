@@ -127,6 +127,21 @@ local function getCoDist(vector1, vector2)
    return math.sqrt((tempVar1 * tempVar1) + (tempVar2 * tempVar2))
 end
 
+local function forceZLevel()
+   local playerPos = (getPlayerCellPos())
+   local shiesPos = selfObj.position
+   if playerPos == nil then
+      return
+   end
+   if MWVars["flycheck"] and types.Actor.getStance(selfObj) == types.Actor.STANCE.Weapon then
+      core.sendGlobalEvent("teleport", {
+         actor = selfObj,
+         cell = selfObj.cell.name,
+         position = util.vector3(shiesPos.x, shiesPos.y, playerPos.cellPos.z),
+      })
+   end
+end
+
 local function maintainDistance()
    local shiesPos = selfObj.position
    local playerPos = (getPlayerCellPos())
@@ -242,6 +257,7 @@ return {
             heal()
          end
          if isShiesFollowing() then
+            forceZLevel()
             warpToPlayer()
          end
          maintainDistance()
