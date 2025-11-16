@@ -49,9 +49,9 @@ return {
             	actor:addScript('scripts/safl_shies/shies.lua', nil)
          	end
       	end,
-	  	onActivate = function(object: core.GameObject, actor: core.GameObject)
+	  	onActivate = function(object: core.GameObject)
 			if object.recordId == shies then
-				object:sendEvent("shiesActivated", actor)
+				object:sendEvent("shiesActivated", nil)
 			end
 		end,
 		onUpdate = function()

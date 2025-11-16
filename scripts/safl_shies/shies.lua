@@ -42,7 +42,8 @@ local doOnce = false
 local doOnce2 = false
 
 
-local MWVars
+
+local MWVars = {}
 
 
 local function updateMWVar(varName, varData)
@@ -97,6 +98,21 @@ local function heal()
    health(selfObj).current = getMaxHealth()
 end
 
+local function isShiesFollowing()
+   local currentPackage = ai.getActivePackage()
+   if currentPackage ~= nil and currentPackage.type == "Follow" then
+      return true
+   else
+      return false
+   end
+end
+
+local function getPlayerLeader()
+   if isShiesFollowing() then
+      PlayerLeader = ai.getActiveTarget("Follow")
+   end
+end
+
 local function getPlayerCellPos()
    if PlayerLeader == nil then
       return nil
@@ -111,28 +127,28 @@ local function getCoDist(vector1, vector2)
    return math.sqrt((tempVar1 * tempVar1) + (tempVar2 * tempVar2))
 end
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+local function maintainDistance()
+   local shiesPos = selfObj.position
+   local playerPos = (getPlayerCellPos())
+   local c_move = false
+   if playerPos == nil then
+      return
+   end
+   if isShiesFollowing() and MWVars["compmove"] == 1 and c_move == false and getCoDist(shiesPos, playerPos.cellPos) < 70 then
+      ai.startPackage({
+         type = "Wander",
+         distance = 300,
+      })
+      c_move = true
+   end
+   if c_move == true and getCoDist(shiesPos, playerPos.cellPos) > 100 then
+      ai.startPackage({
+         type = "Follow",
+         target = PlayerLeader,
+      })
+      c_move = false
+   end
+end
 
 local function warpToPlayer()
    posA = getPlayerCellPos()
@@ -160,7 +176,7 @@ local function warpToPlayer()
       doOnce2 = false
    end
 
-   if MWVars["warp"] == 0 and getCoDist(self.object.position, (getPlayerCellPos()).cellPos) > 680 then
+   if MWVars["warp"] == 0 and getCoDist(selfObj.position, (getPlayerCellPos()).cellPos) > 680 then
       if coDist > 350 then
          core.sendGlobalEvent("teleport", {
             actor = selfObj,
@@ -218,16 +234,17 @@ end
 return {
    engineHandlers = {
       onUpdate = function()
-         local currentPackage = ai.getActivePackage()
+         getPlayerLeader()
          if getCurrentHealth() / getMaxHealth() < FLEE_THRESHOLD then
             updateMWVar("companion", 0)
             updateMWVar("c_move", 0)
             flee()
             heal()
          end
-         if currentPackage ~= nil and currentPackage.type == "Follow" then
+         if isShiesFollowing() then
             warpToPlayer()
          end
+         maintainDistance()
       end,
       onInit = onInit,
       onSave = onSave,
@@ -244,9 +261,12 @@ return {
       ["hurtShies"] = function()
          health(selfObj).current = 1
       end,
-      ["shiesActivated"] = function(player)
-         print("shies activated")
-         PlayerLeader = player
+      ["shiesActivated"] = function()
+         for k, v in pairs(MWVars) do
+            print(k)
+            print(v)
+            print("--")
+         end
       end,
    },
 }

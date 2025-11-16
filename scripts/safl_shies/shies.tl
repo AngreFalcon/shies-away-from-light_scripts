@@ -42,18 +42,19 @@ local doOnce: boolean = false
 local doOnce2: boolean = false
 
 -- mwscript variables - persistent
-local MWVars: {string: number}
+-- important to note: all MWScript variables are automatically cast to all lowercase
+local MWVars: {string: number} = {}
 --
 
-local function updateMWVar(varName: string, varData: number)
+local function updateMWVar(varName: string, varData: number) -- Send an event to the global script to update a single mwscript variable with the provided value
 	core.sendGlobalEvent("updateMWVar", {varName, varData, selfObj})
 end
 
-local function onInit() -- called when the script is created but not loaded
+local function onInit() -- Called when the script is created but not loaded
 	RECALL_LOC = INIT_DATA.recallLoc
 end
 
-local function onSave(): SaveData -- called when the game saves, even if currently in an inactive state
+local function onSave(): SaveData -- Called when the game saves, even if currently in an inactive state
 	for k, v in pairs(MWVars) do
 		updateMWVar(k, v)
 	end
@@ -64,7 +65,7 @@ local function onSave(): SaveData -- called when the game saves, even if current
 	}
 end
 
-local function onLoad(data: SaveData) -- called only when the script loads, not the saved game. will not be called if the script was not previously saved
+local function onLoad(data: SaveData) -- Called only when the script loads, not the saved game. will not be called if the script was not previously saved
 	if (not data) or (not data.version) or (data.version < ScriptVersion) then
 		print('Was saved with an old version of the script, initializing to default')
 		RECALL_LOC = INIT_DATA.recallLoc
@@ -79,7 +80,7 @@ local function onLoad(data: SaveData) -- called only when the script loads, not 
 	end
 end
 
-local function triggerShiesFledQuest() -- used to trigger the shies fled quest. should only be triggered once
+local function triggerShiesFledQuest() -- Used to trigger the shies fled quest. should only be triggered once
 	if PlayerLeader ~= nil then
 		(PlayerLeader as core.GameObject):sendEvent("shiesFled", nil)
 	end
@@ -97,7 +98,22 @@ local function heal()
     health(selfObj).current = getMaxHealth()
 end
 
-local function getPlayerCellPos(): CellLoc | nil
+local function isShiesFollowing(): boolean -- Simply return true or false if shies is currently following any player
+	local currentPackage = ai.getActivePackage()
+	if currentPackage ~= nil and currentPackage.type == "Follow" then
+		return true
+	else
+		return false
+	end
+end
+
+local function getPlayerLeader() -- Gets the player object that shies is currently following
+	if isShiesFollowing() then
+		PlayerLeader = ai.getActiveTarget("Follow")
+	end
+end
+
+local function getPlayerCellPos(): CellLoc | nil -- Get the cell location of the player that shies is currently following
 	if PlayerLeader == nil then
 		return nil
 	elseif (PlayerLeader as core.GameObject) then
@@ -105,34 +121,34 @@ local function getPlayerCellPos(): CellLoc | nil
 	end
 end
 
-local function getCoDist(vector1: util.Vector3, vector2: util.Vector3): number
+local function getCoDist(vector1: util.Vector3, vector2: util.Vector3): number -- Get cosine distance between two vectors
 	local tempVar1 = vector1.x - vector2.x
 	local tempVar2 = vector1.y - vector2.y
 	return math.sqrt((tempVar1 * tempVar1) + (tempVar2 * tempVar2))
 end
 
---[[
-; if the NPC is following and they've been told to keep their distance
-; they will wander away from the player if they get to within 70 units of the player
-if ( GetCurrentAIPackage == 3 )
-  if ( compMove == 1 )
-    if ( c_move == 0 )
-      if ( GetDistance Player < 70 )
-        AiWander, 300, 0, 0, 0, 0
-        Set c_move to 1
-      endif
-    endif
-  endif
-endif
-
-; if the previous block executes and c_move is toggled true, the NPC will stop wandering
-; and will begin following the player again if they are over 100 units away
-if ( c_move == 1 )
-  if ( GetDistance Player > 100 )
-    AiFollow, Player, 0, 0, 0, 0
-    Set c_move to 0
-  endif
-endif]]
+local function maintainDistance() -- Toggles shies between wandering and following the player in order to maintain a small window of distance from the player. works only if the player activates it from dialogue by updating the "compmove" variable
+	local shiesPos = selfObj.position
+	local playerPos: CellLoc = (getPlayerCellPos() as CellLoc)
+	local c_move: boolean = false
+	if playerPos == nil then
+		return
+	end
+	if isShiesFollowing() and MWVars["compmove"] == 1 and c_move == false and getCoDist(shiesPos, playerPos.cellPos) < 70 then
+		ai.startPackage({
+			type = "Wander",
+			distance = 300
+		})
+		c_move = true
+	end
+	if c_move == true and getCoDist(shiesPos, playerPos.cellPos) > 100 then
+		ai.startPackage({
+			type = "Follow",
+			target = PlayerLeader
+		})
+		c_move = false
+	end
+end
 
 local function warpToPlayer() -- If the player gets too far from shies, teleport shies closer to the player
 	posA = getPlayerCellPos()
@@ -160,7 +176,7 @@ local function warpToPlayer() -- If the player gets too far from shies, teleport
 		doOnce2 = false
 	end
 
-	if MWVars["warp"] == 0 and getCoDist(self.object.position, (getPlayerCellPos() as CellLoc).cellPos) > 680 then
+	if MWVars["warp"] == 0 and getCoDist(selfObj.position, (getPlayerCellPos() as CellLoc).cellPos) > 680 then
 		if coDist > 350 then
 			core.sendGlobalEvent("teleport", {
 				actor = selfObj,
@@ -185,7 +201,7 @@ local function warpToPlayer() -- If the player gets too far from shies, teleport
 	end
 end
 
-local function flee()
+local function flee() -- Triggers if shies' health drops below a certain threshold. Plays the magic cast VFX and then teleports shies to a preset location while canceling shies' follow AI package
     local vfx = core.magic.effects.records["recall"] -- Trigger the Recall vfx
     selfObj:sendEvent('AddVfx', {
         model = types.Static.record(vfx.hitStatic).model,
@@ -218,16 +234,17 @@ end
 return {
     engineHandlers = {
         onUpdate = function()
-			local currentPackage = ai.getActivePackage()
+			getPlayerLeader()
             if getCurrentHealth() / getMaxHealth() < FLEE_THRESHOLD then
 				updateMWVar("companion", 0)
 				updateMWVar("c_move", 0)
                 flee() -- Teleport Shies away from combat to whatever position he has marked
     			heal() -- Heal Shies to avoid the script triggering again, and also to ensure the player doesn't have to restore his health upon recovering him
             end
-			if currentPackage ~= nil and currentPackage.type == "Follow" then
+			if isShiesFollowing() then
 				warpToPlayer()
 			end
+			maintainDistance()
         end,
 		onInit = onInit,
 		onSave = onSave,
@@ -244,9 +261,12 @@ return {
         ["hurtShies"] = function() -- for testing the "Recall away at low health" feature - this event is sent from the player script
             health(selfObj).current = 1
         end,
-		["shiesActivated"] = function(player: core.GameObject)
-			print("shies activated")
-			PlayerLeader = player
+		["shiesActivated"] = function()
+		 	for k, v in pairs(MWVars) do
+				print(k)
+				print(v)
+				print("--")
+		 	end
 		end,
     }
 }
