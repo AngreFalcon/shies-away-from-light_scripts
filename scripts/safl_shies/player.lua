@@ -47,5 +47,8 @@ return {
             return nil
          end
       end,
+      ["getSneakVal"] = function(actor)
+         actor:sendEvent("playerSneak", (selfObj).controls.sneak)
+      end,
    },
 }
