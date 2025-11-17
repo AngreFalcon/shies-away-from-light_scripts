@@ -38,6 +38,7 @@ local interface SaveData
 	moveTimer: number
 	sheatheTimer: number
 	warpTimer: number
+	freeFallTimer: number
 	counter: number
 	posA: CellLoc
 	posB: CellLoc
@@ -60,6 +61,7 @@ local combatCheck: boolean
 local moveTimer: number
 local sheatheTimer: number
 local warpTimer: number
+local freeFallTimer: number
 local counter: number
 
 local potionsArr: {Potions} = {}
@@ -112,6 +114,7 @@ local function onInit() -- Called when the script is created but not loaded
 	moveTimer = 0
 	sheatheTimer = 0
 	warpTimer = 0
+	freeFallTimer = 0
 	counter = 0
 	potionsArr[1] = {
 		check = false,
@@ -223,6 +226,7 @@ local function onSave(): SaveData -- Called when the game saves, even if current
 		moveTimer= moveTimer,
 		sheatheTimer = sheatheTimer,
 		warpTimer = warpTimer,
+		freeFallTimer = freeFallTimer,
 		counter = counter,
 		posA = posA,
 		posB = posB,
@@ -251,6 +255,7 @@ local function onLoad(data: SaveData) -- Called only when the script loads, not 
 		moveTimer= data.moveTimer
 		sheatheTimer = data.sheatheTimer
 		warpTimer = data.warpTimer
+		freeFallTimer = data.freeFallTimer
 		counter = data.counter
 		posA = data.posA
 		posB = data.posB
@@ -503,6 +508,11 @@ local function modSpeedAndAthletics()
 	end
 end
 
+local function checkForPotion(potionName: string): boolean
+	local inventory = types.Actor.inventory(selfObj)
+	return inventory:countOf(potionName) > 0
+end
+
 local function checkPotions(potions: Potions)
 	local inventory = types.Actor.inventory(selfObj)
 	local count: number = 0
@@ -521,9 +531,11 @@ local function consumePotion(potionID: string, effectName: string): number
 	local potion = types.Actor.inventory(selfObj):find(potionID)
 	local potionEffects = types.Potion.record(potion).effects
 	local duration: number = 60
-	for i = 1, #potionEffects do
-		if potionEffects[i].effect.name == effectName then
-			duration = potionEffects[i].duration
+	if effectName ~= nil then
+		for i = 1, #potionEffects do
+			if potionEffects[i].effect.name == effectName then
+				duration = potionEffects[i].duration
+			end
 		end
 	end
 	core.sendGlobalEvent("UseItem", {object = potion, actor = selfObj})
@@ -564,6 +576,13 @@ local function shiesRestoreAttr()
 	end
 end
 
+local function freeFall()
+	if freeFallTimer > 1 and checkForPotion("p_slowfall_s") then
+		print("freefall")
+		freeFallTimer = -(consumePotion("p_slowfall_s", "SlowFall"))
+	end
+end
+
 local function setWanderSpeed()
 	types.Actor.stats.attributes.speed(selfObj).modifier = 40
 end
@@ -573,6 +592,9 @@ local function updateTimers(dt: number)
 		potionsArr[i].timer = potionsArr[i].timer - dt
 	end
 	warpTimer = warpTimer - dt
+	if types.Actor.isOnGround(selfObj) == false or freeFallTimer < 0 then
+		freeFallTimer = freeFallTimer + dt
+	end
 end
 
 return {
@@ -580,12 +602,19 @@ return {
         onUpdate = function(dt: number)
 			getPlayerLeader()
             shiesRestoreAttr()
+		print("freefalltimer:")
+		print(freeFallTimer)
 			if getCurrentAttr(attributes[1](selfObj)) / getMaxAttr(attributes[1](selfObj)) < FLEE_THRESHOLD then
 				updateMWVar("companion", 0)
 				cMove = false
                 flee() -- Teleport Shies away from combat to whatever position he has marked
     			fullHeal() -- Heal Shies to avoid the script triggering again, and also to ensure the player doesn't have to restore his health upon recovering him
             end
+			if flyCheck == false and types.Actor.isOnGround(selfObj) == false then
+				freeFall()
+			elseif freeFallTimer > -1 then -- A negative freeFallTimer implies a slowfall potion is active and the timer should not be reset
+				freeFallTimer = 0
+			end
 
 			updateTimers(dt)
 			setSheatheTimer(dt)

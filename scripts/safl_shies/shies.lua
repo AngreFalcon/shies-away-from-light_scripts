@@ -46,6 +46,7 @@ local util = require('openmw.util')
 
 
 
+
 local attributes = { types.Actor.stats.dynamic.health, types.Actor.stats.dynamic.magicka, types.Actor.stats.dynamic.fatigue }
 local selfObj = self
 
@@ -60,6 +61,7 @@ local combatCheck
 local moveTimer
 local sheatheTimer
 local warpTimer
+local freeFallTimer
 local counter
 
 local potionsArr = {}
@@ -112,6 +114,7 @@ local function onInit()
    moveTimer = 0
    sheatheTimer = 0
    warpTimer = 0
+   freeFallTimer = 0
    counter = 0
    potionsArr[1] = {
       check = false,
@@ -223,6 +226,7 @@ local function onSave()
       moveTimer = moveTimer,
       sheatheTimer = sheatheTimer,
       warpTimer = warpTimer,
+      freeFallTimer = freeFallTimer,
       counter = counter,
       posA = posA,
       posB = posB,
@@ -251,6 +255,7 @@ local function onLoad(data)
       moveTimer = data.moveTimer
       sheatheTimer = data.sheatheTimer
       warpTimer = data.warpTimer
+      freeFallTimer = data.freeFallTimer
       counter = data.counter
       posA = data.posA
       posB = data.posB
@@ -503,6 +508,11 @@ local function modSpeedAndAthletics()
    end
 end
 
+local function checkForPotion(potionName)
+   local inventory = types.Actor.inventory(selfObj)
+   return inventory:countOf(potionName) > 0
+end
+
 local function checkPotions(potions)
    local inventory = types.Actor.inventory(selfObj)
    local count = 0
@@ -521,9 +531,11 @@ local function consumePotion(potionID, effectName)
    local potion = types.Actor.inventory(selfObj):find(potionID)
    local potionEffects = types.Potion.record(potion).effects
    local duration = 60
-   for i = 1, #potionEffects do
-      if potionEffects[i].effect.name == effectName then
-         duration = potionEffects[i].duration
+   if effectName ~= nil then
+      for i = 1, #potionEffects do
+         if potionEffects[i].effect.name == effectName then
+            duration = potionEffects[i].duration
+         end
       end
    end
    core.sendGlobalEvent("UseItem", { object = potion, actor = selfObj })
@@ -564,6 +576,13 @@ local function shiesRestoreAttr()
    end
 end
 
+local function freeFall()
+   if freeFallTimer > 1 and checkForPotion("p_slowfall_s") then
+      print("freefall")
+      freeFallTimer = -(consumePotion("p_slowfall_s", "SlowFall"))
+   end
+end
+
 local function setWanderSpeed()
    types.Actor.stats.attributes.speed(selfObj).modifier = 40
 end
@@ -573,6 +592,9 @@ local function updateTimers(dt)
       potionsArr[i].timer = potionsArr[i].timer - dt
    end
    warpTimer = warpTimer - dt
+   if types.Actor.isOnGround(selfObj) == false or freeFallTimer < 0 then
+      freeFallTimer = freeFallTimer + dt
+   end
 end
 
 return {
@@ -580,11 +602,18 @@ return {
       onUpdate = function(dt)
          getPlayerLeader()
          shiesRestoreAttr()
+         print("freefalltimer:")
+         print(freeFallTimer)
          if getCurrentAttr(attributes[1](selfObj)) / getMaxAttr(attributes[1](selfObj)) < FLEE_THRESHOLD then
             updateMWVar("companion", 0)
             cMove = false
             flee()
             fullHeal()
+         end
+         if flyCheck == false and types.Actor.isOnGround(selfObj) == false then
+            freeFall()
+         elseif freeFallTimer > -1 then
+            freeFallTimer = 0
          end
 
          updateTimers(dt)
