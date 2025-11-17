@@ -32,6 +32,9 @@ local util = require('openmw.util')
 
 
 
+
+
+
 local health = types.Actor.stats.dynamic.health
 local selfObj = self
 
@@ -42,11 +45,15 @@ local cMove
 local flyCheck
 local wwCheck
 local combatCheck
+local pCheck
 
 local moveTimer
 local sheatheTimer
 local warpTimer
 local counter
+local potionTimer
+
+local potions = {}
 
 
 local FLEE_THRESHOLD = 0.1
@@ -81,6 +88,10 @@ local MWVars = {}
 
 
 
+
+
+
+
 local function updateMWVar(varName, varData)
    core.sendGlobalEvent("updateMWVar", { varName, varData, selfObj })
 end
@@ -91,6 +102,7 @@ local function onInit()
    flyCheck = false
    wwCheck = false
    combatCheck = false
+   pCheck = false
    playerSneaking = false
    doOnce = false
    doOnce2 = false
@@ -98,6 +110,12 @@ local function onInit()
    sheatheTimer = 0
    warpTimer = 0
    counter = 0
+   potionTimer = 0
+   potions[1] = { "p_restore_health_b", 0, 5 }
+   potions[2] = { "p_restore_health_c", 0, 10 }
+   potions[3] = { "p_restore_health_s", 0, 50 }
+   potions[4] = { "p_restore_health_q", 0, 100 }
+   potions[5] = { "p_restore_health_e", 0, 200 }
 end
 
 local function onSave()
@@ -112,6 +130,7 @@ local function onSave()
       flyCheck = flyCheck,
       wwCheck = wwCheck,
       combatCheck = combatCheck,
+      pCheck = pCheck,
       playerSneaking = playerSneaking,
       doOnce = doOnce,
       doOnce2 = doOnce2,
@@ -119,9 +138,11 @@ local function onSave()
       sheatheTimer = sheatheTimer,
       warpTimer = warpTimer,
       counter = counter,
+      potionTimer = potionTimer,
       posA = posA,
       posB = posB,
       posC = posC,
+      potions = potions,
    }
 end
 
@@ -139,6 +160,7 @@ local function onLoad(data)
       flyCheck = data.flyCheck
       wwCheck = data.wwCheck
       combatCheck = data.combatCheck
+      pCheck = data.pCheck
       playerSneaking = data.playerSneaking
       doOnce = data.doOnce
       doOnce2 = data.doOnce2
@@ -146,9 +168,11 @@ local function onLoad(data)
       sheatheTimer = data.sheatheTimer
       warpTimer = data.warpTimer
       counter = data.counter
+      potionTimer = data.potionTimer
       posA = data.posA
       posB = data.posB
       posC = data.posC
+      potions = data.potions
    end
 end
 
@@ -160,8 +184,53 @@ local function getMaxHealth()
    return health(selfObj).base + health(selfObj).modifier
 end
 
-local function heal()
+local function fullHeal()
    health(selfObj).current = getMaxHealth()
+end
+
+local function isShiesHurt()
+   return getCurrentHealth() < getMaxHealth()
+end
+
+local function consumePotion(potionID)
+   local potion = types.Actor.inventory(selfObj):find(potionID)
+   local potionEffects = types.Potion.record(potion).effects
+   local duration = 60
+   for i = 1, #potionEffects do
+      if potionEffects[i].effect.name == "Restore Health" then
+         duration = potionEffects[i].duration
+      end
+   end
+   core.sendGlobalEvent("UseItem", { object = potion, actor = selfObj })
+   return duration
+end
+
+local function selectBestPotion()
+   local missingHealth = getMaxHealth() - getCurrentHealth()
+   local potion
+   for i = 1, #potions do
+      if potions[i][2] > 0 then
+         if potion == nil then
+            potion = i
+         end
+         for j = i + 1, #potions do
+            if potions[j][2] > 0 then
+               if math.abs(missingHealth - potions[potion][3]) > math.abs(missingHealth - potions[j][3]) then
+                  potion = j
+               end
+            end
+         end
+      end
+   end
+   return potions[potion][1]
+end
+
+local function shiesDrinkPotion()
+   if pCheck == true and potionTimer <= 0 then
+      local potion = selectBestPotion()
+      potionTimer = consumePotion(potion)
+   elseif potionTimer > 0 then
+   end
 end
 
 local function isShiesFollowing()
@@ -381,19 +450,70 @@ local function toggleWaterWalking()
    end
 end
 
+local function modSpeedAndAthletics()
+   if getCoDist(selfObj.position, (getPlayerCellPos()).cellPos) < 300 then
+      types.Actor.stats.attributes.speed(selfObj).modifier = 15
+      types.NPC.stats.skills.athletics(selfObj).modifier = 15
+   elseif getCoDist(selfObj.position, (getPlayerCellPos()).cellPos) > 300 then
+      local cSpeed = types.Actor.stats.attributes.speed(selfObj).modified * 2.25
+      local cAthletics = types.NPC.stats.skills.athletics(player).modified * 2.25
+      types.Actor.stats.attributes.speed(selfObj).modifier = cSpeed
+      types.NPC.stats.skills.athletics(selfObj).modifier = cAthletics
+   end
+end
+
+local function hasPotions()
+   local inventory = types.Actor.inventory(selfObj)
+   local bPotion = inventory:countOf("p_restore_health_b")
+   local cPotion = inventory:countOf("p_restore_health_c")
+   local sPotion = inventory:countOf("p_restore_health_s")
+   local qPotion = inventory:countOf("p_restore_health_q")
+   local ePotion = inventory:countOf("p_restore_health_e")
+
+   if potions[1][2] ~= bPotion then
+      potions[1][2] = bPotion
+   end
+   if potions[2][2] ~= cPotion then
+      potions[2][2] = cPotion
+   end
+   if potions[3][2] ~= sPotion then
+      potions[3][2] = sPotion
+   end
+   if potions[4][2] ~= qPotion then
+      potions[4][2] = qPotion
+   end
+   if potions[5][2] ~= ePotion then
+      potions[5][2] = ePotion
+   end
+
+   if (bPotion + cPotion + sPotion + qPotion + ePotion) > 0 and pCheck == false then
+      pCheck = true
+   elseif (bPotion + cPotion + sPotion + qPotion + ePotion) == 0 and pCheck == true then
+      pCheck = false
+   end
+end
+
+local function setWanderSpeed()
+   types.Actor.stats.attributes.speed(selfObj).modifier = 40
+end
+
 
 return {
    engineHandlers = {
       onUpdate = function(dt)
          getPlayerLeader()
+         if isShiesHurt() then
+            shiesDrinkPotion()
+         end
+
          if getCurrentHealth() / getMaxHealth() < FLEE_THRESHOLD then
             updateMWVar("companion", 0)
             cMove = false
             flee()
-            heal()
+            fullHeal()
          end
 
-
+         potionTimer = potionTimer - dt
          warpTimer = warpTimer - dt
          setSheatheTimer(dt)
          if isShiesFollowing() then
@@ -402,9 +522,7 @@ return {
             toggleWaterWalking()
             forceZLevel()
             warpToPlayer()
-         end
-
-         if player ~= nil then
+         elseif player ~= nil then
             maintainDistance()
             nudge(dt)
          end
@@ -415,9 +533,12 @@ return {
          end
          counter = 0
 
-
-
-
+         if isShiesFollowing() then
+            modSpeedAndAthletics()
+            hasPotions()
+         elseif player ~= nil then
+            setWanderSpeed()
+         end
       end,
       onInit = onInit,
       onSave = onSave,

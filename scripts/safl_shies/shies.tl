@@ -19,6 +19,7 @@ local interface SaveData
 	flyCheck: boolean
 	wwCheck: boolean
 	combatCheck: boolean
+	pCheck: boolean
 	playerSneaking: boolean
 	doOnce: boolean
 	doOnce2: boolean
@@ -26,9 +27,11 @@ local interface SaveData
 	sheatheTimer: number
 	warpTimer: number
 	counter: number
+	potionTimer: number
 	posA: CellLoc
 	posB: CellLoc
 	posC: CellLoc
+	potions: {{string, number, number}}
 end
 
 -- aliases
@@ -42,11 +45,15 @@ local cMove: boolean
 local flyCheck: boolean
 local wwCheck: boolean
 local combatCheck: boolean
+local pCheck: boolean
 
 local moveTimer: number
 local sheatheTimer: number
 local warpTimer: number
 local counter: number
+local potionTimer: number
+
+local potions: {{string, number, number}} = {}
 
 -- constants
 local FLEE_THRESHOLD = 0.1
@@ -78,7 +85,11 @@ short compmove -- true if the player has asked shies to maintain his distance
 short onetimemove -- true if the player has asked shies to move out of the way
 short weapuse -- true if the player has asked shies to use the same weapons as the player
 short addonce -- true after the mwscript has executed once, is used to initialize companion to 0
-short p_check -- true if shies has any healing potions of any quality in his inventory
+short p_b_count -- number of bargain healing potions in shies' inventory - restores ~5 hitpoints
+short p_c_count -- number of cheap healing potions in shies' inventory - restore ~10 hitpoints
+short p_s_count -- number of standard healing potions in shies' inventory - restores ~50 hitpoints
+short p_q_count -- number of quality healing potions in shies' inventory - restores ~100 hitpoints
+short p_e_count -- number of exclusive healing potions in shies' inventory - restores ~200 hitpoints
 ]]
 
 local function updateMWVar(varName: string, varData: number) -- Send an event to the global script to update a single mwscript variable with the provided value
@@ -91,6 +102,7 @@ local function onInit() -- Called when the script is created but not loaded
 	flyCheck = false
 	wwCheck = false
 	combatCheck = false
+	pCheck = false
 	playerSneaking = false
 	doOnce = false
 	doOnce2 = false
@@ -98,6 +110,12 @@ local function onInit() -- Called when the script is created but not loaded
 	sheatheTimer = 0
 	warpTimer = 0
 	counter = 0
+	potionTimer = 0
+	potions[1] = {"p_restore_health_b", 0, 5}
+	potions[2] = {"p_restore_health_c", 0, 10}
+	potions[3] = {"p_restore_health_s", 0, 50}
+	potions[4] = {"p_restore_health_q", 0, 100}
+	potions[5] = {"p_restore_health_e", 0, 200}
 end
 
 local function onSave(): SaveData -- Called when the game saves, even if currently in an inactive state
@@ -112,6 +130,7 @@ local function onSave(): SaveData -- Called when the game saves, even if current
 		flyCheck = flyCheck,
 		wwCheck = wwCheck,
 		combatCheck = combatCheck,
+		pCheck = pCheck,
 		playerSneaking = playerSneaking,
 		doOnce = doOnce,
 		doOnce2 = doOnce2,
@@ -119,9 +138,11 @@ local function onSave(): SaveData -- Called when the game saves, even if current
 		sheatheTimer = sheatheTimer,
 		warpTimer = warpTimer,
 		counter = counter,
+		potionTimer = potionTimer,
 		posA = posA,
 		posB = posB,
 		posC = posC,
+		potions = potions,
 	}
 end
 
@@ -139,6 +160,7 @@ local function onLoad(data: SaveData) -- Called only when the script loads, not 
 		flyCheck = data.flyCheck
 		wwCheck = data.wwCheck
 		combatCheck = data.combatCheck
+		pCheck = data.pCheck
 		playerSneaking = data.playerSneaking
 		doOnce = data.doOnce
 		doOnce2 = data.doOnce2
@@ -146,9 +168,11 @@ local function onLoad(data: SaveData) -- Called only when the script loads, not 
 		sheatheTimer = data.sheatheTimer
 		warpTimer = data.warpTimer
 		counter = data.counter
+		potionTimer = data.potionTimer
 		posA = data.posA
 		posB = data.posB
 		posC = data.posC
+		potions = data.potions
 	end
 end
 
@@ -160,8 +184,53 @@ local function getMaxHealth(): number
     return health(selfObj).base + health(selfObj).modifier
 end
 
-local function heal()
+local function fullHeal()
     health(selfObj).current = getMaxHealth()
+end
+
+local function isShiesHurt(): boolean
+	return getCurrentHealth() < getMaxHealth()
+end
+
+local function consumePotion(potionID: string): number
+	local potion = types.Actor.inventory(selfObj):find(potionID)
+	local potionEffects = types.Potion.record(potion).effects
+	local duration: number = 60
+	for i = 1, #potionEffects do
+		if potionEffects[i].effect.name == "Restore Health" then
+			duration = potionEffects[i].duration
+		end
+	end
+	core.sendGlobalEvent("UseItem", {object = potion, actor = selfObj})
+	return duration
+end
+
+local function selectBestPotion(): string
+	local missingHealth = getMaxHealth() - getCurrentHealth()
+	local potion: integer
+	for i = 1, #potions do
+		if potions[i][2] > 0 then -- only execute if shies actually has any potions of this type
+			if potion == nil then
+				potion = i
+			end
+			for j = i + 1, #potions do
+				if potions[j][2] > 0 then
+					if math.abs(missingHealth - potions[potion][3]) > math.abs(missingHealth - potions[j][3]) then
+						potion = j
+					end
+				end
+			end
+		end
+	end
+	return potions[potion][1]
+end
+
+local function shiesDrinkPotion()
+	if pCheck == true and potionTimer <= 0 then
+		local potion = selectBestPotion()
+		potionTimer = consumePotion(potion)
+	elseif potionTimer > 0 then
+	end
 end
 
 local function isShiesFollowing(): boolean -- Simply return true or false if shies is currently following any player
@@ -380,20 +449,71 @@ local function toggleWaterWalking() -- This function should apply the waterwalki
 		wwCheck = false
 	end
 end
+
+local function modSpeedAndAthletics()
+	if getCoDist(selfObj.position, (getPlayerCellPos() as CellLoc).cellPos) < 300 then
+		types.Actor.stats.attributes.speed(selfObj).modifier = 15
+		types.NPC.stats.skills.athletics(selfObj).modifier = 15
+	elseif getCoDist(selfObj.position, (getPlayerCellPos() as CellLoc).cellPos) > 300 then
+		local cSpeed = types.Actor.stats.attributes.speed(selfObj).modified * 2.25
+		local cAthletics = types.NPC.stats.skills.athletics(player).modified * 2.25
+		types.Actor.stats.attributes.speed(selfObj).modifier = cSpeed
+		types.NPC.stats.skills.athletics(selfObj).modifier = cAthletics
+	end
+end
+
+local function hasPotions()
+	local inventory = types.Actor.inventory(selfObj)
+	local bPotion = inventory:countOf("p_restore_health_b")
+	local cPotion = inventory:countOf("p_restore_health_c")
+	local sPotion = inventory:countOf("p_restore_health_s")
+	local qPotion = inventory:countOf("p_restore_health_q")
+	local ePotion = inventory:countOf("p_restore_health_e")
+
+	if potions[1][2] ~= bPotion then
+		potions[1][2] = bPotion
+	end
+	if potions[2][2] ~= cPotion then
+		potions[2][2] = cPotion
+	end
+	if potions[3][2] ~= sPotion then
+		potions[3][2] = sPotion
+	end
+	if potions[4][2] ~= qPotion then
+		potions[4][2] = qPotion
+	end
+	if potions[5][2] ~= ePotion then
+		potions[5][2] = ePotion
+	end
+
+	if (bPotion + cPotion + sPotion + qPotion + ePotion) > 0 and pCheck == false then
+		pCheck = true
+	elseif (bPotion + cPotion + sPotion + qPotion + ePotion) == 0 and pCheck == true then
+		pCheck = false
+	end
+end
+
+local function setWanderSpeed()
+	types.Actor.stats.attributes.speed(selfObj).modifier = 40
+end
 -- mwscript logic above
 
 return {
     engineHandlers = {
         onUpdate = function(dt: number)
 			getPlayerLeader()
-            if getCurrentHealth() / getMaxHealth() < FLEE_THRESHOLD then
+			if isShiesHurt() then
+				shiesDrinkPotion()
+			end
+            
+			if getCurrentHealth() / getMaxHealth() < FLEE_THRESHOLD then
 				updateMWVar("companion", 0)
 				cMove = false
                 flee() -- Teleport Shies away from combat to whatever position he has marked
-    			heal() -- Heal Shies to avoid the script triggering again, and also to ensure the player doesn't have to restore his health upon recovering him
+    			fullHeal() -- Heal Shies to avoid the script triggering again, and also to ensure the player doesn't have to restore his health upon recovering him
             end
 
-			-- mwscript logic
+			potionTimer = potionTimer - dt
 			warpTimer = warpTimer - dt
 			setSheatheTimer(dt)
 			if isShiesFollowing() then
@@ -402,9 +522,7 @@ return {
 				toggleWaterWalking()
 				forceZLevel()
 				warpToPlayer()
-			end
-
-			if player ~= nil then
+			elseif player ~= nil then
 				maintainDistance()
 				nudge(dt)
 			end
@@ -415,9 +533,12 @@ return {
 			end
 			counter = 0
 
-			-- set speed and athletics function
-			-- check for potion count function
-			-- set speed while wandering function
+			if isShiesFollowing() then
+				modSpeedAndAthletics()
+				hasPotions()
+			elseif player ~= nil then
+				setWanderSpeed()
+			end
         end,
 		onInit = onInit,
 		onSave = onSave,
