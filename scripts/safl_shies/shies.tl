@@ -305,58 +305,6 @@ local function isShiesStaminaFull(): boolean
 	return getCurrentFatigue() < getMaxFatigue()
 end
 
-local function consumePotion(potionID: string): number
-	local potion = types.Actor.inventory(selfObj):find(potionID)
-	local potionEffects = types.Potion.record(potion).effects
-	local duration: number = 60
-	for i = 1, #potionEffects do
-		if potionEffects[i].effect.name == "Restore Health" then
-			duration = potionEffects[i].duration
-		end
-	end
-	core.sendGlobalEvent("UseItem", {object = potion, actor = selfObj})
-	return duration
-end
-
-local function selectBestPotion(statDiff: number, potions: {PotionArr}): string
-	local potion: integer
-	for i = 1, #potions do
-		if potions[i].count > 0 then -- only execute if shies actually has any potions of this type
-			if potion == nil then
-				potion = i
-			end
-			for j = i + 1, #potions do
-				if potions[j].count > 0 then
-					if math.abs(statDiff - potions[potion].magnitude) > math.abs(statDiff - potions[j].magnitude) then
-						potion = j
-					end
-				end
-			end
-		end
-	end
-	return potions[potion].name
-end
-
-local function shiesDrinkAttrPotion(potions: Potions, attrMax: number, attrCurrent: number)
-	if potions.check == true and potions.timer <= 0 then
-		local potion = selectBestPotion(attrMax - attrCurrent, potions.count)
-		potions.timer = consumePotion(potion)
-	elseif potions.timer > 0 then
-	end
-end
-
-local function shiesRestoreAttr()
-	if isShiesHurt() then
-		shiesDrinkAttrPotion(hPotions, getMaxHealth(), getCurrentHealth())
-	end
-	if isShiesMagickaFull() then
-		shiesDrinkAttrPotion(mPotions, getMaxMagicka(), getCurrentMagicka())
-	end
-	if isShiesStaminaFull() then
-		shiesDrinkAttrPotion(fPotions, getMaxFatigue(), getCurrentFatigue())
-	end
-end
-
 local function isShiesFollowing(): boolean -- Simply return true or false if shies is currently following any player
 	local currentPackage = ai.getActivePackage()
 	return ((currentPackage ~= nil) and (currentPackage.type == "Follow"))
@@ -430,7 +378,6 @@ local function flee() -- Triggers if shies' health drops below a certain thresho
     time.newSimulationTimer(RECALL_TIMEOUT, cb, self, nil)
 end
 
--- mwscript logic below
 local function setSheatheTimer(timePassed: number) -- Sheathe weapon after combat check
 	if combatCheck == true then
 		warpTimer = 6
@@ -586,7 +533,7 @@ local function modSpeedAndAthletics()
 	end
 end
 
-local function hasPotions(potions: Potions)
+local function checkPotions(potions: Potions)
 	local inventory = types.Actor.inventory(selfObj)
 	local count: number = 0
 	for i = 1, #potions.count do
@@ -604,10 +551,68 @@ local function hasPotions(potions: Potions)
 	end
 end
 
+local function consumePotion(potionID: string): number
+	local potion = types.Actor.inventory(selfObj):find(potionID)
+	local potionEffects = types.Potion.record(potion).effects
+	local duration: number = 60
+	for i = 1, #potionEffects do
+		if potionEffects[i].effect.name == "Restore Health" then
+			duration = potionEffects[i].duration
+		end
+	end
+	core.sendGlobalEvent("UseItem", {object = potion, actor = selfObj})
+	return duration
+end
+
+local function selectBestPotion(statDiff: number, potions: {PotionArr}): string
+	local potion: integer
+	for i = 1, #potions do
+		if potions[i].count > 0 then -- only execute if shies actually has any potions of this type
+			if potion == nil then
+				potion = i
+			end
+			for j = i + 1, #potions do
+				if potions[j].count > 0 then
+					if math.abs(statDiff - potions[potion].magnitude) > math.abs(statDiff - potions[j].magnitude) then
+						potion = j
+					end
+				end
+			end
+		end
+	end
+	return potions[potion].name
+end
+
+local function shiesDrinkAttrPotion(potions: Potions, attrMax: number, attrCurrent: number)
+	if potions.check == true and potions.timer <= 0 then
+		local potion = selectBestPotion(attrMax - attrCurrent, potions.count)
+		potions.timer = consumePotion(potion)
+	elseif potions.timer > 0 then
+	end
+end
+
+local function shiesRestoreAttr()
+	if isShiesHurt() then
+		shiesDrinkAttrPotion(hPotions, getMaxHealth(), getCurrentHealth())
+	end
+	if isShiesMagickaFull() then
+		shiesDrinkAttrPotion(mPotions, getMaxMagicka(), getCurrentMagicka())
+	end
+	if isShiesStaminaFull() then
+		shiesDrinkAttrPotion(fPotions, getMaxFatigue(), getCurrentFatigue())
+	end
+end
+
 local function setWanderSpeed()
 	types.Actor.stats.attributes.speed(selfObj).modifier = 40
 end
--- mwscript logic above
+
+local function updateTimers(dt: number)
+	hPotions.timer = hPotions.timer - dt
+	mPotions.timer = mPotions.timer - dt
+	fPotions.timer = fPotions.timer - dt
+	warpTimer = warpTimer - dt
+end
 
 return {
     engineHandlers = {
@@ -621,10 +626,7 @@ return {
     			fullHeal() -- Heal Shies to avoid the script triggering again, and also to ensure the player doesn't have to restore his health upon recovering him
             end
 
-			hPotions.timer = hPotions.timer - dt
-			mPotions.timer = mPotions.timer - dt
-			fPotions.timer = fPotions.timer - dt
-			warpTimer = warpTimer - dt
+			updateTimers(dt)
 			setSheatheTimer(dt)
 			if isShiesFollowing() then
 				setSneak()
@@ -645,9 +647,9 @@ return {
 
 			if isShiesFollowing() then
 				modSpeedAndAthletics()
-				hasPotions(hPotions)
-				hasPotions(mPotions)
-				hasPotions(fPotions)
+				checkPotions(hPotions)
+				checkPotions(mPotions)
+				checkPotions(fPotions)
 			elseif player ~= nil then
 				setWanderSpeed()
 			end
