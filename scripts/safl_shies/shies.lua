@@ -417,6 +417,13 @@ local function shiesDrinkAttrPotion(potions, attr)
 end
 
 local function checkAttributes()
+   if getCurrentAttr(attributes[1](selfObj)) / getMaxAttr(attributes[1](selfObj)) < FLEE_THRESHOLD then
+      updateMWVar("companion", 0)
+      cMove = false
+      flee()
+      fullHeal()
+      return
+   end
    for i = 1, #attributes do
       if checkAttrDamaged(attributes[i](selfObj)) == false then
          checkPotions(potionsArr[i])
@@ -429,12 +436,11 @@ end
 
 local function freeFall()
    if freeFallTimer > 1 and checkForPotion("p_slowfall_s") then
-      print("freefall")
       freeFallTimer = -(consumePotion("p_slowfall_s", "SlowFall"))
    end
 end
 
-local function setWanderSpeed()
+local function setDefaultSpeed()
    types.Actor.stats.attributes.speed(selfObj).modifier = 40
 end
 
@@ -443,8 +449,10 @@ local function updateTimers(dt)
       potionsArr[i].timer = potionsArr[i].timer - dt
    end
    warpTimer = warpTimer - dt
-   if types.Actor.isOnGround(selfObj) == false or freeFallTimer < 0 then
+   if ((flyCheck == false) and (types.Actor.isOnGround(selfObj) == false)) or freeFallTimer < 0 then
       freeFallTimer = freeFallTimer + dt
+   elseif freeFallTimer > 0 then
+      freeFallTimer = 0
    end
 end
 
@@ -452,17 +460,8 @@ local function onUpdate(dt)
    getPlayerLeader()
    checkAttributes()
 
-   if getCurrentAttr(attributes[1](selfObj)) / getMaxAttr(attributes[1](selfObj)) < FLEE_THRESHOLD then
-      updateMWVar("companion", 0)
-      cMove = false
-      flee()
-      fullHeal()
-   end
-
    if flyCheck == false and types.Actor.isOnGround(selfObj) == false then
       freeFall()
-   elseif freeFallTimer > -1 then
-      freeFallTimer = 0
    end
 
    updateTimers(dt)
@@ -488,7 +487,7 @@ local function onUpdate(dt)
    if isShiesFollowing() then
       modSpeedAndAthletics()
    elseif player ~= nil then
-      setWanderSpeed()
+      setDefaultSpeed()
    end
 end
 

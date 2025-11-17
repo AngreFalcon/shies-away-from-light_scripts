@@ -102,15 +102,15 @@ local function updateMWVar(varName: string, varData: number) -- Send an event to
 	core.sendGlobalEvent("updateMWVar", {varName, varData, selfObj})
 end
 
-local function getCurrentAttr(attr: types.DynamicStat): number
+local function getCurrentAttr(attr: types.DynamicStat): number -- Get the current value of the specified dynamic stat
     return attr.current
 end
 
-local function getMaxAttr(attr: types.DynamicStat): number
+local function getMaxAttr(attr: types.DynamicStat): number -- Get the maximum value of the specified dynamic stat
     return attr.base + attr.modifier
 end
 
-local function fullHeal()
+local function fullHeal() -- Fully restore shies' health
     attributes[1](selfObj).current = getMaxAttr(attributes[1](selfObj))
 end
 
@@ -129,7 +129,7 @@ local function getPlayerLeader() -- Gets the player object that shies is current
 	end
 end
 
-local function makeShiesFollow()
+local function makeShiesFollow() -- Helper function for setting the Follow AI package
 	ai.startPackage({
 		type = "Follow",
 		target = player
@@ -334,7 +334,7 @@ local function toggleWaterWalking() -- This function should apply the waterwalki
 	end
 end
 
-local function modSpeedAndAthletics()
+local function modSpeedAndAthletics() -- Set shies' speed and athletics modifier to a flat 15 if he's within a certain distance of the player, or add a multiplier based off the player's stats if he's too far
 	if getCoDist(selfObj.position, (getPlayerCellPos() as CellLoc).cellPos) < 300 then
 		types.Actor.stats.attributes.speed(selfObj).modifier = 15
 		types.NPC.stats.skills.athletics(selfObj).modifier = 15
@@ -346,12 +346,12 @@ local function modSpeedAndAthletics()
 	end
 end
 
-local function checkForPotion(potionName: string): boolean
+local function checkForPotion(potionName: string): boolean -- Returns true if shies has any of the specified potions in his inventory
 	local inventory = types.Actor.inventory(selfObj)
 	return inventory:countOf(potionName) > 0
 end
 
-local function checkPotions(potions: Potions)
+local function checkPotions(potions: Potions) -- Checks shies' inventory to update the count of restore health/magicka/stamina potions he has
 	local inventory = types.Actor.inventory(selfObj)
 	local count: number = 0
 	for i = 1, #potions.types do
@@ -365,7 +365,7 @@ local function checkPotions(potions: Potions)
 	end
 end
 
-local function consumePotion(potionID: string, effectName: string): number
+local function consumePotion(potionID: string, effectName: string): number -- Sends a global event to trigger shies to consume the specified potion. Returns the duration of whatever effect is specified, or 60 if the potion does not have that effect
 	local potion = types.Actor.inventory(selfObj):find(potionID)
 	local potionEffects = types.Potion.record(potion).effects
 	local duration: number = 60
@@ -380,7 +380,7 @@ local function consumePotion(potionID: string, effectName: string): number
 	return duration
 end
 
-local function selectBestPotion(attr: types.DynamicStat, potions: {PotionArr}): string
+local function selectBestPotion(attr: types.DynamicStat, potions: {PotionArr}): string -- Find the potion whose restore amount is closest to the amount missing from the specified attribute
 	local potion: integer
 	local attrDiff = getMaxAttr(attr) - getCurrentAttr(attr)
 	for i = 1, #potions do
@@ -398,13 +398,13 @@ local function selectBestPotion(attr: types.DynamicStat, potions: {PotionArr}): 
 		end
 	end
 	if ((potions[potion].magnitude / 4) >= attrDiff) and (attrDiff <= (getMaxAttr(attr) * 0.75)) then
-		return nil -- if 3/4s or more of the potion's effect will be wasted, don't consume it unless shies is missing more than 3/4s of the attribute
+		return nil -- If 3/4s or more of the potion's effect will be wasted, don't consume it unless shies is missing more than 3/4s of the attribute
 	else
 		return potions[potion].name
 	end
 end
 
-local function shiesDrinkAttrPotion(potions: Potions, attr: types.DynamicStat): boolean
+local function shiesDrinkAttrPotion(potions: Potions, attr: types.DynamicStat): boolean -- Find the most applicable restore potion for the given attribute and then consume it. Returns false if a potion was not consumed
 	if potions.check == true and potions.timer <= 0 then
 		local potion = selectBestPotion(attr, potions.types)
 		if potion ~= nil then
@@ -416,7 +416,14 @@ local function shiesDrinkAttrPotion(potions: Potions, attr: types.DynamicStat): 
 	end
 end
 
-local function checkAttributes()
+local function checkAttributes() -- Used to call various functions that affect shies' dynamic attributes like health, fatigue, magicka
+	if getCurrentAttr(attributes[1](selfObj)) / getMaxAttr(attributes[1](selfObj)) < FLEE_THRESHOLD then -- Check health ratio
+		updateMWVar("companion", 0)
+		cMove = false
+        flee() -- Teleport Shies away from combat to whatever position he has marked
+		fullHeal() -- Heal Shies to avoid the script triggering again, and also to ensure the player doesn't have to restore his health upon recovering him
+		return
+	end
 	for i = 1, #attributes do
 		if checkAttrDamaged(attributes[i](selfObj)) == false then
 			checkPotions(potionsArr[i])
@@ -427,14 +434,13 @@ local function checkAttributes()
 	end
 end
 
-local function freeFall()
+local function freeFall() -- Used to call various functions that should trigger while shies is in freefall
 	if freeFallTimer > 1 and checkForPotion("p_slowfall_s") then
-		print("freefall")
 		freeFallTimer = -(consumePotion("p_slowfall_s", "SlowFall"))
 	end
 end
 
-local function setWanderSpeed()
+local function setDefaultSpeed() -- Sets shies' speed modifier while not following the player
 	types.Actor.stats.attributes.speed(selfObj).modifier = 40
 end
 
@@ -443,8 +449,10 @@ local function updateTimers(dt: number)
 		potionsArr[i].timer = potionsArr[i].timer - dt
 	end
 	warpTimer = warpTimer - dt
-	if types.Actor.isOnGround(selfObj) == false or freeFallTimer < 0 then
+	if ((flyCheck == false) and (types.Actor.isOnGround(selfObj) == false)) or freeFallTimer < 0 then
 		freeFallTimer = freeFallTimer + dt
+	elseif freeFallTimer > 0 then -- A negative freeFallTimer implies a slowfall potion is active and the timer should not be reset
+		freeFallTimer = 0
 	end
 end
 
@@ -452,17 +460,8 @@ local function onUpdate(dt: number) -- called every frame while the script is lo
 	getPlayerLeader()
     checkAttributes()
 
-	if getCurrentAttr(attributes[1](selfObj)) / getMaxAttr(attributes[1](selfObj)) < FLEE_THRESHOLD then -- Check health ratio
-		updateMWVar("companion", 0)
-		cMove = false
-        flee() -- Teleport Shies away from combat to whatever position he has marked
-		fullHeal() -- Heal Shies to avoid the script triggering again, and also to ensure the player doesn't have to restore his health upon recovering him
-    end
-
 	if flyCheck == false and types.Actor.isOnGround(selfObj) == false then
 		freeFall()
-	elseif freeFallTimer > -1 then -- A negative freeFallTimer implies a slowfall potion is active and the timer should not be reset
-		freeFallTimer = 0
 	end
 
 	updateTimers(dt)
@@ -488,7 +487,7 @@ local function onUpdate(dt: number) -- called every frame while the script is lo
 	if isShiesFollowing() then
 		modSpeedAndAthletics()
 	elseif player ~= nil then
-		setWanderSpeed()
+		setDefaultSpeed()
 	end
 end
 
