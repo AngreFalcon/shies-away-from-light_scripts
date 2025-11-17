@@ -102,168 +102,6 @@ local function updateMWVar(varName, varData)
    core.sendGlobalEvent("updateMWVar", { varName, varData, selfObj })
 end
 
-local function onInit()
-   RECALL_LOC = INIT_DATA.recallLoc
-   cMove = false
-   flyCheck = false
-   wwCheck = false
-   combatCheck = false
-   playerSneaking = false
-   doOnce = false
-   doOnce2 = false
-   moveTimer = 0
-   sheatheTimer = 0
-   warpTimer = 0
-   freeFallTimer = 0
-   counter = 0
-   potionsArr[1] = {
-      check = false,
-      timer = 0,
-      effectName = "Restore Health",
-      types = { {
-         name = "p_restore_health_b",
-         count = 0,
-         magnitude = 5,
-      },
-      {
-         name = "p_restore_health_c",
-         count = 0,
-         magnitude = 10,
-      },
-      {
-         name = "p_restore_health_s",
-         count = 0,
-         magnitude = 50,
-      },
-      {
-         name = "p_restore_health_q",
-         count = 0,
-         magnitude = 100,
-      },
-      {
-         name = "p_restore_health_e",
-         count = 0,
-         magnitude = 200,
-      },
-      }, }
-   potionsArr[2] = {
-      check = false,
-      timer = 0,
-      effectName = "Restore Magicka",
-      types = { {
-         name = "p_restore_magicka_b",
-         count = 0,
-         magnitude = 5,
-      },
-      {
-         name = "p_restore_magicka_c",
-         count = 0,
-         magnitude = 10,
-      },
-      {
-         name = "p_restore_magicka_s",
-         count = 0,
-         magnitude = 50,
-      },
-      {
-         name = "p_restore_magicka_q",
-         count = 0,
-         magnitude = 100,
-      },
-      {
-         name = "p_restore_magicka_e",
-         count = 0,
-         magnitude = 200,
-      },
-      }, }
-   potionsArr[3] = {
-      check = false,
-      timer = 0,
-      effectName = "Restore Fatigue",
-      types = { {
-         name = "p_restore_fatigue_b",
-         count = 0,
-         magnitude = 25,
-      },
-      {
-         name = "p_restore_fatigue_c",
-         count = 0,
-         magnitude = 50,
-      },
-      {
-         name = "p_restore_fatigue_s",
-         count = 0,
-         magnitude = 100,
-      },
-      {
-         name = "p_restore_fatigue_q",
-         count = 0,
-         magnitude = 200,
-      },
-      {
-         name = "p_restore_fatigue_e",
-         count = 0,
-         magnitude = 400,
-      },
-      }, }
-end
-
-local function onSave()
-   for k, v in pairs(MWVars) do
-      updateMWVar(k, v)
-   end
-   return {
-      version = ScriptVersion,
-      recallLoc = RECALL_LOC,
-      player = player,
-      cMove = cMove,
-      flyCheck = flyCheck,
-      wwCheck = wwCheck,
-      combatCheck = combatCheck,
-      playerSneaking = playerSneaking,
-      doOnce = doOnce,
-      doOnce2 = doOnce2,
-      moveTimer = moveTimer,
-      sheatheTimer = sheatheTimer,
-      warpTimer = warpTimer,
-      freeFallTimer = freeFallTimer,
-      counter = counter,
-      posA = posA,
-      posB = posB,
-      posC = posC,
-      potionsArr = potionsArr,
-   }
-end
-
-local function onLoad(data)
-   if (not data) or (not data.version) or (data.version < ScriptVersion) then
-      print('Was saved with an old version of the script, initializing to default')
-      RECALL_LOC = INIT_DATA.recallLoc
-      return
-   elseif (data.version > ScriptVersion) then
-      error('Required update to a new version of the script')
-   elseif (data.version == ScriptVersion) then
-      RECALL_LOC = data.recallLoc
-      player = data.player
-      cMove = data.cMove
-      flyCheck = data.flyCheck
-      wwCheck = data.wwCheck
-      combatCheck = data.combatCheck
-      playerSneaking = data.playerSneaking
-      doOnce = data.doOnce
-      doOnce2 = data.doOnce2
-      moveTimer = data.moveTimer
-      sheatheTimer = data.sheatheTimer
-      warpTimer = data.warpTimer
-      freeFallTimer = data.freeFallTimer
-      counter = data.counter
-      posA = data.posA
-      posB = data.posB
-      posC = data.posC
-      potionsArr = data.potionsArr
-   end
-end
-
 local function getCurrentAttr(attr)
    return attr.current
 end
@@ -276,7 +114,7 @@ local function fullHeal()
    attributes[1](selfObj).current = getMaxAttr(attributes[1](selfObj))
 end
 
-local function checkAttrFull(attr)
+local function checkAttrDamaged(attr)
    return getCurrentAttr(attr) < getMaxAttr(attr)
 end
 
@@ -542,8 +380,9 @@ local function consumePotion(potionID, effectName)
    return duration
 end
 
-local function selectBestPotion(statDiff, potions)
+local function selectBestPotion(attr, potions)
    local potion
+   local attrDiff = getMaxAttr(attr) - getCurrentAttr(attr)
    for i = 1, #potions do
       if potions[i].count > 0 then
          if potion == nil then
@@ -551,27 +390,39 @@ local function selectBestPotion(statDiff, potions)
          end
          for j = i + 1, #potions do
             if potions[j].count > 0 then
-               if math.abs(statDiff - potions[potion].magnitude) > math.abs(statDiff - potions[j].magnitude) then
+               if math.abs(attrDiff - potions[potion].magnitude) > math.abs(attrDiff - potions[j].magnitude) then
                   potion = j
                end
             end
          end
       end
    end
-   return potions[potion].name
-end
-
-local function shiesDrinkAttrPotion(potions, attrMax, attrCurrent)
-   if potions.check == true and potions.timer <= 0 then
-      local potion = selectBestPotion(attrMax - attrCurrent, potions.types)
-      potions.timer = consumePotion(potion, potions.effectName)
+   if ((potions[potion].magnitude / 4) >= attrDiff) and (attrDiff <= (getMaxAttr(attr) * 0.75)) then
+      return nil
+   else
+      return potions[potion].name
    end
 end
 
-local function shiesRestoreAttr()
+local function shiesDrinkAttrPotion(potions, attr)
+   if potions.check == true and potions.timer <= 0 then
+      local potion = selectBestPotion(attr, potions.types)
+      if potion ~= nil then
+         potions.timer = consumePotion(potion, potions.effectName)
+         return true
+      else
+         return false
+      end
+   end
+end
+
+local function checkAttributes()
    for i = 1, #attributes do
-      if checkAttrFull(attributes[i](selfObj)) then
-         shiesDrinkAttrPotion(potionsArr[i], getMaxAttr(attributes[i](selfObj)), getCurrentAttr(attributes[i](selfObj)))
+      if checkAttrDamaged(attributes[i](selfObj)) == false then
+         checkPotions(potionsArr[i])
+         if potionsArr[i].check == false or shiesDrinkAttrPotion(potionsArr[i], attributes[i](selfObj)) == false then
+
+         end
       end
    end
 end
@@ -597,53 +448,218 @@ local function updateTimers(dt)
    end
 end
 
+local function onUpdate(dt)
+   getPlayerLeader()
+   checkAttributes()
+
+   if getCurrentAttr(attributes[1](selfObj)) / getMaxAttr(attributes[1](selfObj)) < FLEE_THRESHOLD then
+      updateMWVar("companion", 0)
+      cMove = false
+      flee()
+      fullHeal()
+   end
+
+   if flyCheck == false and types.Actor.isOnGround(selfObj) == false then
+      freeFall()
+   elseif freeFallTimer > -1 then
+      freeFallTimer = 0
+   end
+
+   updateTimers(dt)
+   setSheatheTimer(dt)
+
+   if isShiesFollowing() then
+      setSneak()
+      toggleLevitation()
+      toggleWaterWalking()
+      forceZLevel()
+      warpToPlayer()
+   elseif player ~= nil then
+      maintainDistance()
+      nudge(dt)
+   end
+
+   if counter < 20 then
+      counter = counter + 1
+      return
+   end
+   counter = 0
+
+   if isShiesFollowing() then
+      modSpeedAndAthletics()
+   elseif player ~= nil then
+      setWanderSpeed()
+   end
+end
+
+local function onInit()
+   RECALL_LOC = INIT_DATA.recallLoc
+   cMove = false
+   flyCheck = false
+   wwCheck = false
+   combatCheck = false
+   playerSneaking = false
+   doOnce = false
+   doOnce2 = false
+   moveTimer = 0
+   sheatheTimer = 0
+   warpTimer = 0
+   freeFallTimer = 0
+   counter = 0
+   potionsArr[1] = {
+      check = false,
+      timer = 0,
+      effectName = "Restore Health",
+      types = { {
+         name = "p_restore_health_b",
+         count = 0,
+         magnitude = 5,
+      },
+      {
+         name = "p_restore_health_c",
+         count = 0,
+         magnitude = 10,
+      },
+      {
+         name = "p_restore_health_s",
+         count = 0,
+         magnitude = 50,
+      },
+      {
+         name = "p_restore_health_q",
+         count = 0,
+         magnitude = 100,
+      },
+      {
+         name = "p_restore_health_e",
+         count = 0,
+         magnitude = 200,
+      },
+      }, }
+   potionsArr[2] = {
+      check = false,
+      timer = 0,
+      effectName = "Restore Magicka",
+      types = { {
+         name = "p_restore_magicka_b",
+         count = 0,
+         magnitude = 5,
+      },
+      {
+         name = "p_restore_magicka_c",
+         count = 0,
+         magnitude = 10,
+      },
+      {
+         name = "p_restore_magicka_s",
+         count = 0,
+         magnitude = 50,
+      },
+      {
+         name = "p_restore_magicka_q",
+         count = 0,
+         magnitude = 100,
+      },
+      {
+         name = "p_restore_magicka_e",
+         count = 0,
+         magnitude = 200,
+      },
+      }, }
+   potionsArr[3] = {
+      check = false,
+      timer = 0,
+      effectName = "Restore Fatigue",
+      types = { {
+         name = "p_restore_fatigue_b",
+         count = 0,
+         magnitude = 25,
+      },
+      {
+         name = "p_restore_fatigue_c",
+         count = 0,
+         magnitude = 50,
+      },
+      {
+         name = "p_restore_fatigue_s",
+         count = 0,
+         magnitude = 100,
+      },
+      {
+         name = "p_restore_fatigue_q",
+         count = 0,
+         magnitude = 200,
+      },
+      {
+         name = "p_restore_fatigue_e",
+         count = 0,
+         magnitude = 400,
+      },
+      }, }
+   for i = 1, #potionsArr do
+      checkPotions(potionsArr[i])
+   end
+end
+
+local function onSave()
+   for k, v in pairs(MWVars) do
+      updateMWVar(k, v)
+   end
+   return {
+      version = ScriptVersion,
+      recallLoc = RECALL_LOC,
+      player = player,
+      cMove = cMove,
+      flyCheck = flyCheck,
+      wwCheck = wwCheck,
+      combatCheck = combatCheck,
+      playerSneaking = playerSneaking,
+      doOnce = doOnce,
+      doOnce2 = doOnce2,
+      moveTimer = moveTimer,
+      sheatheTimer = sheatheTimer,
+      warpTimer = warpTimer,
+      freeFallTimer = freeFallTimer,
+      counter = counter,
+      posA = posA,
+      posB = posB,
+      posC = posC,
+      potionsArr = potionsArr,
+   }
+end
+
+local function onLoad(data)
+   if (not data) or (not data.version) or (data.version < ScriptVersion) then
+      print('Was saved with an old version of the script, initializing to default')
+      RECALL_LOC = INIT_DATA.recallLoc
+      return
+   elseif (data.version > ScriptVersion) then
+      error('Required update to a new version of the script')
+   elseif (data.version == ScriptVersion) then
+      RECALL_LOC = data.recallLoc
+      player = data.player
+      cMove = data.cMove
+      flyCheck = data.flyCheck
+      wwCheck = data.wwCheck
+      combatCheck = data.combatCheck
+      playerSneaking = data.playerSneaking
+      doOnce = data.doOnce
+      doOnce2 = data.doOnce2
+      moveTimer = data.moveTimer
+      sheatheTimer = data.sheatheTimer
+      warpTimer = data.warpTimer
+      freeFallTimer = data.freeFallTimer
+      counter = data.counter
+      posA = data.posA
+      posB = data.posB
+      posC = data.posC
+      potionsArr = data.potionsArr
+   end
+end
+
 return {
    engineHandlers = {
-      onUpdate = function(dt)
-         getPlayerLeader()
-         shiesRestoreAttr()
-         print("freefalltimer:")
-         print(freeFallTimer)
-         if getCurrentAttr(attributes[1](selfObj)) / getMaxAttr(attributes[1](selfObj)) < FLEE_THRESHOLD then
-            updateMWVar("companion", 0)
-            cMove = false
-            flee()
-            fullHeal()
-         end
-         if flyCheck == false and types.Actor.isOnGround(selfObj) == false then
-            freeFall()
-         elseif freeFallTimer > -1 then
-            freeFallTimer = 0
-         end
-
-         updateTimers(dt)
-         setSheatheTimer(dt)
-         if isShiesFollowing() then
-            setSneak()
-            toggleLevitation()
-            toggleWaterWalking()
-            forceZLevel()
-            warpToPlayer()
-         elseif player ~= nil then
-            maintainDistance()
-            nudge(dt)
-         end
-
-         if counter < 20 then
-            counter = counter + 1
-            return
-         end
-         counter = 0
-
-         if isShiesFollowing() then
-            modSpeedAndAthletics()
-            for i = 1, #potionsArr do
-               checkPotions(potionsArr[i])
-            end
-         elseif player ~= nil then
-            setWanderSpeed()
-         end
-      end,
+      onUpdate = onUpdate,
       onInit = onInit,
       onSave = onSave,
       onLoad = onLoad,
