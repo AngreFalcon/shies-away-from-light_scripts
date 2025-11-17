@@ -5,46 +5,9 @@ local core = require('openmw.core')
 local ai = require('openmw.interfaces').AI
 local time = require('openmw_aux.time')
 local util = require('openmw.util')
+local cmn = require("scripts.safl_shies.common")
 
-local interface CellLoc
-	cellId: string
-	cellPos: util.Vector3
-end
-
-local interface PotionArr
-	name: string
-	count: number
-	magnitude: number
-end
-
-local interface Potions
-	check: boolean
-	timer: number
-	effectName: string
-	types: {PotionArr}
-end
-
-local interface SaveData
-	version: number
-	recallLoc: CellLoc
-	player: core.GameObject
-	cMove: boolean
-	flyCheck: boolean
-	wwCheck: boolean
-	combatCheck: boolean
-	playerSneaking: boolean
-	doOnce: boolean
-	doOnce2: boolean
-	moveTimer: number
-	sheatheTimer: number
-	warpTimer: number
-	freeFallTimer: number
-	counter: number
-	posA: CellLoc
-	posB: CellLoc
-	posC: CellLoc
-	potionsArr: {Potions}
-end
+-- Credit to Grumpy and Kateri for their companion mwscripts, which were used as the foundation for much of the below logic
 
 -- aliases
 local attributes = {types.Actor.stats.dynamic.health,types.Actor.stats.dynamic.magicka,types.Actor.stats.dynamic.fatigue}
@@ -53,10 +16,12 @@ local selfObj = self as core.GameObject
 -- variables
 local ScriptVersion = 1 -- increment whenever onSave is changed
 
-local cMove: boolean
-local flyCheck: boolean
-local wwCheck: boolean
-local combatCheck: boolean
+local checks: {cmn.Flag: boolean} = {
+	["cMove"] = false,
+	["fly"] = false,
+	["ww"] = false,
+	["combat"] = false,
+}
 
 local moveTimer: number
 local sheatheTimer: number
@@ -64,22 +29,22 @@ local warpTimer: number
 local freeFallTimer: number
 local counter: number
 
-local potionsArr: {Potions} = {}
+local potionsArr: {cmn.Potions} = {}
 
 -- constants
 local FLEE_THRESHOLD = 0.1
 local RECALL_TIMEOUT = 2 * time.second
-local INIT_DATA: SaveData = {recallLoc = {cellId = "Balmora, Council Club", cellPos = util.vector3(-5, -218, -251)}}
+local INIT_DATA: cmn.SaveData = {recallLoc = {cellId = "Balmora, Council Club", cellPos = util.vector3(-5, -218, -251)}}
 
 -- persistent variables
-local RECALL_LOC: CellLoc
+local RECALL_LOC: cmn.CellLoc
 local player: core.GameObject
 local playerSneaking: boolean
 
 -- warp function variables - persistent
-local posA: CellLoc
-local posB: CellLoc
-local posC: CellLoc
+local posA: cmn.CellLoc
+local posB: cmn.CellLoc
+local posC: cmn.CellLoc
 local doOnce: boolean
 local doOnce2: boolean
 
@@ -102,10 +67,6 @@ local function updateMWVar(varName: string, varData: number) -- Send an event to
 	core.sendGlobalEvent("updateMWVar", {varName, varData, selfObj})
 end
 
-local function getCurrentAttr(attr: types.DynamicStat): number -- Get the current value of the specified dynamic stat
-    return attr.current
-end
-
 local function getMaxAttr(attr: types.DynamicStat): number -- Get the maximum value of the specified dynamic stat
     return attr.base + attr.modifier
 end
@@ -115,7 +76,7 @@ local function fullHeal() -- Fully restore shies' health
 end
 
 local function checkAttrDamaged(attr: types.DynamicStat): boolean
-	return getCurrentAttr(attr) < getMaxAttr(attr)
+	return attr.current < getMaxAttr(attr)
 end
 
 local function isShiesFollowing(): boolean -- Simply return true or false if shies is currently following any player
@@ -136,7 +97,7 @@ local function makeShiesFollow() -- Helper function for setting the Follow AI pa
 	})
 end
 
-local function getPlayerCellPos(): CellLoc -- Get the cell location of the player that shies is currently following
+local function getPlayerCellPos(): cmn.CellLoc -- Get the cell location of the player that shies is currently following
 	return {cellId = player.cell.name, cellPos = player.position}
 end
 
@@ -192,7 +153,7 @@ local function flee() -- Triggers if shies' health drops below a certain thresho
 end
 
 local function setSheatheTimer(timePassed: number) -- Sheathe weapon after combat check
-	if combatCheck == true then
+	if checks["combat"] == true then
 		warpTimer = 6
 		sheatheTimer = sheatheTimer - timePassed
 		if core.sound.isSoundPlaying("Weapon Swish", selfObj) == true
@@ -205,7 +166,7 @@ local function setSheatheTimer(timePassed: number) -- Sheathe weapon after comba
 		then
 			sheatheTimer = 4.4
 		elseif sheatheTimer <= 0 then
-			combatCheck = false
+			checks["combat"] = false
 			if types.Actor.getStance(selfObj) == types.Actor.STANCE.Spell then
 				-- cast levitation spell on player? not sure why
 			else
@@ -215,16 +176,16 @@ local function setSheatheTimer(timePassed: number) -- Sheathe weapon after comba
 	elseif types.Actor.getStance(selfObj) == types.Actor.STANCE.Weapon
 		or types.Actor.getStance(selfObj) == types.Actor.STANCE.Spell
 	then
-		combatCheck = true
+		checks["combat"] = true
 		sheatheTimer = 4.4
 		warpTimer = 6
 	end
 end
 
 local function forceZLevel() -- If in combat, levitating and the player Z level is different from shies', force shies' Z level to the player's
-	local playerPos: CellLoc = (getPlayerCellPos() as CellLoc)
+	local playerPos: cmn.CellLoc = (getPlayerCellPos() as cmn.CellLoc)
 	local shiesPos = selfObj.position
-	if flyCheck == true and types.Actor.getStance(selfObj) == types.Actor.STANCE.Weapon then
+	if checks["fly"] == true and types.Actor.getStance(selfObj) == types.Actor.STANCE.Weapon then
 		core.sendGlobalEvent("teleport", {
 			actor = selfObj,
 			cell = selfObj.cell.name,
@@ -235,22 +196,22 @@ end
 
 local function maintainDistance() -- Toggles shies between wandering and following the player in order to maintain a small window of distance from the player. works only if the player activates it from dialogue by updating the "compmove" variable
 	local shiesPos = selfObj.position
-	local playerPos: CellLoc = (getPlayerCellPos() as CellLoc)
+	local playerPos: cmn.CellLoc = (getPlayerCellPos() as cmn.CellLoc)
 	if playerPos == nil then
 		return
 	end
-	if isShiesFollowing() and MWVars["compmove"] == 1 and cMove == false and getCoDist(shiesPos, playerPos.cellPos) < 70 then
+	if isShiesFollowing() and MWVars["compmove"] == 1 and checks["cMove"] == false and getCoDist(shiesPos, playerPos.cellPos) < 70 then
 		ai.removePackages("Follow")
 		ai.startPackage({
 			type = "Wander",
 			distance = 300
 		})
-		cMove = true
+		checks["cMove"] = true
 	end
-	if cMove == true and getCoDist(shiesPos, playerPos.cellPos) > 100 then
+	if checks["cMove"] == true and getCoDist(shiesPos, playerPos.cellPos) > 100 then
 		ai.removePackages("Wander")
 		makeShiesFollow()
-		cMove = false
+		checks["cMove"] = false
 	end
 end
 
@@ -276,7 +237,7 @@ local function warpToPlayer() -- If the player gets too far from shies, teleport
 		doOnce = true
 	end
 	
-	local coDist = getCoDist((posA as CellLoc).cellPos, posB.cellPos)
+	local coDist = getCoDist((posA as cmn.CellLoc).cellPos, posB.cellPos)
 	if coDist > 360 then
 		doOnce = false
 	end
@@ -286,17 +247,17 @@ local function warpToPlayer() -- If the player gets too far from shies, teleport
 		doOnce2 = true
 	end
 
-	local coDist2 = getCoDist((posA as CellLoc).cellPos, (posC as CellLoc).cellPos)
+	local coDist2 = getCoDist((posA as cmn.CellLoc).cellPos, (posC as cmn.CellLoc).cellPos)
 	if coDist2 > 360 then
 		doOnce2 = false
 	end
 
-	if warpTimer <= 0 and getCoDist(selfObj.position, (getPlayerCellPos() as CellLoc).cellPos) > 680 then
+	if warpTimer <= 0 and getCoDist(selfObj.position, (getPlayerCellPos() as cmn.CellLoc).cellPos) > 680 then
 		if coDist > 350 then
 			core.sendGlobalEvent("teleport", {
 				actor = selfObj,
-				cell = (posC as CellLoc).cellId,
-				position = (posC as CellLoc).cellPos
+				cell = (posC as cmn.CellLoc).cellId,
+				position = (posC as cmn.CellLoc).cellPos
 			})
 			makeShiesFollow()
 		elseif coDist2 > 350 then
@@ -310,35 +271,23 @@ local function warpToPlayer() -- If the player gets too far from shies, teleport
 	end
 end
 
-local function toggleLevitation() -- This function should apply the levitate effect to shies if the player is levitating, and remove it if the player isn't
-	local playerLevitating = types.Actor.activeEffects(player):getEffect((core.magic.EFFECT_TYPE.Levitate as string), nil).magnitude
-	if playerLevitating > 0 and flyCheck == false then
-		types.Actor.activeEffects(selfObj):modify(playerLevitating, (core.magic.EFFECT_TYPE.Levitate as string), nil)
-		flyCheck = true
-	elseif playerLevitating <= 0 and flyCheck == true then
-		local shiesLevitating = types.Actor.activeEffects(selfObj):getEffect((core.magic.EFFECT_TYPE.Levitate as string), nil).magnitude
-		types.Actor.activeEffects(selfObj):modify(-(shiesLevitating), (core.magic.EFFECT_TYPE.Levitate as string), nil)
-		flyCheck = false
-	end
-end
-
-local function toggleWaterWalking() -- This function should apply the waterwalking effect to shies if the player is waterwalking, and remove it if the player isn't
-	local playerWaterWalking = types.Actor.activeEffects(player):getEffect((core.magic.EFFECT_TYPE.WaterWalking as string), nil).magnitude
-	if playerWaterWalking > 0 and wwCheck == false then
-		types.Actor.activeEffects(selfObj):modify(playerWaterWalking, (core.magic.EFFECT_TYPE.WaterWalking as string), nil)
-		wwCheck = true
-	elseif playerWaterWalking <= 0 and wwCheck == true then
-		local shiesWaterWalking = types.Actor.activeEffects(selfObj):getEffect((core.magic.EFFECT_TYPE.WaterWalking as string), nil).magnitude
-		types.Actor.activeEffects(selfObj):modify(-(shiesWaterWalking), (core.magic.EFFECT_TYPE.WaterWalking as string), nil)
-		wwCheck = false
+local function toggleEffect(flag: cmn.Flag, effectType: string) -- This function should apply the levitate effect to shies if the player is levitating, and remove it if the player isn't
+	local playerEffect = types.Actor.activeEffects(player):getEffect(effectType, nil).magnitude
+	if playerEffect > 0 and checks[flag] == false then
+		types.Actor.activeEffects(selfObj):modify(playerEffect, effectType, nil)
+		checks[flag] = true
+	elseif playerEffect <= 0 and checks[flag] == true then
+		local shiesEffect = types.Actor.activeEffects(selfObj):getEffect(effectType, nil).magnitude
+		types.Actor.activeEffects(selfObj):modify(-(shiesEffect), effectType, nil)
+		checks[flag] = false
 	end
 end
 
 local function modSpeedAndAthletics() -- Set shies' speed and athletics modifier to a flat 15 if he's within a certain distance of the player, or add a multiplier based off the player's stats if he's too far
-	if getCoDist(selfObj.position, (getPlayerCellPos() as CellLoc).cellPos) < 300 then
+	if getCoDist(selfObj.position, (getPlayerCellPos() as cmn.CellLoc).cellPos) < 300 then
 		types.Actor.stats.attributes.speed(selfObj).modifier = 15
 		types.NPC.stats.skills.athletics(selfObj).modifier = 15
-	elseif getCoDist(selfObj.position, (getPlayerCellPos() as CellLoc).cellPos) > 300 then
+	elseif getCoDist(selfObj.position, (getPlayerCellPos() as cmn.CellLoc).cellPos) > 300 then
 		local cSpeed = types.Actor.stats.attributes.speed(selfObj).modified * 2.25
 		local cAthletics = types.NPC.stats.skills.athletics(player).modified * 2.25
 		types.Actor.stats.attributes.speed(selfObj).modifier = cSpeed
@@ -351,7 +300,7 @@ local function checkForPotion(potionName: string): boolean -- Returns true if sh
 	return inventory:countOf(potionName) > 0
 end
 
-local function checkPotions(potions: Potions) -- Checks shies' inventory to update the count of restore health/magicka/stamina potions he has
+local function checkPotions(potions: cmn.Potions) -- Checks shies' inventory to update the count of restore health/magicka/stamina potions he has
 	local inventory = types.Actor.inventory(selfObj)
 	local count: number = 0
 	for i = 1, #potions.types do
@@ -380,9 +329,9 @@ local function consumePotion(potionID: string, effectName: string): number -- Se
 	return duration
 end
 
-local function selectBestPotion(attr: types.DynamicStat, potions: {PotionArr}): string -- Find the potion whose restore amount is closest to the amount missing from the specified attribute
+local function selectBestPotion(attr: types.DynamicStat, potions: {cmn.PotionArr}): string -- Find the potion whose restore amount is closest to the amount missing from the specified attribute
 	local potion: integer
-	local attrDiff = getMaxAttr(attr) - getCurrentAttr(attr)
+	local attrDiff = getMaxAttr(attr) - attr.current
 	for i = 1, #potions do
 		if potions[i].count > 0 then
 			if potion == nil then
@@ -404,7 +353,7 @@ local function selectBestPotion(attr: types.DynamicStat, potions: {PotionArr}): 
 	end
 end
 
-local function shiesDrinkAttrPotion(potions: Potions, attr: types.DynamicStat): boolean -- Find the most applicable restore potion for the given attribute and then consume it. Returns false if a potion was not consumed
+local function shiesDrinkAttrPotion(potions: cmn.Potions, attr: types.DynamicStat): boolean -- Find the most applicable restore potion for the given attribute and then consume it. Returns false if a potion was not consumed
 	if potions.check == true and potions.timer <= 0 then
 		local potion = selectBestPotion(attr, potions.types)
 		if potion ~= nil then
@@ -417,9 +366,9 @@ local function shiesDrinkAttrPotion(potions: Potions, attr: types.DynamicStat): 
 end
 
 local function checkAttributes() -- Used to call various functions that affect shies' dynamic attributes like health, fatigue, magicka
-	if getCurrentAttr(attributes[1](selfObj)) / getMaxAttr(attributes[1](selfObj)) < FLEE_THRESHOLD then -- Check health ratio
+	if attributes[1](selfObj).current / getMaxAttr(attributes[1](selfObj)) < FLEE_THRESHOLD then -- Check health ratio
 		updateMWVar("companion", 0)
-		cMove = false
+		checks["cMove"] = false
         flee() -- Teleport Shies away from combat to whatever position he has marked
 		fullHeal() -- Heal Shies to avoid the script triggering again, and also to ensure the player doesn't have to restore his health upon recovering him
 		return
@@ -449,7 +398,7 @@ local function updateTimers(dt: number)
 		potionsArr[i].timer = potionsArr[i].timer - dt
 	end
 	warpTimer = warpTimer - dt
-	if ((flyCheck == false) and (types.Actor.isOnGround(selfObj) == false)) or freeFallTimer < 0 then
+	if ((checks["fly"] == false) and (types.Actor.isOnGround(selfObj) == false)) or freeFallTimer < 0 then
 		freeFallTimer = freeFallTimer + dt
 	elseif freeFallTimer > 0 then -- A negative freeFallTimer implies a slowfall potion is active and the timer should not be reset
 		freeFallTimer = 0
@@ -460,7 +409,7 @@ local function onUpdate(dt: number) -- called every frame while the script is lo
 	getPlayerLeader()
     checkAttributes()
 
-	if flyCheck == false and types.Actor.isOnGround(selfObj) == false then
+	if checks["fly"] == false and types.Actor.isOnGround(selfObj) == false then
 		freeFall()
 	end
 
@@ -469,8 +418,8 @@ local function onUpdate(dt: number) -- called every frame while the script is lo
 
 	if isShiesFollowing() then
 		setSneak()
-		toggleLevitation()
-		toggleWaterWalking()
+		toggleEffect("fly", (core.magic.EFFECT_TYPE.Levitate as string))
+		toggleEffect("ww", (core.magic.EFFECT_TYPE.WaterWalking as string))
 		forceZLevel()
 		warpToPlayer()
 	elseif player ~= nil then
@@ -493,10 +442,10 @@ end
 
 local function onInit() -- Called when the script is created but not loaded
 	RECALL_LOC = INIT_DATA.recallLoc
-	cMove = false
-	flyCheck = false
-	wwCheck = false
-	combatCheck = false
+	checks["cMove"] = false
+	checks["fly"] = false
+	checks["ww"] = false
+	checks["combat"] = false
 	playerSneaking = false
 	doOnce = false
 	doOnce2 = false
@@ -600,7 +549,7 @@ local function onInit() -- Called when the script is created but not loaded
 	end
 end
 
-local function onSave(): SaveData -- Called when the game saves, even if currently in an inactive state
+local function onSave(): cmn.SaveData -- Called when the game saves, even if currently in an inactive state
 	for k, v in pairs(MWVars) do
 		updateMWVar(k, v)
 	end
@@ -608,10 +557,7 @@ local function onSave(): SaveData -- Called when the game saves, even if current
 		version = ScriptVersion,
 		recallLoc = RECALL_LOC,
 		player = player,
-		cMove = cMove,
-		flyCheck = flyCheck,
-		wwCheck = wwCheck,
-		combatCheck = combatCheck,
+		checks = checks,
 		playerSneaking = playerSneaking,
 		doOnce = doOnce,
 		doOnce2 = doOnce2,
@@ -627,7 +573,7 @@ local function onSave(): SaveData -- Called when the game saves, even if current
 	}
 end
 
-local function onLoad(data: SaveData) -- Called only when the script loads, not the saved game. will not be called if the script was not previously saved
+local function onLoad(data: cmn.SaveData) -- Called only when the script loads, not the saved game. will not be called if the script was not previously saved
 	if (not data) or (not data.version) or (data.version < ScriptVersion) then
 		print('Was saved with an old version of the script, initializing to default')
 		RECALL_LOC = INIT_DATA.recallLoc
@@ -637,10 +583,7 @@ local function onLoad(data: SaveData) -- Called only when the script loads, not 
 	elseif (data.version == ScriptVersion) then
 		RECALL_LOC = data.recallLoc
 		player = data.player
-		cMove = data.cMove
-		flyCheck = data.flyCheck
-		wwCheck = data.wwCheck
-		combatCheck = data.combatCheck
+		checks = data.checks
 		playerSneaking = data.playerSneaking
 		doOnce = data.doOnce
 		doOnce2 = data.doOnce2
@@ -666,6 +609,11 @@ return {
     eventHandlers = {
 		["fetchMWVars"] = function(data: {string: number})
 			MWVars = data
+			for k, v in pairs(data) do
+				if MWVars[k] ~= v then
+					MWVars[k] = v
+				end
+			end
 		end,
         ["Hit"] = function(attack: I.Combat.AttackInfo) -- example of sending an event (with a message) back to the player that hit him
             local attackerObj = attack.attacker as core.GameObject

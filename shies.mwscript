@@ -1,0 +1,45 @@
+begin safl_compscript ;this script has been modified but credit for the original goes to Grumpy
+
+short companion
+short nohello
+short nolore
+short fled
+short compmove
+short onetimemove
+short weapuse
+short addonce
+
+; if the player has a menu open and the player is not sleeping, return
+if ( MenuMode == 1 )
+  if ( GetPCSleep == 0 )
+    return
+  endif
+endif
+
+; this block adjusts the NPC's marksmanship when they're forced to use the same fighting style as the PC
+; Will discard once skill leveling is implemented in lua
+if ( weapUse == 1 )
+  if ( Player->GetWeaponType <= 8 )
+    SetMarksman, 0
+  else
+    SetMarksman, 200
+  endif
+endif
+
+; this block controls whether the NPC should scale to the player's level when the player sleeps
+; Will discard once skill leveling is implemented in lua
+if ( GetCurrentAIPackage == 3 )
+  if ( GetPCSleep == 1 )
+    StartScript, safl_compLevel
+  endif
+endif
+
+;ADD ADDITIONAL TOPICS IN THIS SECTION IF REQUIRED.
+
+if ( addOnce == 0 )
+  StartScript, safl_compLevel ; Will discard once skill leveling is implemented in lua
+  Set companion to 0
+  Set addOnce to 1
+endif
+
+end

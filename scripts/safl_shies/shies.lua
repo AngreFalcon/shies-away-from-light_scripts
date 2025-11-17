@@ -5,44 +5,7 @@ local core = require('openmw.core')
 local ai = require('openmw.interfaces').AI
 local time = require('openmw_aux.time')
 local util = require('openmw.util')
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+local cmn = require("common")
 
 
 
@@ -53,10 +16,12 @@ local selfObj = self
 
 local ScriptVersion = 1
 
-local cMove
-local flyCheck
-local wwCheck
-local combatCheck
+local checks = {
+   ["cMove"] = false,
+   ["fly"] = false,
+   ["ww"] = false,
+   ["combat"] = false,
+}
 
 local moveTimer
 local sheatheTimer
@@ -102,10 +67,6 @@ local function updateMWVar(varName, varData)
    core.sendGlobalEvent("updateMWVar", { varName, varData, selfObj })
 end
 
-local function getCurrentAttr(attr)
-   return attr.current
-end
-
 local function getMaxAttr(attr)
    return attr.base + attr.modifier
 end
@@ -115,7 +76,7 @@ local function fullHeal()
 end
 
 local function checkAttrDamaged(attr)
-   return getCurrentAttr(attr) < getMaxAttr(attr)
+   return attr.current < getMaxAttr(attr)
 end
 
 local function isShiesFollowing()
@@ -192,7 +153,7 @@ local function flee()
 end
 
 local function setSheatheTimer(timePassed)
-   if combatCheck == true then
+   if checks["combat"] == true then
       warpTimer = 6
       sheatheTimer = sheatheTimer - timePassed
       if core.sound.isSoundPlaying("Weapon Swish", selfObj) == true or
@@ -205,7 +166,7 @@ local function setSheatheTimer(timePassed)
 
          sheatheTimer = 4.4
       elseif sheatheTimer <= 0 then
-         combatCheck = false
+         checks["combat"] = false
          if types.Actor.getStance(selfObj) == types.Actor.STANCE.Spell then
 
          else
@@ -215,7 +176,7 @@ local function setSheatheTimer(timePassed)
    elseif types.Actor.getStance(selfObj) == types.Actor.STANCE.Weapon or
       types.Actor.getStance(selfObj) == types.Actor.STANCE.Spell then
 
-      combatCheck = true
+      checks["combat"] = true
       sheatheTimer = 4.4
       warpTimer = 6
    end
@@ -224,7 +185,7 @@ end
 local function forceZLevel()
    local playerPos = (getPlayerCellPos())
    local shiesPos = selfObj.position
-   if flyCheck == true and types.Actor.getStance(selfObj) == types.Actor.STANCE.Weapon then
+   if checks["fly"] == true and types.Actor.getStance(selfObj) == types.Actor.STANCE.Weapon then
       core.sendGlobalEvent("teleport", {
          actor = selfObj,
          cell = selfObj.cell.name,
@@ -239,18 +200,18 @@ local function maintainDistance()
    if playerPos == nil then
       return
    end
-   if isShiesFollowing() and MWVars["compmove"] == 1 and cMove == false and getCoDist(shiesPos, playerPos.cellPos) < 70 then
+   if isShiesFollowing() and MWVars["compmove"] == 1 and checks["cMove"] == false and getCoDist(shiesPos, playerPos.cellPos) < 70 then
       ai.removePackages("Follow")
       ai.startPackage({
          type = "Wander",
          distance = 300,
       })
-      cMove = true
+      checks["cMove"] = true
    end
-   if cMove == true and getCoDist(shiesPos, playerPos.cellPos) > 100 then
+   if checks["cMove"] == true and getCoDist(shiesPos, playerPos.cellPos) > 100 then
       ai.removePackages("Wander")
       makeShiesFollow()
-      cMove = false
+      checks["cMove"] = false
    end
 end
 
@@ -310,27 +271,15 @@ local function warpToPlayer()
    end
 end
 
-local function toggleLevitation()
-   local playerLevitating = types.Actor.activeEffects(player):getEffect((core.magic.EFFECT_TYPE.Levitate), nil).magnitude
-   if playerLevitating > 0 and flyCheck == false then
-      types.Actor.activeEffects(selfObj):modify(playerLevitating, (core.magic.EFFECT_TYPE.Levitate), nil)
-      flyCheck = true
-   elseif playerLevitating <= 0 and flyCheck == true then
-      local shiesLevitating = types.Actor.activeEffects(selfObj):getEffect((core.magic.EFFECT_TYPE.Levitate), nil).magnitude
-      types.Actor.activeEffects(selfObj):modify(-(shiesLevitating), (core.magic.EFFECT_TYPE.Levitate), nil)
-      flyCheck = false
-   end
-end
-
-local function toggleWaterWalking()
-   local playerWaterWalking = types.Actor.activeEffects(player):getEffect((core.magic.EFFECT_TYPE.WaterWalking), nil).magnitude
-   if playerWaterWalking > 0 and wwCheck == false then
-      types.Actor.activeEffects(selfObj):modify(playerWaterWalking, (core.magic.EFFECT_TYPE.WaterWalking), nil)
-      wwCheck = true
-   elseif playerWaterWalking <= 0 and wwCheck == true then
-      local shiesWaterWalking = types.Actor.activeEffects(selfObj):getEffect((core.magic.EFFECT_TYPE.WaterWalking), nil).magnitude
-      types.Actor.activeEffects(selfObj):modify(-(shiesWaterWalking), (core.magic.EFFECT_TYPE.WaterWalking), nil)
-      wwCheck = false
+local function toggleEffect(flag, effectType)
+   local playerEffect = types.Actor.activeEffects(player):getEffect(effectType, nil).magnitude
+   if playerEffect > 0 and checks[flag] == false then
+      types.Actor.activeEffects(selfObj):modify(playerEffect, effectType, nil)
+      checks[flag] = true
+   elseif playerEffect <= 0 and checks[flag] == true then
+      local shiesEffect = types.Actor.activeEffects(selfObj):getEffect(effectType, nil).magnitude
+      types.Actor.activeEffects(selfObj):modify(-(shiesEffect), effectType, nil)
+      checks[flag] = false
    end
 end
 
@@ -382,7 +331,7 @@ end
 
 local function selectBestPotion(attr, potions)
    local potion
-   local attrDiff = getMaxAttr(attr) - getCurrentAttr(attr)
+   local attrDiff = getMaxAttr(attr) - attr.current
    for i = 1, #potions do
       if potions[i].count > 0 then
          if potion == nil then
@@ -417,9 +366,9 @@ local function shiesDrinkAttrPotion(potions, attr)
 end
 
 local function checkAttributes()
-   if getCurrentAttr(attributes[1](selfObj)) / getMaxAttr(attributes[1](selfObj)) < FLEE_THRESHOLD then
+   if attributes[1](selfObj).current / getMaxAttr(attributes[1](selfObj)) < FLEE_THRESHOLD then
       updateMWVar("companion", 0)
-      cMove = false
+      checks["cMove"] = false
       flee()
       fullHeal()
       return
@@ -449,7 +398,7 @@ local function updateTimers(dt)
       potionsArr[i].timer = potionsArr[i].timer - dt
    end
    warpTimer = warpTimer - dt
-   if ((flyCheck == false) and (types.Actor.isOnGround(selfObj) == false)) or freeFallTimer < 0 then
+   if ((checks["fly"] == false) and (types.Actor.isOnGround(selfObj) == false)) or freeFallTimer < 0 then
       freeFallTimer = freeFallTimer + dt
    elseif freeFallTimer > 0 then
       freeFallTimer = 0
@@ -460,7 +409,7 @@ local function onUpdate(dt)
    getPlayerLeader()
    checkAttributes()
 
-   if flyCheck == false and types.Actor.isOnGround(selfObj) == false then
+   if checks["fly"] == false and types.Actor.isOnGround(selfObj) == false then
       freeFall()
    end
 
@@ -469,8 +418,8 @@ local function onUpdate(dt)
 
    if isShiesFollowing() then
       setSneak()
-      toggleLevitation()
-      toggleWaterWalking()
+      toggleEffect("fly", (core.magic.EFFECT_TYPE.Levitate))
+      toggleEffect("ww", (core.magic.EFFECT_TYPE.WaterWalking))
       forceZLevel()
       warpToPlayer()
    elseif player ~= nil then
@@ -493,10 +442,10 @@ end
 
 local function onInit()
    RECALL_LOC = INIT_DATA.recallLoc
-   cMove = false
-   flyCheck = false
-   wwCheck = false
-   combatCheck = false
+   checks["cMove"] = false
+   checks["fly"] = false
+   checks["ww"] = false
+   checks["combat"] = false
    playerSneaking = false
    doOnce = false
    doOnce2 = false
@@ -608,10 +557,7 @@ local function onSave()
       version = ScriptVersion,
       recallLoc = RECALL_LOC,
       player = player,
-      cMove = cMove,
-      flyCheck = flyCheck,
-      wwCheck = wwCheck,
-      combatCheck = combatCheck,
+      checks = checks,
       playerSneaking = playerSneaking,
       doOnce = doOnce,
       doOnce2 = doOnce2,
@@ -637,10 +583,7 @@ local function onLoad(data)
    elseif (data.version == ScriptVersion) then
       RECALL_LOC = data.recallLoc
       player = data.player
-      cMove = data.cMove
-      flyCheck = data.flyCheck
-      wwCheck = data.wwCheck
-      combatCheck = data.combatCheck
+      checks = data.checks
       playerSneaking = data.playerSneaking
       doOnce = data.doOnce
       doOnce2 = data.doOnce2
@@ -666,6 +609,11 @@ return {
    eventHandlers = {
       ["fetchMWVars"] = function(data)
          MWVars = data
+         for k, v in pairs(data) do
+            if MWVars[k] ~= v then
+               MWVars[k] = v
+            end
+         end
       end,
       ["Hit"] = function(attack)
          local attackerObj = attack.attacker
