@@ -14,50 +14,72 @@ end
 local interface SaveData
 	version: number
 	recallLoc: CellLoc
-	playerLeader: core.GameObject
+	player: core.GameObject
+	cMove: boolean
+	flyCheck: boolean
+	wwCheck: boolean
+	combatCheck: boolean
+	playerSneaking: boolean
+	doOnce: boolean
+	doOnce2: boolean
+	moveTimer: number
+	sheatheTimer: number
+	warpTimer: number
+	counter: number
+	posA: CellLoc
+	posB: CellLoc
+	posC: CellLoc
 end
 
 -- aliases
 local health = types.Actor.stats.dynamic.health
 local selfObj = self as core.GameObject
---
 
 -- variables
 local ScriptVersion = 1 -- increment whenever onSave is changed
 
-local cMove: boolean = false
-local flyCheck: boolean = false
-local wwCheck: boolean = false	
-local combatCheck: boolean = false
+local cMove: boolean
+local flyCheck: boolean
+local wwCheck: boolean
+local combatCheck: boolean
 
-local moveTimer: number = 0
-local sheatheTimer: number = 0
-local warpTimer: number = 0
-local counter: number = 0
---
+local moveTimer: number
+local sheatheTimer: number
+local warpTimer: number
+local counter: number
 
 -- constants
 local FLEE_THRESHOLD = 0.1
 local RECALL_TIMEOUT = 2 * time.second
 local INIT_DATA: SaveData = {recallLoc = {cellId = "Balmora, Council Club", cellPos = util.vector3(-5, -218, -251)}}
---
 
 -- persistent variables
 local RECALL_LOC: CellLoc
-local playerSneaking: boolean = false
---
+local player: core.GameObject
+local playerSneaking: boolean
 
 -- warp function variables - persistent
-local posA: CellLoc | nil
+local posA: CellLoc
 local posB: CellLoc
-local posC: CellLoc | nil
-local doOnce: boolean = false
-local doOnce2: boolean = false
+local posC: CellLoc
+local doOnce: boolean
+local doOnce2: boolean
 
 -- mwscript variables - persistent
 -- important to note: all MWScript variables are automatically cast to all lowercase
 local MWVars: {string: number} = {}
---
+--[[
+variables:
+short companion -- engine variable -- true if shies is currently following the player. if 0, companion dialogue topics don't appear
+short nohello -- engine variable -- 
+short nolore -- engine variable --
+short fled -- true if shies has teleported away during combat
+short compmove -- true if the player has asked shies to maintain his distance
+short onetimemove -- true if the player has asked shies to move out of the way
+short weapuse -- true if the player has asked shies to use the same weapons as the player
+short addonce -- true after the mwscript has executed once, is used to initialize companion to 0
+short p_check -- true if shies has any healing potions of any quality in his inventory
+]]
 
 local function updateMWVar(varName: string, varData: number) -- Send an event to the global script to update a single mwscript variable with the provided value
 	core.sendGlobalEvent("updateMWVar", {varName, varData, selfObj})
@@ -65,6 +87,17 @@ end
 
 local function onInit() -- Called when the script is created but not loaded
 	RECALL_LOC = INIT_DATA.recallLoc
+	cMove = false
+	flyCheck = false
+	wwCheck = false
+	combatCheck = false
+	playerSneaking = false
+	doOnce = false
+	doOnce2 = false
+	moveTimer = 0
+	sheatheTimer = 0
+	warpTimer = 0
+	counter = 0
 end
 
 local function onSave(): SaveData -- Called when the game saves, even if currently in an inactive state
@@ -74,6 +107,21 @@ local function onSave(): SaveData -- Called when the game saves, even if current
 	return {
 		version = ScriptVersion,
 		recallLoc = RECALL_LOC,
+		player = player,
+		cMove = cMove,
+		flyCheck = flyCheck,
+		wwCheck = wwCheck,
+		combatCheck = combatCheck,
+		playerSneaking = playerSneaking,
+		doOnce = doOnce,
+		doOnce2 = doOnce2,
+		moveTimer= moveTimer,
+		sheatheTimer = sheatheTimer,
+		warpTimer = warpTimer,
+		counter = counter,
+		posA = posA,
+		posB = posB,
+		posC = posC,
 	}
 end
 
@@ -86,8 +134,21 @@ local function onLoad(data: SaveData) -- Called only when the script loads, not 
 		error('Required update to a new version of the script')
 	elseif (data.version == ScriptVersion) then
 		RECALL_LOC = data.recallLoc
-	else
-
+		player = data.player
+		cMove = data.cMove
+		flyCheck = data.flyCheck
+		wwCheck = data.wwCheck
+		combatCheck = data.combatCheck
+		playerSneaking = data.playerSneaking
+		doOnce = data.doOnce
+		doOnce2 = data.doOnce2
+		moveTimer= data.moveTimer
+		sheatheTimer = data.sheatheTimer
+		warpTimer = data.warpTimer
+		counter = data.counter
+		posA = data.posA
+		posB = data.posB
+		posC = data.posC
 	end
 end
 
@@ -108,19 +169,21 @@ local function isShiesFollowing(): boolean -- Simply return true or false if shi
 	return ((currentPackage ~= nil) and (currentPackage.type == "Follow"))
 end
 
-local function getPlayerLeader(): core.GameObject -- Gets the player object that shies is currently following
+local function getPlayerLeader() -- Gets the player object that shies is currently following
 	if isShiesFollowing() then
-		return ai.getActiveTarget("Follow")
+		player = ai.getActiveTarget("Follow")
 	end
 end
 
-local function getPlayerCellPos(): CellLoc | nil -- Get the cell location of the player that shies is currently following
-	local player = getPlayerLeader()
-	if player == nil then
-		return nil
-	else
-		return {cellId = player.cell.name, cellPos = player.position}
-	end
+local function makeShiesFollow()
+	ai.startPackage({
+		type = "Follow",
+		target = player
+	})
+end
+
+local function getPlayerCellPos(): CellLoc -- Get the cell location of the player that shies is currently following
+	return {cellId = player.cell.name, cellPos = player.position}
 end
 
 local function getCoDist(vector1: util.Vector3, vector2: util.Vector3): number -- Get cosine distance between two vectors
@@ -130,7 +193,6 @@ local function getCoDist(vector1: util.Vector3, vector2: util.Vector3): number -
 end
 
 local function setSneak() -- Make sure if the player is sneaking, shies sneaks as well
-	local player = getPlayerLeader()
 	if player ~= nil then
 		player:sendEvent("getSneakVal", selfObj)
 	end
@@ -140,7 +202,6 @@ local function setSneak() -- Make sure if the player is sneaking, shies sneaks a
 end
 
 local function triggerShiesFledQuest() -- Used to trigger the shies fled quest. Should only be triggered once
-	local player = getPlayerLeader()
 	if player ~= nil then
 		player:sendEvent("shiesFled", nil)
 	end
@@ -207,12 +268,9 @@ local function setSheatheTimer(timePassed: number) -- Sheathe weapon after comba
 	end
 end
 
-local function forceZLevel() -- If the player is levitating and their Z level is different from shies', force shies' Z level to the player's
+local function forceZLevel() -- If in combat, levitating and the player Z level is different from shies', force shies' Z level to the player's
 	local playerPos: CellLoc = (getPlayerCellPos() as CellLoc)
 	local shiesPos = selfObj.position
-	if playerPos == nil then
-		return
-	end
 	if flyCheck == true and types.Actor.getStance(selfObj) == types.Actor.STANCE.Weapon then
 		core.sendGlobalEvent("teleport", {
 			actor = selfObj,
@@ -229,6 +287,7 @@ local function maintainDistance() -- Toggles shies between wandering and followi
 		return
 	end
 	if isShiesFollowing() and MWVars["compmove"] == 1 and cMove == false and getCoDist(shiesPos, playerPos.cellPos) < 70 then
+		ai.removePackages("Follow")
 		ai.startPackage({
 			type = "Wander",
 			distance = 300
@@ -236,23 +295,18 @@ local function maintainDistance() -- Toggles shies between wandering and followi
 		cMove = true
 	end
 	if cMove == true and getCoDist(shiesPos, playerPos.cellPos) > 100 then
-		ai.startPackage({
-			type = "Follow",
-			target = getPlayerLeader()
-		})
+		ai.removePackages("Wander")
+		makeShiesFollow()
 		cMove = false
 	end
 end
 
-local function nudge(timePassed: number)
+local function nudge(timePassed: number) -- Waits 4 seconds before making shies follow the player again. onetimemove is set true in dialogue while simultaneously triggering the Wander AI package to make him move
 	if MWVars["onetimemove"] == 1 then
 		moveTimer = moveTimer + timePassed
 		if moveTimer > 4 then
 			moveTimer = 0
-			ai.startPackage({
-				type = "Follow",
-				target = getPlayerLeader()
-			})
+			makeShiesFollow()
 			updateMWVar("onetimemove", 0)
 		end
 	end
@@ -291,30 +345,20 @@ local function warpToPlayer() -- If the player gets too far from shies, teleport
 				cell = (posC as CellLoc).cellId,
 				position = (posC as CellLoc).cellPos
 			})
-			if isShiesFollowing() ~= true then
-				ai.startPackage({
-					type = "Follow",
-					target = getPlayerLeader
-				})
-			end
+			makeShiesFollow()
 		elseif coDist2 > 350 then
 			core.sendGlobalEvent("teleport", {
 				actor = selfObj,
 				cell = posB.cellId,
 				position = posB.cellPos
 			})
-			if isShiesFollowing() ~= true then
-				ai.startPackage({
-					type = "Follow",
-					target = getPlayerLeader
-				})
-			end
+			makeShiesFollow()
 		end
 	end
 end
 
 local function toggleLevitation() -- This function should apply the levitate effect to shies if the player is levitating, and remove it if the player isn't
-	local playerLevitating = types.Actor.activeEffects(getPlayerLeader()):getEffect((core.magic.EFFECT_TYPE.Levitate as string), nil).magnitude
+	local playerLevitating = types.Actor.activeEffects(player):getEffect((core.magic.EFFECT_TYPE.Levitate as string), nil).magnitude
 	if playerLevitating > 0 and flyCheck == false then
 		types.Actor.activeEffects(selfObj):modify(playerLevitating, (core.magic.EFFECT_TYPE.Levitate as string), nil)
 		flyCheck = true
@@ -326,7 +370,7 @@ local function toggleLevitation() -- This function should apply the levitate eff
 end
 
 local function toggleWaterWalking() -- This function should apply the waterwalking effect to shies if the player is waterwalking, and remove it if the player isn't
-	local playerWaterWalking = types.Actor.activeEffects(getPlayerLeader()):getEffect((core.magic.EFFECT_TYPE.WaterWalking as string), nil).magnitude
+	local playerWaterWalking = types.Actor.activeEffects(player):getEffect((core.magic.EFFECT_TYPE.WaterWalking as string), nil).magnitude
 	if playerWaterWalking > 0 and wwCheck == false then
 		types.Actor.activeEffects(selfObj):modify(playerWaterWalking, (core.magic.EFFECT_TYPE.WaterWalking as string), nil)
 		wwCheck = true
@@ -336,7 +380,6 @@ local function toggleWaterWalking() -- This function should apply the waterwalki
 		wwCheck = false
 	end
 end
-
 -- mwscript logic above
 
 return {
@@ -361,8 +404,10 @@ return {
 				warpToPlayer()
 			end
 
-			maintainDistance()
-			nudge(dt)
+			if player ~= nil then
+				maintainDistance()
+				nudge(dt)
+			end
 
 			if counter < 20 then
 				counter = counter + 1

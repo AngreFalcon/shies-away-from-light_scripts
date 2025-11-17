@@ -18,23 +18,35 @@ local util = require('openmw.util')
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 local health = types.Actor.stats.dynamic.health
 local selfObj = self
 
 
-
 local ScriptVersion = 1
 
-local cMove = false
-local flyCheck = false
-local wwCheck = false
-local combatCheck = false
+local cMove
+local flyCheck
+local wwCheck
+local combatCheck
 
-local moveTimer = 0
-local sheatheTimer = 0
-local warpTimer = 0
-local counter = 0
-
+local moveTimer
+local sheatheTimer
+local warpTimer
+local counter
 
 
 local FLEE_THRESHOLD = 0.1
@@ -42,21 +54,31 @@ local RECALL_TIMEOUT = 2 * time.second
 local INIT_DATA = { recallLoc = { cellId = "Balmora, Council Club", cellPos = util.vector3(-5, -218, -251) } }
 
 
-
 local RECALL_LOC
-local playerSneaking = false
-
+local player
+local playerSneaking
 
 
 local posA
 local posB
 local posC
-local doOnce = false
-local doOnce2 = false
+local doOnce
+local doOnce2
 
 
 
 local MWVars = {}
+
+
+
+
+
+
+
+
+
+
+
 
 
 local function updateMWVar(varName, varData)
@@ -65,6 +87,17 @@ end
 
 local function onInit()
    RECALL_LOC = INIT_DATA.recallLoc
+   cMove = false
+   flyCheck = false
+   wwCheck = false
+   combatCheck = false
+   playerSneaking = false
+   doOnce = false
+   doOnce2 = false
+   moveTimer = 0
+   sheatheTimer = 0
+   warpTimer = 0
+   counter = 0
 end
 
 local function onSave()
@@ -74,6 +107,21 @@ local function onSave()
    return {
       version = ScriptVersion,
       recallLoc = RECALL_LOC,
+      player = player,
+      cMove = cMove,
+      flyCheck = flyCheck,
+      wwCheck = wwCheck,
+      combatCheck = combatCheck,
+      playerSneaking = playerSneaking,
+      doOnce = doOnce,
+      doOnce2 = doOnce2,
+      moveTimer = moveTimer,
+      sheatheTimer = sheatheTimer,
+      warpTimer = warpTimer,
+      counter = counter,
+      posA = posA,
+      posB = posB,
+      posC = posC,
    }
 end
 
@@ -86,8 +134,21 @@ local function onLoad(data)
       error('Required update to a new version of the script')
    elseif (data.version == ScriptVersion) then
       RECALL_LOC = data.recallLoc
-   else
-
+      player = data.player
+      cMove = data.cMove
+      flyCheck = data.flyCheck
+      wwCheck = data.wwCheck
+      combatCheck = data.combatCheck
+      playerSneaking = data.playerSneaking
+      doOnce = data.doOnce
+      doOnce2 = data.doOnce2
+      moveTimer = data.moveTimer
+      sheatheTimer = data.sheatheTimer
+      warpTimer = data.warpTimer
+      counter = data.counter
+      posA = data.posA
+      posB = data.posB
+      posC = data.posC
    end
 end
 
@@ -110,17 +171,19 @@ end
 
 local function getPlayerLeader()
    if isShiesFollowing() then
-      return ai.getActiveTarget("Follow")
+      player = ai.getActiveTarget("Follow")
    end
 end
 
+local function makeShiesFollow()
+   ai.startPackage({
+      type = "Follow",
+      target = player,
+   })
+end
+
 local function getPlayerCellPos()
-   local player = getPlayerLeader()
-   if player == nil then
-      return nil
-   else
-      return { cellId = player.cell.name, cellPos = player.position }
-   end
+   return { cellId = player.cell.name, cellPos = player.position }
 end
 
 local function getCoDist(vector1, vector2)
@@ -130,7 +193,6 @@ local function getCoDist(vector1, vector2)
 end
 
 local function setSneak()
-   local player = getPlayerLeader()
    if player ~= nil then
       player:sendEvent("getSneakVal", selfObj)
    end
@@ -140,7 +202,6 @@ local function setSneak()
 end
 
 local function triggerShiesFledQuest()
-   local player = getPlayerLeader()
    if player ~= nil then
       player:sendEvent("shiesFled", nil)
    end
@@ -210,9 +271,6 @@ end
 local function forceZLevel()
    local playerPos = (getPlayerCellPos())
    local shiesPos = selfObj.position
-   if playerPos == nil then
-      return
-   end
    if flyCheck == true and types.Actor.getStance(selfObj) == types.Actor.STANCE.Weapon then
       core.sendGlobalEvent("teleport", {
          actor = selfObj,
@@ -229,6 +287,7 @@ local function maintainDistance()
       return
    end
    if isShiesFollowing() and MWVars["compmove"] == 1 and cMove == false and getCoDist(shiesPos, playerPos.cellPos) < 70 then
+      ai.removePackages("Follow")
       ai.startPackage({
          type = "Wander",
          distance = 300,
@@ -236,10 +295,8 @@ local function maintainDistance()
       cMove = true
    end
    if cMove == true and getCoDist(shiesPos, playerPos.cellPos) > 100 then
-      ai.startPackage({
-         type = "Follow",
-         target = getPlayerLeader(),
-      })
+      ai.removePackages("Wander")
+      makeShiesFollow()
       cMove = false
    end
 end
@@ -249,10 +306,7 @@ local function nudge(timePassed)
       moveTimer = moveTimer + timePassed
       if moveTimer > 4 then
          moveTimer = 0
-         ai.startPackage({
-            type = "Follow",
-            target = getPlayerLeader(),
-         })
+         makeShiesFollow()
          updateMWVar("onetimemove", 0)
       end
    end
@@ -291,30 +345,20 @@ local function warpToPlayer()
             cell = (posC).cellId,
             position = (posC).cellPos,
          })
-         if isShiesFollowing() ~= true then
-            ai.startPackage({
-               type = "Follow",
-               target = getPlayerLeader,
-            })
-         end
+         makeShiesFollow()
       elseif coDist2 > 350 then
          core.sendGlobalEvent("teleport", {
             actor = selfObj,
             cell = posB.cellId,
             position = posB.cellPos,
          })
-         if isShiesFollowing() ~= true then
-            ai.startPackage({
-               type = "Follow",
-               target = getPlayerLeader,
-            })
-         end
+         makeShiesFollow()
       end
    end
 end
 
 local function toggleLevitation()
-   local playerLevitating = types.Actor.activeEffects(getPlayerLeader()):getEffect((core.magic.EFFECT_TYPE.Levitate), nil).magnitude
+   local playerLevitating = types.Actor.activeEffects(player):getEffect((core.magic.EFFECT_TYPE.Levitate), nil).magnitude
    if playerLevitating > 0 and flyCheck == false then
       types.Actor.activeEffects(selfObj):modify(playerLevitating, (core.magic.EFFECT_TYPE.Levitate), nil)
       flyCheck = true
@@ -326,7 +370,7 @@ local function toggleLevitation()
 end
 
 local function toggleWaterWalking()
-   local playerWaterWalking = types.Actor.activeEffects(getPlayerLeader()):getEffect((core.magic.EFFECT_TYPE.WaterWalking), nil).magnitude
+   local playerWaterWalking = types.Actor.activeEffects(player):getEffect((core.magic.EFFECT_TYPE.WaterWalking), nil).magnitude
    if playerWaterWalking > 0 and wwCheck == false then
       types.Actor.activeEffects(selfObj):modify(playerWaterWalking, (core.magic.EFFECT_TYPE.WaterWalking), nil)
       wwCheck = true
@@ -336,7 +380,6 @@ local function toggleWaterWalking()
       wwCheck = false
    end
 end
-
 
 
 return {
@@ -361,8 +404,10 @@ return {
             warpToPlayer()
          end
 
-         maintainDistance()
-         nudge(dt)
+         if player ~= nil then
+            maintainDistance()
+            nudge(dt)
+         end
 
          if counter < 20 then
             counter = counter + 1
