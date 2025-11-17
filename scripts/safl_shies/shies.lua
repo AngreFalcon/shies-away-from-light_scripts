@@ -46,7 +46,6 @@ local util = require('openmw.util')
 
 
 
-
 local attributes = { types.Actor.stats.dynamic.health, types.Actor.stats.dynamic.magicka, types.Actor.stats.dynamic.fatigue }
 local selfObj = self
 
@@ -63,9 +62,7 @@ local sheatheTimer
 local warpTimer
 local counter
 
-local hPotions = {}
-local mPotions = {}
-local fPotions = {}
+local potionsArr = {}
 
 
 local FLEE_THRESHOLD = 0.1
@@ -116,9 +113,10 @@ local function onInit()
    sheatheTimer = 0
    warpTimer = 0
    counter = 0
-   hPotions = {
+   potionsArr[1] = {
       check = false,
       timer = 0,
+      effectName = "Restore Health",
       types = { {
          name = "p_restore_health_b",
          count = 0,
@@ -145,9 +143,10 @@ local function onInit()
          magnitude = 200,
       },
       }, }
-   mPotions = {
+   potionsArr[2] = {
       check = false,
       timer = 0,
+      effectName = "Restore Magicka",
       types = { {
          name = "p_restore_magicka_b",
          count = 0,
@@ -174,9 +173,10 @@ local function onInit()
          magnitude = 200,
       },
       }, }
-   fPotions = {
+   potionsArr[3] = {
       check = false,
       timer = 0,
+      effectName = "Restore Fatigue",
       types = { {
          name = "p_restore_fatigue_b",
          count = 0,
@@ -227,9 +227,7 @@ local function onSave()
       posA = posA,
       posB = posB,
       posC = posC,
-      hPotions = hPotions,
-      mPotions = mPotions,
-      fPotions = fPotions,
+      potionsArr = potionsArr,
    }
 end
 
@@ -257,9 +255,7 @@ local function onLoad(data)
       posA = data.posA
       posB = data.posB
       posC = data.posC
-      hPotions = data.hPotions
-      mPotions = data.mPotions
-      fPotions = data.fPotions
+      potionsArr = data.potionsArr
    end
 end
 
@@ -521,12 +517,12 @@ local function checkPotions(potions)
    end
 end
 
-local function consumePotion(potionID)
+local function consumePotion(potionID, effectName)
    local potion = types.Actor.inventory(selfObj):find(potionID)
    local potionEffects = types.Potion.record(potion).effects
    local duration = 60
    for i = 1, #potionEffects do
-      if potionEffects[i].effect.name == "Restore Health" then
+      if potionEffects[i].effect.name == effectName then
          duration = potionEffects[i].duration
       end
    end
@@ -556,14 +552,14 @@ end
 local function shiesDrinkAttrPotion(potions, attrMax, attrCurrent)
    if potions.check == true and potions.timer <= 0 then
       local potion = selectBestPotion(attrMax - attrCurrent, potions.types)
-      potions.timer = consumePotion(potion)
+      potions.timer = consumePotion(potion, potions.effectName)
    end
 end
 
 local function shiesRestoreAttr()
    for i = 1, #attributes do
       if checkAttrFull(attributes[i](selfObj)) then
-         shiesDrinkAttrPotion(hPotions, getMaxAttr(attributes[i](selfObj)), getCurrentAttr(attributes[i](selfObj)))
+         shiesDrinkAttrPotion(potionsArr[i], getMaxAttr(attributes[i](selfObj)), getCurrentAttr(attributes[i](selfObj)))
       end
    end
 end
@@ -573,9 +569,9 @@ local function setWanderSpeed()
 end
 
 local function updateTimers(dt)
-   hPotions.timer = hPotions.timer - dt
-   mPotions.timer = mPotions.timer - dt
-   fPotions.timer = fPotions.timer - dt
+   for i = 1, #potionsArr do
+      potionsArr[i].timer = potionsArr[i].timer - dt
+   end
    warpTimer = warpTimer - dt
 end
 
@@ -612,9 +608,9 @@ return {
 
          if isShiesFollowing() then
             modSpeedAndAthletics()
-            checkPotions(hPotions)
-            checkPotions(mPotions)
-            checkPotions(fPotions)
+            for i = 1, #potionsArr do
+               checkPotions(potionsArr[i])
+            end
          elseif player ~= nil then
             setWanderSpeed()
          end
