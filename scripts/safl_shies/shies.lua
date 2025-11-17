@@ -35,7 +35,21 @@ local util = require('openmw.util')
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 local health = types.Actor.stats.dynamic.health
+local magicka = types.Actor.stats.dynamic.magicka
+local fatigue = types.Actor.stats.dynamic.fatigue
 local selfObj = self
 
 
@@ -45,15 +59,15 @@ local cMove
 local flyCheck
 local wwCheck
 local combatCheck
-local pCheck
 
 local moveTimer
 local sheatheTimer
 local warpTimer
 local counter
-local potionTimer
 
-local potions = {}
+local hPotions = {}
+local mPotions = {}
+local fPotions = {}
 
 
 local FLEE_THRESHOLD = 0.1
@@ -87,11 +101,6 @@ local MWVars = {}
 
 
 
-
-
-
-
-
 local function updateMWVar(varName, varData)
    core.sendGlobalEvent("updateMWVar", { varName, varData, selfObj })
 end
@@ -102,7 +111,6 @@ local function onInit()
    flyCheck = false
    wwCheck = false
    combatCheck = false
-   pCheck = false
    playerSneaking = false
    doOnce = false
    doOnce2 = false
@@ -110,12 +118,93 @@ local function onInit()
    sheatheTimer = 0
    warpTimer = 0
    counter = 0
-   potionTimer = 0
-   potions[1] = { "p_restore_health_b", 0, 5 }
-   potions[2] = { "p_restore_health_c", 0, 10 }
-   potions[3] = { "p_restore_health_s", 0, 50 }
-   potions[4] = { "p_restore_health_q", 0, 100 }
-   potions[5] = { "p_restore_health_e", 0, 200 }
+   hPotions = {
+      check = false,
+      timer = 0,
+      count = { {
+         name = "p_restore_health_b",
+         count = 0,
+         magnitude = 5,
+      },
+      {
+         name = "p_restore_health_c",
+         count = 0,
+         magnitude = 10,
+      },
+      {
+         name = "p_restore_health_s",
+         count = 0,
+         magnitude = 50,
+      },
+      {
+         name = "p_restore_health_q",
+         count = 0,
+         magnitude = 100,
+      },
+      {
+         name = "p_restore_health_e",
+         count = 0,
+         magnitude = 200,
+      },
+      }, }
+   mPotions = {
+      check = false,
+      timer = 0,
+      count = { {
+         name = "p_restore_magicka_b",
+         count = 0,
+         magnitude = 5,
+      },
+      {
+         name = "p_restore_magicka_c",
+         count = 0,
+         magnitude = 10,
+      },
+      {
+         name = "p_restore_magicka_s",
+         count = 0,
+         magnitude = 50,
+      },
+      {
+         name = "p_restore_magicka_q",
+         count = 0,
+         magnitude = 100,
+      },
+      {
+         name = "p_restore_magicka_e",
+         count = 0,
+         magnitude = 200,
+      },
+      }, }
+   fPotions = {
+      check = false,
+      timer = 0,
+      count = { {
+         name = "p_restore_fatigue_b",
+         count = 0,
+         magnitude = 25,
+      },
+      {
+         name = "p_restore_fatigue_c",
+         count = 0,
+         magnitude = 50,
+      },
+      {
+         name = "p_restore_fatigue_s",
+         count = 0,
+         magnitude = 100,
+      },
+      {
+         name = "p_restore_fatigue_q",
+         count = 0,
+         magnitude = 200,
+      },
+      {
+         name = "p_restore_fatigue_e",
+         count = 0,
+         magnitude = 400,
+      },
+      }, }
 end
 
 local function onSave()
@@ -130,7 +219,6 @@ local function onSave()
       flyCheck = flyCheck,
       wwCheck = wwCheck,
       combatCheck = combatCheck,
-      pCheck = pCheck,
       playerSneaking = playerSneaking,
       doOnce = doOnce,
       doOnce2 = doOnce2,
@@ -138,11 +226,12 @@ local function onSave()
       sheatheTimer = sheatheTimer,
       warpTimer = warpTimer,
       counter = counter,
-      potionTimer = potionTimer,
       posA = posA,
       posB = posB,
       posC = posC,
-      potions = potions,
+      hPotions = hPotions,
+      mPotions = mPotions,
+      fPotions = fPotions,
    }
 end
 
@@ -160,7 +249,6 @@ local function onLoad(data)
       flyCheck = data.flyCheck
       wwCheck = data.wwCheck
       combatCheck = data.combatCheck
-      pCheck = data.pCheck
       playerSneaking = data.playerSneaking
       doOnce = data.doOnce
       doOnce2 = data.doOnce2
@@ -168,11 +256,12 @@ local function onLoad(data)
       sheatheTimer = data.sheatheTimer
       warpTimer = data.warpTimer
       counter = data.counter
-      potionTimer = data.potionTimer
       posA = data.posA
       posB = data.posB
       posC = data.posC
-      potions = data.potions
+      hPotions = data.hPotions
+      mPotions = data.mPotions
+      fPotions = data.fPotions
    end
 end
 
@@ -184,12 +273,36 @@ local function getMaxHealth()
    return health(selfObj).base + health(selfObj).modifier
 end
 
+local function getCurrentMagicka()
+   return magicka(selfObj).current
+end
+
+local function getMaxMagicka()
+   return magicka(selfObj).base + magicka(selfObj).modifier
+end
+
+local function getCurrentFatigue()
+   return fatigue(selfObj).current
+end
+
+local function getMaxFatigue()
+   return fatigue(selfObj).base + fatigue(selfObj).modifier
+end
+
 local function fullHeal()
    health(selfObj).current = getMaxHealth()
 end
 
 local function isShiesHurt()
    return getCurrentHealth() < getMaxHealth()
+end
+
+local function isShiesMagickaFull()
+   return getCurrentMagicka() < getMaxMagicka()
+end
+
+local function isShiesStaminaFull()
+   return getCurrentFatigue() < getMaxFatigue()
 end
 
 local function consumePotion(potionID)
@@ -205,31 +318,42 @@ local function consumePotion(potionID)
    return duration
 end
 
-local function selectBestPotion()
-   local missingHealth = getMaxHealth() - getCurrentHealth()
+local function selectBestPotion(statDiff, potions)
    local potion
    for i = 1, #potions do
-      if potions[i][2] > 0 then
+      if potions[i].count > 0 then
          if potion == nil then
             potion = i
          end
          for j = i + 1, #potions do
-            if potions[j][2] > 0 then
-               if math.abs(missingHealth - potions[potion][3]) > math.abs(missingHealth - potions[j][3]) then
+            if potions[j].count > 0 then
+               if math.abs(statDiff - potions[potion].magnitude) > math.abs(statDiff - potions[j].magnitude) then
                   potion = j
                end
             end
          end
       end
    end
-   return potions[potion][1]
+   return potions[potion].name
 end
 
-local function shiesDrinkPotion()
-   if pCheck == true and potionTimer <= 0 then
-      local potion = selectBestPotion()
-      potionTimer = consumePotion(potion)
-   elseif potionTimer > 0 then
+local function shiesDrinkAttrPotion(potions, attrMax, attrCurrent)
+   if potions.check == true and potions.timer <= 0 then
+      local potion = selectBestPotion(attrMax - attrCurrent, potions.count)
+      potions.timer = consumePotion(potion)
+   elseif potions.timer > 0 then
+   end
+end
+
+local function shiesRestoreAttr()
+   if isShiesHurt() then
+      shiesDrinkAttrPotion(hPotions, getMaxHealth(), getCurrentHealth())
+   end
+   if isShiesMagickaFull() then
+      shiesDrinkAttrPotion(mPotions, getMaxMagicka(), getCurrentMagicka())
+   end
+   if isShiesStaminaFull() then
+      shiesDrinkAttrPotion(fPotions, getMaxFatigue(), getCurrentFatigue())
    end
 end
 
@@ -462,34 +586,21 @@ local function modSpeedAndAthletics()
    end
 end
 
-local function hasPotions()
+local function hasPotions(potions)
    local inventory = types.Actor.inventory(selfObj)
-   local bPotion = inventory:countOf("p_restore_health_b")
-   local cPotion = inventory:countOf("p_restore_health_c")
-   local sPotion = inventory:countOf("p_restore_health_s")
-   local qPotion = inventory:countOf("p_restore_health_q")
-   local ePotion = inventory:countOf("p_restore_health_e")
-
-   if potions[1][2] ~= bPotion then
-      potions[1][2] = bPotion
-   end
-   if potions[2][2] ~= cPotion then
-      potions[2][2] = cPotion
-   end
-   if potions[3][2] ~= sPotion then
-      potions[3][2] = sPotion
-   end
-   if potions[4][2] ~= qPotion then
-      potions[4][2] = qPotion
-   end
-   if potions[5][2] ~= ePotion then
-      potions[5][2] = ePotion
+   local count = 0
+   for i = 1, #potions.count do
+      local potion = inventory:countOf(potions.count[i].name)
+      if potions.count[i].count ~= potion then
+         potions.count[i].count = potion
+         count = count + potion
+      end
    end
 
-   if (bPotion + cPotion + sPotion + qPotion + ePotion) > 0 and pCheck == false then
-      pCheck = true
-   elseif (bPotion + cPotion + sPotion + qPotion + ePotion) == 0 and pCheck == true then
-      pCheck = false
+   if count > 0 and potions.check == false then
+      potions.check = true
+   elseif count == 0 and potions.check == true then
+      potions.check = false
    end
 end
 
@@ -502,10 +613,7 @@ return {
    engineHandlers = {
       onUpdate = function(dt)
          getPlayerLeader()
-         if isShiesHurt() then
-            shiesDrinkPotion()
-         end
-
+         shiesRestoreAttr()
          if getCurrentHealth() / getMaxHealth() < FLEE_THRESHOLD then
             updateMWVar("companion", 0)
             cMove = false
@@ -513,7 +621,9 @@ return {
             fullHeal()
          end
 
-         potionTimer = potionTimer - dt
+         hPotions.timer = hPotions.timer - dt
+         mPotions.timer = mPotions.timer - dt
+         fPotions.timer = fPotions.timer - dt
          warpTimer = warpTimer - dt
          setSheatheTimer(dt)
          if isShiesFollowing() then
@@ -535,7 +645,9 @@ return {
 
          if isShiesFollowing() then
             modSpeedAndAthletics()
-            hasPotions()
+            hasPotions(hPotions)
+            hasPotions(mPotions)
+            hasPotions(fPotions)
          elseif player ~= nil then
             setWanderSpeed()
          end
