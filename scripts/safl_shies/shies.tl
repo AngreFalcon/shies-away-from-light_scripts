@@ -20,7 +20,7 @@ end
 local interface Potions
 	check: boolean
 	timer: number
-	count: {PotionArr}
+	types: {PotionArr}
 end
 
 local interface SaveData
@@ -47,9 +47,7 @@ local interface SaveData
 end
 
 -- aliases
-local health = types.Actor.stats.dynamic.health
-local magicka = types.Actor.stats.dynamic.magicka
-local fatigue = types.Actor.stats.dynamic.fatigue
+local attributes = {types.Actor.stats.dynamic.health,types.Actor.stats.dynamic.magicka,types.Actor.stats.dynamic.fatigue}
 local selfObj = self as core.GameObject
 
 -- variables
@@ -121,7 +119,7 @@ local function onInit() -- Called when the script is created but not loaded
 	hPotions = {
 		check = false,
 		timer = 0,
-		count = {{
+		types = {{
 			name = "p_restore_health_b",
 			count = 0,
 			magnitude = 5
@@ -150,7 +148,7 @@ local function onInit() -- Called when the script is created but not loaded
 	mPotions = {
 		check = false,
 		timer = 0,
-		count = {{
+		types = {{
 			name = "p_restore_magicka_b",
 			count = 0,
 			magnitude = 5
@@ -179,7 +177,7 @@ local function onInit() -- Called when the script is created but not loaded
 	fPotions = {
 		check = false,
 		timer = 0,
-		count = {{
+		types = {{
 			name = "p_restore_fatigue_b",
 			count = 0,
 			magnitude = 25
@@ -265,44 +263,20 @@ local function onLoad(data: SaveData) -- Called only when the script loads, not 
 	end
 end
 
-local function getCurrentHealth(): number
-    return health(selfObj).current
+local function getCurrentAttr(attr: types.DynamicStat): number
+    return attr.current
 end
 
-local function getMaxHealth(): number
-    return health(selfObj).base + health(selfObj).modifier
-end
-
-local function getCurrentMagicka(): number
-	return magicka(selfObj).current
-end
-
-local function getMaxMagicka(): number
-	return magicka(selfObj).base + magicka(selfObj).modifier
-end
-
-local function getCurrentFatigue(): number
-	return fatigue(selfObj).current
-end
-
-local function getMaxFatigue(): number
-	return fatigue(selfObj).base + fatigue(selfObj).modifier
+local function getMaxAttr(attr: types.DynamicStat): number
+    return attr.base + attr.modifier
 end
 
 local function fullHeal()
-    health(selfObj).current = getMaxHealth()
+    attributes[1](selfObj).current = getMaxAttr(attributes[1](selfObj))
 end
 
-local function isShiesHurt(): boolean
-	return getCurrentHealth() < getMaxHealth()
-end
-
-local function isShiesMagickaFull(): boolean
-	return getCurrentMagicka() < getMaxMagicka()
-end
-
-local function isShiesStaminaFull(): boolean
-	return getCurrentFatigue() < getMaxFatigue()
+local function checkAttrFull(attr: types.DynamicStat): boolean
+	return getCurrentAttr(attr) < getMaxAttr(attr)
 end
 
 local function isShiesFollowing(): boolean -- Simply return true or false if shies is currently following any player
@@ -536,14 +510,10 @@ end
 local function checkPotions(potions: Potions)
 	local inventory = types.Actor.inventory(selfObj)
 	local count: number = 0
-	for i = 1, #potions.count do
-		local potion = inventory:countOf(potions.count[i].name)
-		if potions.count[i].count ~= potion then
-			potions.count[i].count = potion
-			count = count + potion
-		end
+	for i = 1, #potions.types do
+		potions.types[i].count = inventory:countOf(potions.types[i].name)
+		count = count + potions.types[i].count
 	end
-
 	if count > 0 and potions.check == false then
 		potions.check = true
 	elseif count == 0 and potions.check == true then
@@ -567,7 +537,7 @@ end
 local function selectBestPotion(statDiff: number, potions: {PotionArr}): string
 	local potion: integer
 	for i = 1, #potions do
-		if potions[i].count > 0 then -- only execute if shies actually has any potions of this type
+		if potions[i].count > 0 then
 			if potion == nil then
 				potion = i
 			end
@@ -585,21 +555,16 @@ end
 
 local function shiesDrinkAttrPotion(potions: Potions, attrMax: number, attrCurrent: number)
 	if potions.check == true and potions.timer <= 0 then
-		local potion = selectBestPotion(attrMax - attrCurrent, potions.count)
+		local potion = selectBestPotion(attrMax - attrCurrent, potions.types)
 		potions.timer = consumePotion(potion)
-	elseif potions.timer > 0 then
 	end
 end
 
 local function shiesRestoreAttr()
-	if isShiesHurt() then
-		shiesDrinkAttrPotion(hPotions, getMaxHealth(), getCurrentHealth())
-	end
-	if isShiesMagickaFull() then
-		shiesDrinkAttrPotion(mPotions, getMaxMagicka(), getCurrentMagicka())
-	end
-	if isShiesStaminaFull() then
-		shiesDrinkAttrPotion(fPotions, getMaxFatigue(), getCurrentFatigue())
+	for i = 1, #attributes do
+		if checkAttrFull(attributes[i](selfObj)) then
+			shiesDrinkAttrPotion(hPotions, getMaxAttr(attributes[i](selfObj)), getCurrentAttr(attributes[i](selfObj)))
+		end
 	end
 end
 
@@ -619,7 +584,7 @@ return {
         onUpdate = function(dt: number)
 			getPlayerLeader()
             shiesRestoreAttr()
-			if getCurrentHealth() / getMaxHealth() < FLEE_THRESHOLD then
+			if getCurrentAttr(attributes[1](selfObj)) / getMaxAttr(attributes[1](selfObj)) < FLEE_THRESHOLD then
 				updateMWVar("companion", 0)
 				cMove = false
                 flee() -- Teleport Shies away from combat to whatever position he has marked
@@ -667,7 +632,7 @@ return {
             attackerObj:sendEvent("shiesAttacked", "Why did you do that :(\nincremdibly rude...")
         end,
         ["hurtShies"] = function() -- for testing the "Recall away at low health" feature - this event is sent from the player script
-            health(selfObj).current = 1
+            attributes[1](selfObj).current = 1
         end,
 		["shiesActivated"] = function()
 		 	for k, v in pairs(MWVars) do
