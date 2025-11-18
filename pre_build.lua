@@ -7,7 +7,6 @@ local dest = projDir .. "/scripts/safl_shies"
 for file in lfs.dir(dest) do
 	if file ~= nil and file ~= "." and file ~= ".." then
 		if string.sub(file, -4) == ".lua" then
-			print(dest .. "/" .. file)
 			os.remove(dest .. "/" .. file)
 		end
 	end
