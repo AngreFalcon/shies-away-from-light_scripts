@@ -5,7 +5,7 @@ local core = require('openmw.core')
 local ai = require('openmw.interfaces').AI
 local time = require('openmw_aux.time')
 local util = require('openmw.util')
-local cmn = require("common")
+local cmn = require("scripts.safl_shies.common")
 
 
 
