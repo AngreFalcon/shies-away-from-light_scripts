@@ -28,7 +28,6 @@ local sheatheTimer: number
 local warpTimer: number
 local freeFallTimer: number
 local counter: number
-
 local potionsArr: {cmn.Potions} = {}
 
 -- constants
