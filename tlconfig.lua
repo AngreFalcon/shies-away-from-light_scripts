@@ -2,7 +2,8 @@ return {
     source_dir = '',
     build_dir = '',
     include_dir = {
-		'include/openmw',
+		'include/openmw/',
+		'scripts',
 	},
     gen_target = '5.1',
 }
