@@ -5,7 +5,7 @@ local core = require('openmw.core')
 local ai = require('openmw.interfaces').AI
 local time = require('openmw_aux.time')
 local util = require('openmw.util')
-local cmn = require("scripts.safl_shies.common")
+local cmn = require('scripts.safl_shies.common')
 
 -- Credit to Grumpy and Kateri for their companion mwscripts, which were used as the foundation for much of the below logic
 
@@ -405,6 +405,9 @@ local function updateTimers(dt: number)
 end
 
 local function onUpdate(dt: number) -- called every frame while the script is loaded
+	if core.isWorldPaused() == true then
+		return
+	end
 	getPlayerLeader()
     checkAttributes()
 

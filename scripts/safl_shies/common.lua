@@ -1,5 +1,5 @@
-local util = require("openmw.util")
-local core = require("openmw.core")
+local util = require('openmw.util')
+local core = require('openmw.core')
 
 
 

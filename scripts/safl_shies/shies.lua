@@ -5,7 +5,7 @@ local core = require('openmw.core')
 local ai = require('openmw.interfaces').AI
 local time = require('openmw_aux.time')
 local util = require('openmw.util')
-local cmn = require("scripts.safl_shies.common")
+local cmn = require('scripts.safl_shies.common')
 
 
 
@@ -405,6 +405,9 @@ local function updateTimers(dt)
 end
 
 local function onUpdate(dt)
+   if core.isWorldPaused() == true then
+      return
+   end
    getPlayerLeader()
    checkAttributes()
 
