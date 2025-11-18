@@ -16,8 +16,10 @@ local infile = io.open(src, "r")
 if infile ~= nil then
 	local instr = infile:read("*a")
 	infile:close()
-
+	
 	local outfile = io.open(dest .. "/common.tl", "w")
-	outfile:write(instr)
-	outfile:close()
+	if outfile ~= nil then
+		outfile:write(instr)
+		outfile:close()
+	end
 end
