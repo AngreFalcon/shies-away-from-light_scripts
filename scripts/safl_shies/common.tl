@@ -43,15 +43,14 @@ local interface SaveData
 	recallLoc: CellLoc
 	player: core.GameObject
 	checks: {Flag: boolean}
-	playerSneaking: boolean
-	doOnce: boolean
-	doOnce2: boolean
 	timers: {Timer: number}
+	potionsArr: {Potions}
 	counter: number
 	posA: CellLoc
 	posB: CellLoc
 	posC: CellLoc
-	potionsArr: {Potions}
+	doOnce: boolean
+	doOnce2: boolean
 end
 
 return {

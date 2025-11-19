@@ -109,12 +109,15 @@ local function setSneak()
 end
 
 local function shiesIncapacitated()
-   local animName = "deathknockdown"
-   if checks["incapacitated"] == true and anim.isPlaying(selfObj, animName) == false then
+   local animName = "knockout"
+   if anim.isPlaying(selfObj, animName) == false then
+      anim.clearAnimationQueue(selfObj, false)
       anim.playQueued(selfObj, animName, {})
+   elseif (types.Player.quests(player))["SAFL_ShiesFled"].stage >= 40 then
+      anim.setLoopingEnabled(selfObj, animName, false)
+
+
       checks["incapacitated"] = false
-   elseif checks["incapacitated"] == false then
-      anim.cancel(selfObj, animName)
    end
 end
 
@@ -379,9 +382,12 @@ local function checkAttributes()
       return
    end
    for i = 1, #attributes do
-      if attributes[i](selfObj).current < getMaxAttr(attributes[i](selfObj)) and checkAttrDamaged(attributes[i](selfObj)) == false then
+      if checkAttrDamaged(attributes[i](selfObj)) == true then
          checkAttrPotions(potionsArr[i])
          if potionsArr[i].check == false or shiesDrinkAttrPotion(potionsArr[i], attributes[i](selfObj)) == false then
+
+
+
 
          end
       end
@@ -416,7 +422,9 @@ local function onUpdate(dt)
    end
    getPlayerLeader()
    checkAttributes()
-
+   if checks["incapacitated"] == true then
+      shiesIncapacitated()
+   end
 
    if checks["fly"] == false and types.Actor.isOnGround(selfObj) == false then
       freeFall()
@@ -554,6 +562,9 @@ local function onInit()
          magnitude = 400,
       },
       }, }
+   for i = 1, #potionsArr do
+      checkAttrPotions(potionsArr[i])
+   end
 end
 
 local function onSave()
@@ -565,14 +576,14 @@ local function onSave()
       recallLoc = RECALL_LOC,
       player = player,
       checks = checks,
-      doOnce = doOnce,
-      doOnce2 = doOnce2,
       timers = timers,
+      potionsArr = potionsArr,
       counter = counter,
       posA = posA,
       posB = posB,
       posC = posC,
-      potionsArr = potionsArr,
+      doOnce = doOnce,
+      doOnce2 = doOnce2,
    }
 end
 
@@ -587,14 +598,14 @@ local function onLoad(data)
       RECALL_LOC = data.recallLoc
       player = data.player
       checks = data.checks
-      doOnce = data.doOnce
-      doOnce2 = data.doOnce2
       timers = data.timers
+      potionsArr = data.potionsArr
       counter = data.counter
       posA = data.posA
       posB = data.posB
       posC = data.posC
-      potionsArr = data.potionsArr
+      doOnce = data.doOnce
+      doOnce2 = data.doOnce2
    end
 end
 

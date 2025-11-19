@@ -109,12 +109,15 @@ local function setSneak() -- Make sure if the player is sneaking, shies sneaks a
 end
 
 local function shiesIncapacitated()
-	local animName = "deathknockdown"
-	if checks["incapacitated"] == true and anim.isPlaying(selfObj, animName) == false then
+	local animName = "knockout"
+	if anim.isPlaying(selfObj, animName) == false then
+		anim.clearAnimationQueue(selfObj, false)
 		anim.playQueued(selfObj, animName, {})
+	elseif (types.Player.quests(player) as {string: cmn.PlayerQuest})["SAFL_ShiesFled"].stage >= 40 then
+		anim.setLoopingEnabled(selfObj, animName, false)
+		--anim.playQueued(selfObj, animName, {startkey = 'stop', stopkey = 'stop', loops = 0})
+		--anim.clearAnimationQueue(selfObj, true)
 		checks["incapacitated"] = false
-	elseif checks["incapacitated"] == false then
-		anim.cancel(selfObj, animName)
 	end
 end
 
@@ -383,6 +386,9 @@ local function checkAttributes() -- Used to call various functions that affect s
 			checkAttrPotions(potionsArr[i])
 			if potionsArr[i].check == false or shiesDrinkAttrPotion(potionsArr[i], attributes[i](selfObj)) == false then
 				-- cast some sort of restorative spell on self
+				--local shiesSpells = types.Actor.spells(selfObj)
+				--for _, spell in pairs((shiesSpells as {any: core.Spell})) do
+				--end
 			end
 		end
 	end
@@ -416,7 +422,9 @@ local function onUpdate(dt: number) -- called every frame while the script is lo
 	end
 	getPlayerLeader()
     checkAttributes()
-	--shiesIncapacitated()
+	if checks["incapacitated"] == true then
+		shiesIncapacitated()
+	end
 
 	if checks["fly"] == false and types.Actor.isOnGround(selfObj) == false then
 		freeFall()
@@ -568,14 +576,14 @@ local function onSave(): cmn.SaveData -- Called when the game saves, even if cur
 		recallLoc = RECALL_LOC,
 		player = player,
 		checks = checks,
-		doOnce = doOnce,
-		doOnce2 = doOnce2,
 		timers = timers,
+		potionsArr = potionsArr,
 		counter = counter,
 		posA = posA,
 		posB = posB,
 		posC = posC,
-		potionsArr = potionsArr,
+		doOnce = doOnce,
+		doOnce2 = doOnce2,
 	}
 end
 
@@ -590,14 +598,14 @@ local function onLoad(data: cmn.SaveData) -- Called only when the script loads, 
 		RECALL_LOC = data.recallLoc
 		player = data.player
 		checks = data.checks
-		doOnce = data.doOnce
-		doOnce2 = data.doOnce2
 		timers = data.timers
+		potionsArr = data.potionsArr
 		counter = data.counter
 		posA = data.posA
 		posB = data.posB
 		posC = data.posC
-		potionsArr = data.potionsArr
+		doOnce = data.doOnce
+		doOnce2 = data.doOnce2
 	end
 end
 

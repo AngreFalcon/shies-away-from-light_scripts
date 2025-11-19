@@ -53,7 +53,6 @@ local types = require('openmw.types')
 
 
 
-
 return {
    PlayerQuest = PlayerQuest,
    Flag = Flag,
