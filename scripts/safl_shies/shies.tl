@@ -305,20 +305,6 @@ local function checkForPotion(potionName: string): boolean -- Returns true if sh
 	return inventory:countOf(potionName) > 0
 end
 
-local function checkPotions(potions: cmn.Potions) -- Checks shies' inventory to update the count of restore health/magicka/stamina potions he has
-	local inventory = types.Actor.inventory(selfObj)
-	local count: number = 0
-	for i = 1, #potions.types do
-		potions.types[i].count = inventory:countOf(potions.types[i].name)
-		count = count + potions.types[i].count
-	end
-	if count > 0 and potions.check == false then
-		potions.check = true
-	elseif count == 0 and potions.check == true then
-		potions.check = false
-	end
-end
-
 local function consumePotion(potionID: string, effectName: string): number -- Sends a global event to trigger shies to consume the specified potion. Returns the duration of whatever effect is specified, or 60 if the potion does not have that effect
 	local potion = types.Actor.inventory(selfObj):find(potionID)
 	local potionEffects = types.Potion.record(potion).effects
@@ -370,8 +356,22 @@ local function shiesDrinkAttrPotion(potions: cmn.Potions, attr: types.DynamicSta
 	end
 end
 
+local function checkAttrPotions(potions: cmn.Potions) -- Checks shies' inventory to update the count of restore health/magicka/stamina potions he has
+	local inventory = types.Actor.inventory(selfObj)
+	local count: number = 0
+	for i = 1, #potions.types do
+		potions.types[i].count = inventory:countOf(potions.types[i].name)
+		count = count + potions.types[i].count
+	end
+	if count > 0 and potions.check == false then
+		potions.check = true
+	elseif count == 0 and potions.check == true then
+		potions.check = false
+	end
+end
+
 local function checkAttributes() -- Used to call various functions that affect shies' dynamic attributes like health, fatigue, magicka
-	if attributes[1](selfObj).current / getMaxAttr(attributes[1](selfObj)) < FLEE_THRESHOLD then -- Check health ratio
+	if attributes[1](selfObj).current > 0 and attributes[1](selfObj).current / getMaxAttr(attributes[1](selfObj)) < FLEE_THRESHOLD then -- Check health ratio
 		updateMWVar("companion", 0)
 		checks["cMove"] = false
         flee() -- Teleport Shies away from combat to whatever position he has marked
@@ -379,10 +379,10 @@ local function checkAttributes() -- Used to call various functions that affect s
 		return
 	end
 	for i = 1, #attributes do
-		if checkAttrDamaged(attributes[i](selfObj)) == false then
-			checkPotions(potionsArr[i])
+		if checkAttrDamaged(attributes[i](selfObj)) == true then
+			checkAttrPotions(potionsArr[i])
 			if potionsArr[i].check == false or shiesDrinkAttrPotion(potionsArr[i], attributes[i](selfObj)) == false then
-				-- cast some sort of restorative spell
+				-- cast some sort of restorative spell on self
 			end
 		end
 	end
@@ -416,7 +416,7 @@ local function onUpdate(dt: number) -- called every frame while the script is lo
 	end
 	getPlayerLeader()
     checkAttributes()
-	shiesIncapacitated()
+	--shiesIncapacitated()
 
 	if checks["fly"] == false and types.Actor.isOnGround(selfObj) == false then
 		freeFall()
@@ -555,7 +555,7 @@ local function onInit() -- Called when the script is created but not loaded
 		}
 	}}
 	for i = 1, #potionsArr do
-		checkPotions(potionsArr[i])
+		checkAttrPotions(potionsArr[i])
 	end
 end
 

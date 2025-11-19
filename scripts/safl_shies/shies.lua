@@ -111,11 +111,9 @@ end
 local function shiesIncapacitated()
    local animName = "deathknockdown"
    if checks["incapacitated"] == true and anim.isPlaying(selfObj, animName) == false then
-      print("once")
       anim.playQueued(selfObj, animName, {})
       checks["incapacitated"] = false
    elseif checks["incapacitated"] == false then
-      print("cancel")
       anim.cancel(selfObj, animName)
    end
 end
@@ -307,20 +305,6 @@ local function checkForPotion(potionName)
    return inventory:countOf(potionName) > 0
 end
 
-local function checkPotions(potions)
-   local inventory = types.Actor.inventory(selfObj)
-   local count = 0
-   for i = 1, #potions.types do
-      potions.types[i].count = inventory:countOf(potions.types[i].name)
-      count = count + potions.types[i].count
-   end
-   if count > 0 and potions.check == false then
-      potions.check = true
-   elseif count == 0 and potions.check == true then
-      potions.check = false
-   end
-end
-
 local function consumePotion(potionID, effectName)
    local potion = types.Actor.inventory(selfObj):find(potionID)
    local potionEffects = types.Potion.record(potion).effects
@@ -372,8 +356,22 @@ local function shiesDrinkAttrPotion(potions, attr)
    end
 end
 
+local function checkAttrPotions(potions)
+   local inventory = types.Actor.inventory(selfObj)
+   local count = 0
+   for i = 1, #potions.types do
+      potions.types[i].count = inventory:countOf(potions.types[i].name)
+      count = count + potions.types[i].count
+   end
+   if count > 0 and potions.check == false then
+      potions.check = true
+   elseif count == 0 and potions.check == true then
+      potions.check = false
+   end
+end
+
 local function checkAttributes()
-   if attributes[1](selfObj).current / getMaxAttr(attributes[1](selfObj)) < FLEE_THRESHOLD then
+   if attributes[1](selfObj).current > 0 and attributes[1](selfObj).current / getMaxAttr(attributes[1](selfObj)) < FLEE_THRESHOLD then
       updateMWVar("companion", 0)
       checks["cMove"] = false
       flee()
@@ -381,8 +379,8 @@ local function checkAttributes()
       return
    end
    for i = 1, #attributes do
-      if checkAttrDamaged(attributes[i](selfObj)) == false then
-         checkPotions(potionsArr[i])
+      if attributes[i](selfObj).current < getMaxAttr(attributes[i](selfObj)) and checkAttrDamaged(attributes[i](selfObj)) == false then
+         checkAttrPotions(potionsArr[i])
          if potionsArr[i].check == false or shiesDrinkAttrPotion(potionsArr[i], attributes[i](selfObj)) == false then
 
          end
@@ -418,7 +416,7 @@ local function onUpdate(dt)
    end
    getPlayerLeader()
    checkAttributes()
-   shiesIncapacitated()
+
 
    if checks["fly"] == false and types.Actor.isOnGround(selfObj) == false then
       freeFall()
@@ -556,9 +554,6 @@ local function onInit()
          magnitude = 400,
       },
       }, }
-   for i = 1, #potionsArr do
-      checkPotions(potionsArr[i])
-   end
 end
 
 local function onSave()
