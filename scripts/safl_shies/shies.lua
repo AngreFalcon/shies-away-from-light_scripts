@@ -1,4 +1,4 @@
-local _tl_compat; if (tonumber((_VERSION or ''):match('[%d.]*$')) or 0) < 5.3 then local p, m = pcall(require, 'compat53.module'); if p then _tl_compat = m end end; local math = _tl_compat and _tl_compat.math or math; local pairs = _tl_compat and _tl_compat.pairs or pairs; local I = require('openmw.interfaces')
+local _tl_compat; if (tonumber((_VERSION or ''):match('[%d.]*$')) or 0) < 5.3 then local p, m = pcall(require, 'compat53.module'); if p then _tl_compat = m end end; local math = _tl_compat and _tl_compat.math or math; local pairs = _tl_compat and _tl_compat.pairs or pairs; local string = _tl_compat and _tl_compat.string or string; local I = require('openmw.interfaces')
 local types = require('openmw.types')
 local self = require('openmw.self')
 local core = require('openmw.core')
@@ -112,9 +112,19 @@ local function shiesIncapacitated()
    local animName = "knockout"
    if anim.isPlaying(selfObj, animName) == false then
       anim.clearAnimationQueue(selfObj, false)
+
       anim.playQueued(selfObj, animName, {})
    elseif (types.Player.quests(player))["SAFL_ShiesFled"].stage >= 40 then
       anim.setLoopingEnabled(selfObj, animName, false)
+
+
+
+      I.AnimationController.addTextKeyHandler(animName, function(animGroup, key)
+         anim.playQueued(selfObj, animGroup, { startkey = 'stop', stopkey = 'stop', loops = 0 })
+         if key.sub(key, #key - 4) == 'stop' then
+            anim.clearAnimationQueue(selfObj, true)
+         end
+      end)
 
 
       checks["incapacitated"] = false

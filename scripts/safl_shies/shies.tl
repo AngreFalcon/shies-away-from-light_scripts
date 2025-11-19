@@ -112,9 +112,19 @@ local function shiesIncapacitated()
 	local animName = "knockout"
 	if anim.isPlaying(selfObj, animName) == false then
 		anim.clearAnimationQueue(selfObj, false)
+		--I.AnimationController.playBlendedAnimation(animName, {})
 		anim.playQueued(selfObj, animName, {})
 	elseif (types.Player.quests(player) as {string: cmn.PlayerQuest})["SAFL_ShiesFled"].stage >= 40 then
 		anim.setLoopingEnabled(selfObj, animName, false)
+		--I.AnimationController.addPlayBlendedAnimationHandler(function(animName, options)
+		--	local stop = options.stopkey
+		--end)
+		I.AnimationController.addTextKeyHandler(animName, function(animGroup: string, key: string)
+			anim.playQueued(selfObj, animGroup, {startkey = 'stop', stopkey = 'stop', loops = 0})
+			if key.sub(key, #key - 4) == 'stop' then
+				anim.clearAnimationQueue(selfObj, true)
+			end
+		end)
 		--anim.playQueued(selfObj, animName, {startkey = 'stop', stopkey = 'stop', loops = 0})
 		--anim.clearAnimationQueue(selfObj, true)
 		checks["incapacitated"] = false
