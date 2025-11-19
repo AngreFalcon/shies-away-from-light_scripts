@@ -6,13 +6,12 @@ local types = require('openmw.types')
 local core = require('openmw.core')
 local self = require('openmw.self')
 local util = require('openmw.util')
+local cmn = require('scripts.safl_shies.common')
 
 local selfObj = self as core.GameObject
 
-local interface PlayerQuest is types.PlayerQuest, types.PLAYERQuest end
-
-local function getQuest(questName: string): PlayerQuest
-	return (types.Player.quests(selfObj) as {string: PlayerQuest})[questName]
+local function getQuest(questName: string): cmn.PlayerQuest
+	return (types.Player.quests(selfObj) as {string: cmn.PlayerQuest})[questName]
 end
 
 return {

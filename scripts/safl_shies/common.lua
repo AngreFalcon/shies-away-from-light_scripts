@@ -1,5 +1,12 @@
 local util = require('openmw.util')
 local core = require('openmw.core')
+local types = require('openmw.types')
+
+
+
+
+
+
 
 
 
@@ -48,7 +55,9 @@ local core = require('openmw.core')
 
 
 return {
+   PlayerQuest = PlayerQuest,
    Flag = Flag,
+   Timer = Timer,
    SaveData = SaveData,
    Potions = Potions,
    PotionArr = PotionArr,

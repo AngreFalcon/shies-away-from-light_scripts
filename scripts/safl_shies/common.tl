@@ -1,13 +1,23 @@
 local util = require('openmw.util')
 local core = require('openmw.core')
+local types = require('openmw.types')
 
--- get pwned
+local interface PlayerQuest is types.PlayerQuest, types.PLAYERQuest end
 
 local type Flag = enum
 	"cMove"
 	"fly"
 	"ww"
 	"combat"
+	"incapacitated"
+	"playerSneak"
+end
+
+local type Timer = enum
+	"move"
+	"sheathe"
+	"warp"
+	"freefall"
 end
 
 local interface CellLoc
@@ -36,10 +46,7 @@ local interface SaveData
 	playerSneaking: boolean
 	doOnce: boolean
 	doOnce2: boolean
-	moveTimer: number
-	sheatheTimer: number
-	warpTimer: number
-	freeFallTimer: number
+	timers: {Timer: number}
 	counter: number
 	posA: CellLoc
 	posB: CellLoc
@@ -48,7 +55,9 @@ local interface SaveData
 end
 
 return {
+	PlayerQuest = PlayerQuest,
 	Flag = Flag,
+	Timer = Timer,
     SaveData = SaveData,
     Potions = Potions,
 	PotionArr = PotionArr,

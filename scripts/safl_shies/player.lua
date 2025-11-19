@@ -6,10 +6,9 @@ local types = require('openmw.types')
 local core = require('openmw.core')
 local self = require('openmw.self')
 local util = require('openmw.util')
+local cmn = require('scripts.safl_shies.common')
 
 local selfObj = self
-
-
 
 local function getQuest(questName)
    return (types.Player.quests(selfObj))[questName]

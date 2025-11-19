@@ -5,6 +5,7 @@ local core = require('openmw.core')
 local ai = require('openmw.interfaces').AI
 local time = require('openmw_aux.time')
 local util = require('openmw.util')
+local anim = require('openmw.animation')
 local cmn = require('scripts.safl_shies.common')
 
 -- Credit to Grumpy and Kateri for their companion mwscripts, which were used as the foundation for much of the below logic
@@ -16,19 +17,14 @@ local selfObj = self as core.GameObject
 -- variables
 local ScriptVersion = 1 -- increment whenever onSave is changed
 
-local checks: {cmn.Flag: boolean} = {
-	["cMove"] = false,
-	["fly"] = false,
-	["ww"] = false,
-	["combat"] = false,
-}
+local RECALL_LOC: cmn.CellLoc
+local player: core.GameObject
 
-local moveTimer: number
-local sheatheTimer: number
-local warpTimer: number
-local freeFallTimer: number
-local counter: number
+local checks: {cmn.Flag: boolean} = {}
 local potionsArr: {cmn.Potions} = {}
+local timers: {cmn.Timer: number} = {}
+
+local counter: number
 
 -- constants
 local FLEE_THRESHOLD = 0.1
@@ -36,9 +32,6 @@ local RECALL_TIMEOUT = 2 * time.second
 local INIT_DATA: cmn.SaveData = {recallLoc = {cellId = "Balmora, Council Club", cellPos = util.vector3(-5, -218, -251)}}
 
 -- persistent variables
-local RECALL_LOC: cmn.CellLoc
-local player: core.GameObject
-local playerSneaking: boolean
 
 -- warp function variables - persistent
 local posA: cmn.CellLoc
@@ -110,8 +103,18 @@ local function setSneak() -- Make sure if the player is sneaking, shies sneaks a
 	if player ~= nil then
 		player:sendEvent("getSneakVal", selfObj)
 	end
-	if (selfObj as self).controls.sneak ~= playerSneaking then
-		(selfObj as self).controls.sneak = playerSneaking
+	if (selfObj as self).controls.sneak ~= checks["playerSneak"] then
+		(selfObj as self).controls.sneak = checks["playerSneak"]
+	end
+end
+
+local function shiesIncapacitated()
+	local animName = "deathknockdown"
+	if checks["incapacitated"] == true and anim.isPlaying(selfObj, animName) == false then
+		anim.playQueued(selfObj, animName, {})
+		checks["incapacitated"] = false
+	elseif checks["incapacitated"] == false then
+		anim.cancel(selfObj, animName)
 	end
 end
 
@@ -131,13 +134,13 @@ local function flee() -- Triggers if shies' health drops below a certain thresho
             loop = false,
         }
     })
-    
+
     local cb = time.registerTimerCallback( -- Teleport away after RECALL_TIMEOUT seconds
         selfObj.id .. "_FleeCallback",
         function(actor: core.GameObject)
 			ai.removePackages("Combat")
 			ai.removePackages("Follow")
-			if RECALL_LOC == INIT_DATA.recallLoc then
+			if RECALL_LOC == INIT_DATA.recallLoc and (types.Player.quests(player) as {string: cmn.PlayerQuest})["SAFL_ShiesFled"].started == false then
 				triggerShiesFledQuest() -- The player has not changed Shies' marked location. This likely means the Shies Fled quest has not been started yet; we can further check by checking the player's journal entries
 			end
             return core.sendGlobalEvent("teleport", {
@@ -148,13 +151,16 @@ local function flee() -- Triggers if shies' health drops below a certain thresho
         end,
         nil
     )
+	if RECALL_LOC == INIT_DATA.recallLoc and (types.Player.quests(player) as {string: cmn.PlayerQuest})["SAFL_ShiesFled"].stage < 40 then -- The player has not recovered shies yet
+		checks["incapacitated"] = true
+	end
     time.newSimulationTimer(RECALL_TIMEOUT, cb, self, nil)
 end
 
 local function setSheatheTimer(timePassed: number) -- Sheathe weapon after combat check
 	if checks["combat"] == true then
-		warpTimer = 6
-		sheatheTimer = sheatheTimer - timePassed
+		timers["warp"] = 6
+		timers["sheathe"] = timers["sheathe"] - timePassed
 		if core.sound.isSoundPlaying("Weapon Swish", selfObj) == true
 			or core.sound.isSoundPlaying("crossbowShoot", selfObj) == true
 			or core.sound.isSoundPlaying("bowShoot", selfObj) == true
@@ -163,8 +169,8 @@ local function setSheatheTimer(timePassed: number) -- Sheathe weapon after comba
 			or core.sound.isSoundPlaying("destruction cast", selfObj) == true
 			or core.sound.isSoundPlaying("illusion cast", selfObj) == true
 		then
-			sheatheTimer = 4.4
-		elseif sheatheTimer <= 0 then
+			timers["sheathe"] = 4.4
+		elseif timers["sheathe"] <= 0 then
 			checks["combat"] = false
 			if types.Actor.getStance(selfObj) == types.Actor.STANCE.Spell then
 				-- cast levitation spell on player? not sure why
@@ -176,8 +182,8 @@ local function setSheatheTimer(timePassed: number) -- Sheathe weapon after comba
 		or types.Actor.getStance(selfObj) == types.Actor.STANCE.Spell
 	then
 		checks["combat"] = true
-		sheatheTimer = 4.4
-		warpTimer = 6
+		timers["sheathe"] = 4.4
+		timers["warp"] = 6
 	end
 end
 
@@ -216,9 +222,9 @@ end
 
 local function nudge(timePassed: number) -- Waits 4 seconds before making shies follow the player again. onetimemove is set true in dialogue while simultaneously triggering the Wander AI package to make him move
 	if MWVars["onetimemove"] == 1 then
-		moveTimer = moveTimer + timePassed
-		if moveTimer > 4 then
-			moveTimer = 0
+		timers["move"] = timers["move"] + timePassed
+		if timers["move"] > 4 then
+			timers["move"] = 0
 			makeShiesFollow()
 			updateMWVar("onetimemove", 0)
 		end
@@ -251,7 +257,7 @@ local function warpToPlayer() -- If the player gets too far from shies, teleport
 		doOnce2 = false
 	end
 
-	if warpTimer <= 0 and getCoDist(selfObj.position, (getPlayerCellPos() as cmn.CellLoc).cellPos) > 680 then
+	if timers["warp"] <= 0 and getCoDist(selfObj.position, (getPlayerCellPos() as cmn.CellLoc).cellPos) > 680 then
 		if coDist > 350 then
 			core.sendGlobalEvent("teleport", {
 				actor = selfObj,
@@ -383,8 +389,8 @@ local function checkAttributes() -- Used to call various functions that affect s
 end
 
 local function freeFall() -- Used to call various functions that should trigger while shies is in freefall
-	if freeFallTimer > 1 and checkForPotion("p_slowfall_s") then
-		freeFallTimer = -(consumePotion("p_slowfall_s", "SlowFall"))
+	if timers["freefall"] > 1 and checkForPotion("p_slowfall_s") then
+		timers["freefall"] = -(consumePotion("p_slowfall_s", "SlowFall"))
 	end
 end
 
@@ -396,11 +402,11 @@ local function updateTimers(dt: number)
 	for i = 1, #potionsArr do
 		potionsArr[i].timer = potionsArr[i].timer - dt
 	end
-	warpTimer = warpTimer - dt
-	if ((checks["fly"] == false) and (types.Actor.isOnGround(selfObj) == false)) or freeFallTimer < 0 then
-		freeFallTimer = freeFallTimer + dt
-	elseif freeFallTimer > 0 then -- A negative freeFallTimer implies a slowfall potion is active and the timer should not be reset
-		freeFallTimer = 0
+	timers["warp"] = timers["warp"] - dt
+	if ((checks["fly"] == false) and (types.Actor.isOnGround(selfObj) == false)) or timers["freefall"] < 0 then
+		timers["freefall"] = timers["freefall"] + dt
+	elseif timers["freefall"] > 0 then -- A negative timers["freefall"] implies a slowfall potion is active and the timer should not be reset
+		timers["freefall"] = 0
 	end
 end
 
@@ -410,6 +416,7 @@ local function onUpdate(dt: number) -- called every frame while the script is lo
 	end
 	getPlayerLeader()
     checkAttributes()
+	shiesIncapacitated()
 
 	if checks["fly"] == false and types.Actor.isOnGround(selfObj) == false then
 		freeFall()
@@ -448,13 +455,14 @@ local function onInit() -- Called when the script is created but not loaded
 	checks["fly"] = false
 	checks["ww"] = false
 	checks["combat"] = false
-	playerSneaking = false
+	checks["incapacitated"] = false
+	checks["playerSneak"] = false
 	doOnce = false
 	doOnce2 = false
-	moveTimer = 0
-	sheatheTimer = 0
-	warpTimer = 0
-	freeFallTimer = 0
+	timers["move"] = 0
+	timers["sheathe"] = 0
+	timers["warp"] = 0
+	timers["freefall"] = 0
 	counter = 0
 	potionsArr[1] = {
 		check = false,
@@ -560,13 +568,9 @@ local function onSave(): cmn.SaveData -- Called when the game saves, even if cur
 		recallLoc = RECALL_LOC,
 		player = player,
 		checks = checks,
-		playerSneaking = playerSneaking,
 		doOnce = doOnce,
 		doOnce2 = doOnce2,
-		moveTimer= moveTimer,
-		sheatheTimer = sheatheTimer,
-		warpTimer = warpTimer,
-		freeFallTimer = freeFallTimer,
+		timers = timers,
 		counter = counter,
 		posA = posA,
 		posB = posB,
@@ -586,13 +590,9 @@ local function onLoad(data: cmn.SaveData) -- Called only when the script loads, 
 		RECALL_LOC = data.recallLoc
 		player = data.player
 		checks = data.checks
-		playerSneaking = data.playerSneaking
 		doOnce = data.doOnce
 		doOnce2 = data.doOnce2
-		moveTimer= data.moveTimer
-		sheatheTimer = data.sheatheTimer
-		warpTimer = data.warpTimer
-		freeFallTimer = data.freeFallTimer
+		timers = data.timers
 		counter = data.counter
 		posA = data.posA
 		posB = data.posB
@@ -633,7 +633,7 @@ return {
 		end,
 		["playerSneak"] = function(sneaking: boolean)
 			if sneaking ~= nil then
-				playerSneaking = sneaking
+				checks["playerSneak"] = sneaking
 			end
 		end,
     }
