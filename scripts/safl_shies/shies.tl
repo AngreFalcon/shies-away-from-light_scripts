@@ -108,12 +108,12 @@ local function setSneak() -- Make sure if the player is sneaking, shies sneaks a
 	end
 end
 
-local function shiesIncapacitated()
+local function shiesIncapacitated(getBackUp: boolean) -- 
 	local animName = "knockout"
 	if anim.isPlaying(selfObj, animName) == false then
 		anim.clearAnimationQueue(selfObj, false) -- Empties anim queue to immediately play the knockout animation
 		anim.playQueued(selfObj, animName, {})
-	elseif (types.Player.quests(player) as {string: cmn.PlayerQuest})["SAFL_ShiesFled"].stage >= 40 then
+	elseif getBackUp == true then
 		anim.setLoopingEnabled(selfObj, animName, false) 
 		I.AnimationController.addTextKeyHandler(animName, function(animGroup: string, key: string)
 			anim.playQueued(selfObj, animGroup, {startkey = 'stop', stopkey = 'stop', loops = 0})
@@ -427,7 +427,9 @@ local function onUpdate(dt: number) -- called every frame while the script is lo
 	getPlayerLeader()
     checkAttributes()
 	if checks["incapacitated"] == true then
-		shiesIncapacitated()
+		-- Right now there is only one instance of shies being incapacitated, and only one condition under which he gets back up
+		-- However, if this mechanic is extended in the future, passing a boolean parameter as the get up condition makes this trivial
+		shiesIncapacitated((types.Player.quests(player) as {string: cmn.PlayerQuest})["SAFL_ShiesFled"].stage >= 40)
 	end
 
 	if checks["fly"] == false and types.Actor.isOnGround(selfObj) == false then
