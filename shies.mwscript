@@ -36,9 +36,9 @@ endif
 
 ;ADD ADDITIONAL TOPICS IN THIS SECTION IF REQUIRED.
 
+; once leveling is implemented 
 if ( addOnce == 0 )
   ;StartScript, safl_compLevel ; Will discard once skill leveling is implemented in lua
-  Set companion to 0
   Set addOnce to 1
 endif
 
