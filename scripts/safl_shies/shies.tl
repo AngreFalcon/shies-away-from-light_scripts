@@ -298,8 +298,8 @@ end
 
 local function castSpell1(spell: core.Spell, duration: number)
 	local currentStance = types.Actor.getStance(selfObj)
-	local currentSpell = (types.Actor.getSelectedSpell(selfObj) as core.Spell)
-	local currentEnchItem = (types.Actor.getSelectedEnchantedItem(selfObj) as core.GameObject)
+	--local currentSpell = (types.Actor.getSelectedSpell(selfObj) as core.Spell)
+	--local currentEnchItem = (types.Actor.getSelectedEnchantedItem(selfObj) as core.GameObject)
 
 	print(spell.id)
 	types.Actor.setSelectedSpell(selfObj, spell)
@@ -326,7 +326,7 @@ local function castSpell1(spell: core.Spell, duration: number)
 	types.Actor.setStance(selfObj, currentStance)]]
 end
 
-local function castSpell2(spell: core.Spell, duration: number)
+local function castSpell(spell: core.Spell, duration: number)
 	types.Actor.activeSpells(selfObj):add({
 		id = spell.id,
 		effects = {0},
@@ -337,13 +337,14 @@ local function castSpell2(spell: core.Spell, duration: number)
 	for _, effect in pairs((spell.effects as {any: core.MagicEffectWithParams})) do
 		local vfx = effect.effect
 		selfObj:sendEvent('AddVfx', {
-        	model = types.Static.record(vfx.hitStatic).model,
+        	model = types.Static.record(vfx.castStatic).model,
         	options = {
-            	vfxId = "vfxShiesFlee",
+            	vfxId = "followerCast" .. effect.id,
             	particleTextureOverride = vfx.particle,
             	loop = false,
         	}
     	})
+		core.sound.playSound3d(vfx.castSound, selfObj, {})
 	end
 
 	timers["restorespell"] = duration
@@ -359,7 +360,7 @@ local function checkAttributes() -- Used to call various functions that affect f
 												attributes[2](selfObj).current,
 												attributes[i](selfObj))
 				if spell~= nil and spell[1] ~= nil and spell[2] ~= nil and timers["restorespell"] <= 0 then
-					castSpell2(spell[1], spell[2])
+					castSpell(spell[1], spell[2])
 				end
 			end
 		end
