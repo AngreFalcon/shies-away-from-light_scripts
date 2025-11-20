@@ -67,7 +67,7 @@ local function fullHeal() -- Fully restore shies' health
     attributes[1](selfObj).current = getMaxAttr(attributes[1](selfObj))
 end
 
-local function checkAttrDamaged(attr: types.DynamicStat): boolean
+local function checkAttrDamaged(attr: types.DynamicStat): boolean -- Returns true if the provided attribute is not currently full
 	return attr.current < getMaxAttr(attr)
 end
 
@@ -108,7 +108,7 @@ local function setSneak() -- Make sure if the player is sneaking, shies sneaks a
 	end
 end
 
-local function shiesIncapacitated(getBackUp: boolean) -- 
+local function shiesIncapacitated(getBackUp: boolean) -- This function applies and ends the knockout animation for shies. The boolean parameter must be true for the animation to end
 	local animName = "knockout"
 	if anim.isPlaying(selfObj, animName) == false then
 		anim.clearAnimationQueue(selfObj, false) -- Empties anim queue to immediately play the knockout animation
@@ -408,7 +408,7 @@ local function setDefaultSpeed() -- Sets shies' speed modifier while not followi
 	types.Actor.stats.attributes.speed(selfObj).modifier = 40
 end
 
-local function updateTimers(dt: number)
+local function updateTimers(dt: number) -- This function updates our various timers by dt, the time passed since this script's last executions
 	for i = 1, #potionsArr do
 		potionsArr[i].timer = potionsArr[i].timer - dt
 	end
