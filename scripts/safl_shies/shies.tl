@@ -8,7 +8,7 @@ local util = require('openmw.util')
 local anim = require('openmw.animation')
 local cmn = require('scripts.safl_shies.common')
 
--- Credit to Grumpy and Kateri for their companion mwscripts, which were used as the foundation for much of the below logic
+-- Credit to Grumpy and Kateri for their companion mwscripts, which were used as the foundation from which this script was built
 
 -- aliases
 local attributes = {types.Actor.stats.dynamic.health,types.Actor.stats.dynamic.magicka,types.Actor.stats.dynamic.fatigue}
