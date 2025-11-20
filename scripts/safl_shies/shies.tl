@@ -27,11 +27,18 @@ local timers: {cmn.Timer: number} = {}
 local counter: number
 
 -- constants
-local FLEE_THRESHOLD = 0.1
-local RECALL_TIMEOUT = 2 * time.second
-local INIT_DATA: cmn.SaveData = {recallLoc = {cellId = "Balmora, Council Club", cellPos = util.vector3(-5, -218, -251)}}
-
--- persistent variables
+local FLEE_THRESHOLD <const> = 0.1 -- The health percentage at which shies should flee from combat via recall
+local CATCHUP_MULT <const> = 2.25 -- The value to multiply the player's speed and athletics value by before applying it as a modifier to shies if he falls behind
+local FOLLOW_MOD <const> = 15 -- The modifier to be applied to shies' speed and athletics when normally following the player
+local WANDER_MOD <const> = 40 -- The modifier to be applies to shies' speed when wandering instead of followings
+local SHIESFLED_FOUND_STAGE <const> = 40 -- The stage at which the player has found and spoken with shies after shies fled from combat for the first time
+local DEFAULT_POTION_TIMER <const> = 60 -- The time in seconds to wait until shies can consume another potion of the same type if the potion's actual duration couldn't be found
+local POTION_WASTE_THRESHOLD <const> = 0.25 -- The multiplier used to determine whether a potion's effect would be wasted if consumed
+local ATTRIBUTE_PANIC_THRESHOLD <const> = 0.75 -- The percentage missing from an attribute before shies should ignore the potion waste threshold and consume a restorative potion anyway 
+local DEF_TIMER1 <const> = 6
+local DEF_TIMER2 <const> = 4.4
+local RECALL_TIMEOUT <const> = 2 * time.second
+local INIT_DATA <const>: cmn.SaveData = {recallLoc = {cellId = "Balmora, Council Club", cellPos = util.vector3(-5, -218, -251)}}
 
 -- warp function variables - persistent
 local posA: cmn.CellLoc
@@ -166,7 +173,7 @@ end
 
 local function setSheatheTimer(timePassed: number) -- Sheathe weapon after combat check
 	if checks["combat"] == true then
-		timers["warp"] = 6
+		timers["warp"] = DEF_TIMER1
 		timers["sheathe"] = timers["sheathe"] - timePassed
 		if core.sound.isSoundPlaying("Weapon Swish", selfObj) == true
 			or core.sound.isSoundPlaying("crossbowShoot", selfObj) == true
@@ -176,7 +183,7 @@ local function setSheatheTimer(timePassed: number) -- Sheathe weapon after comba
 			or core.sound.isSoundPlaying("destruction cast", selfObj) == true
 			or core.sound.isSoundPlaying("illusion cast", selfObj) == true
 		then
-			timers["sheathe"] = 4.4
+			timers["sheathe"] = DEF_TIMER2
 		elseif timers["sheathe"] <= 0 then
 			checks["combat"] = false
 			if types.Actor.getStance(selfObj) == types.Actor.STANCE.Spell then
@@ -189,8 +196,8 @@ local function setSheatheTimer(timePassed: number) -- Sheathe weapon after comba
 		or types.Actor.getStance(selfObj) == types.Actor.STANCE.Spell
 	then
 		checks["combat"] = true
-		timers["sheathe"] = 4.4
-		timers["warp"] = 6
+		timers["sheathe"] = DEF_TIMER2
+		timers["warp"] = DEF_TIMER1
 	end
 end
 
@@ -295,13 +302,13 @@ local function toggleEffect(flag: cmn.Flag, effectType: string) -- This function
 	end
 end
 
-local function modSpeedAndAthletics() -- Set shies' speed and athletics modifier to a flat 15 if he's within a certain distance of the player, or add a multiplier based off the player's stats if he's too far
-	if getCoDist(selfObj.position, (getPlayerCellPos() as cmn.CellLoc).cellPos) < 300 then
-		types.Actor.stats.attributes.speed(selfObj).modifier = 15
-		types.NPC.stats.skills.athletics(selfObj).modifier = 15
+local function modSpeedAndAthletics() -- Set shies' speed and athletics modifier to a flat value if he's within a certain distance of the player, or add a multiplier based off the player's stats if he's too far
+	if getCoDist(selfObj.position, (getPlayerCellPos() as cmn.CellLoc).cellPos) <= 300 then
+		types.Actor.stats.attributes.speed(selfObj).modifier = FOLLOW_MOD
+		types.NPC.stats.skills.athletics(selfObj).modifier = FOLLOW_MOD
 	elseif getCoDist(selfObj.position, (getPlayerCellPos() as cmn.CellLoc).cellPos) > 300 then
-		local cSpeed = types.Actor.stats.attributes.speed(player).modified * 2.25
-		local cAthletics = types.NPC.stats.skills.athletics(player).modified * 2.25
+		local cSpeed = types.Actor.stats.attributes.speed(player).modified * CATCHUP_MULT
+		local cAthletics = types.NPC.stats.skills.athletics(player).modified * CATCHUP_MULT
 		types.Actor.stats.attributes.speed(selfObj).modifier = cSpeed
 		types.NPC.stats.skills.athletics(selfObj).modifier = cAthletics
 	end
@@ -315,7 +322,7 @@ end
 local function consumePotion(potionID: string, effectName: string): number -- Sends a global event to trigger shies to consume the specified potion. Returns the duration of whatever effect is specified, or 60 if the potion does not have that effect
 	local potion = types.Actor.inventory(selfObj):find(potionID)
 	local potionEffects = types.Potion.record(potion).effects
-	local duration: number = 60
+	local duration: number = DEFAULT_POTION_TIMER
 	if effectName ~= nil then
 		for i = 1, #potionEffects do
 			if potionEffects[i].effect.name == effectName then
@@ -344,7 +351,7 @@ local function selectBestPotion(attr: types.DynamicStat, potions: {cmn.PotionArr
 			end
 		end
 	end
-	if ((potions[potion].magnitude / 4) >= attrDiff) and (attrDiff <= (getMaxAttr(attr) * 0.75)) then
+	if ((potions[potion].magnitude * POTION_WASTE_THRESHOLD) >= attrDiff) and (attrDiff <= (getMaxAttr(attr) * ATTRIBUTE_PANIC_THRESHOLD)) then
 		return nil -- If 3/4s or more of the potion's effect will be wasted, don't consume it unless shies is missing more than 3/4s of the attribute
 	else
 		return potions[potion].name
@@ -405,7 +412,7 @@ local function freeFall() -- Used to call various functions that should trigger 
 end
 
 local function setDefaultSpeed() -- Sets shies' speed modifier while not following the player
-	types.Actor.stats.attributes.speed(selfObj).modifier = 40
+	types.Actor.stats.attributes.speed(selfObj).modifier = WANDER_MOD
 end
 
 local function updateTimers(dt: number) -- This function updates our various timers by dt, the time passed since this script's last executions
@@ -429,7 +436,7 @@ local function onUpdate(dt: number) -- called every frame while the script is lo
 	if checks["incapacitated"] == true then
 		-- Right now there is only one instance of shies being incapacitated, and only one condition under which he gets back up
 		-- However, if this mechanic is extended in the future, passing a boolean parameter as the get up condition makes this trivial
-		shiesIncapacitated((types.Player.quests(player) as {string: cmn.PlayerQuest})["SAFL_ShiesFled"].stage >= 40)
+		shiesIncapacitated((types.Player.quests(player) as {string: cmn.PlayerQuest})["SAFL_ShiesFled"].stage >= SHIESFLED_FOUND_STAGE)
 	end
 
 	if checks["fly"] == false and types.Actor.isOnGround(selfObj) == false then
