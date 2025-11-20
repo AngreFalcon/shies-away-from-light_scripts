@@ -45,7 +45,6 @@ local interface SaveData
 	checks: {Flag: boolean}
 	timers: {Timer: number}
 	potionsArr: {Potions}
-	counter: number
 	posA: CellLoc
 	posB: CellLoc
 	posC: CellLoc
