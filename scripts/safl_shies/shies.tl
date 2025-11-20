@@ -15,7 +15,7 @@ local attributes = {types.Actor.stats.dynamic.health,types.Actor.stats.dynamic.m
 local selfObj = self as core.GameObject
 
 -- variables
-local ScriptVersion = 1 -- increment whenever onSave is changed
+local ScriptVersion <const> = 1 -- increment whenever onSave is changed
 
 local RECALL_LOC: cmn.CellLoc
 local player: core.GameObject
