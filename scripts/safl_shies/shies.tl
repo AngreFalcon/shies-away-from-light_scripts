@@ -147,14 +147,25 @@ end
 
 local function updateTimers(dt: number) -- This function updates our various timers by dt, the time passed since this script's last executions
 	for i = 1, #potionsArr do
-		potionsArr[i].timer = potionsArr[i].timer - dt
+		if potionsArr[i].timer > 0 then
+			potionsArr[i].timer = potionsArr[i].timer - dt
+		end
 	end
-	timers["warp"] = timers["warp"] - dt
+
+	if timers["warp"] > 0 then
+		timers["warp"] = timers["warp"] - dt
+	end
+
+	if timers["restorespell"] > 0 then
+		timers["restorespell"] = timers["restorespell"] - dt
+	end
+
 	if ((checks["fly"] == false) and (types.Actor.isOnGround(selfObj) == false)) or timers["freefall"] < 0 then
 		timers["freefall"] = timers["freefall"] + dt
 	elseif timers["freefall"] > 0 then -- A negative timers["freefall"] implies a slowfall potion is active and the timer should not be reset
 		timers["freefall"] = 0
 	end
+
 	setSheatheWarpTimers(dt)
 end
 
@@ -248,7 +259,7 @@ local function selectBestPotion(attr: types.DynamicStat, potions: {cmn.PotionArr
 	end
 end
 
-local function  drinkAttrPotion(potions: cmn.Potions, attr: types.DynamicStat): boolean -- Find the most applicable restore potion for the given attribute and then consume it. Returns false if a potion was not consumed
+local function drinkAttrPotion(potions: cmn.Potions, attr: types.DynamicStat): boolean -- Find the most applicable restore potion for the given attribute and then consume it. Returns false if a potion was not consumed
 	if potions.check == true and potions.timer <= 0 then
 		local potion = selectBestPotion(attr, potions.types)
 		if potion ~= nil then
@@ -260,15 +271,73 @@ local function  drinkAttrPotion(potions: cmn.Potions, attr: types.DynamicStat): 
 	end
 end
 
-local function checkAttributes() -- Used to call various functions that affect follower's dynamic attributes like health, fatigue, magicka
+local function selectRestoreSpell(spells: types.ActorSpells, effectId: string, currentMagicka: number, attr: types.DynamicStat): {core.Spell, number} -- Selects the best restorative spell the NPC currently has (prioritizes magnitude over cost). Prefers the spell that restores closest to the missing amount of whichever attribute is being restored rather than just the spell with the greatest magnitude, currently ignores all side effects of casting the spell. Returns nil if no spell is found
+	local selectedSpell: core.Spell
+	local selectedSpellMagnitude: number = 0
+	local selectedSpellDuration: number = 0
+	local attrDiff = getMaxAttr(attr) - attr.current
+	if timers["restorespell"] > 0 then return end -- Can't cast a spell again yet, still on cooldown
+	for _, spell in pairs((spells as {any: core.Spell})) do
+		if spell.type == core.magic.SPELL_TYPE.Spell or (spell.type == core.magic.SPELL_TYPE.Power and types.Actor.activeSpells(selfObj):canUsePower(spell.id) == true) then -- Only use a spell or power, no abilities. Powers will only be cast if they are not currently on cooldown
+			for _, effect in pairs((spell.effects as {any: core.MagicEffectWithParams})) do
+				if effect.id == (effectId as string) and effect.range == core.magic.RANGE.Self then -- We only care if at least one of the effects of this spell restores our chosen attribute and works on self
+					local spellMagnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration -- Find the average magnitude of the given effect for this spell
+					if ((selectedSpell == nil) or (math.abs(attrDiff - spellMagnitude) < math.abs(attrDiff - selectedSpellMagnitude))) -- Choose the spell that would be efficient for the missing amount of whichever attribute this is
+					and (spell.cost < currentMagicka) -- Only selects this spell if we can afford to cast it
+					then
+						selectedSpell = spell
+						selectedSpellMagnitude = spellMagnitude
+						selectedSpellDuration = effect.duration
+					end
+				end
+			end
+		end
+	end
+	return {selectedSpell, selectedSpellDuration}
+end
+
+local function castSpell(spell: core.Spell, duration: number)
+	local currentStance = types.Actor.getStance(selfObj)
+	local currentSpell = (types.Actor.getSelectedSpell(selfObj) as core.Spell)
+	local currentEnchItem = (types.Actor.getSelectedEnchantedItem(selfObj) as core.GameObject)
+
+	print(spell.id)
+	types.Actor.setSelectedSpell(selfObj, spell)
+	print((types.Actor.getSelectedSpell(selfObj) as core.Spell).id)
+	-- spell is properly selected
+
+	print(currentStance)
+	types.Actor.setStance(selfObj, types.Actor.STANCE.Spell)
+	print(types.Actor.getStance(selfObj))
+	-- stance is properly set
+	
+	(selfObj as self).controls.use = (selfObj as self).ATTACK_TYPE.Any
+	-- spell is not cast
+
+	timers["restorespell"] = duration
+
+	--[[
+	-- Restore state from before casting restore spell
+	if currentSpell ~= nil then
+		types.Actor.setSelectedSpell(selfObj, currentSpell)
+	elseif currentEnchItem ~= nil then
+		types.Actor.setSelectedEnchantedItem(selfObj, currentEnchItem)
+	end
+	types.Actor.setStance(selfObj, currentStance)]]
+end
+
+local function checkAttributes() -- Used to call various functions that affect follower's dynamic attributes like health, fatigue, and magicka
 	for i = 1, #attributes do
 		if checkAttrDamaged(attributes[i](selfObj)) == true then
 			countAttrPotions(potionsArr[i])
 			if potionsArr[i].check == false or drinkAttrPotion(potionsArr[i], attributes[i](selfObj)) == false then
-				-- cast some sort of restorative spell on self
-				--local shiesSpells = types.Actor.spells(selfObj)
-				--for _, spell in pairs((shiesSpells as {any: core.Spell})) do
-				--end
+				local spell = selectRestoreSpell(types.Actor.spells(selfObj),
+												potionsArr[i].effectId,
+												attributes[2](selfObj).current,
+												attributes[i](selfObj))
+				if spell ~= nil and timers["restorespell"] <= 0 then
+					castSpell(spell[1], spell[2])
+				end
 			end
 		end
 	end
@@ -507,10 +576,12 @@ local function onInit() -- Called when the script is created but not loaded
 	timers["sheathe"] = 0
 	timers["warp"] = 0
 	timers["freefall"] = 0
+	timers["restorespell"] = 0
 	potionsArr[1] = {
 		check = false,
 		timer = 0,
 		effectName = "Restore Health",
+		effectId = "restorehealth",
 		types = {{
 			name = "p_restore_health_b",
 			count = 0,
@@ -541,6 +612,7 @@ local function onInit() -- Called when the script is created but not loaded
 		check = false,
 		timer = 0,
 		effectName = "Restore Magicka",
+		effectId = "restoremagicka",
 		types = {{
 			name = "p_restore_magicka_b",
 			count = 0,
@@ -571,6 +643,7 @@ local function onInit() -- Called when the script is created but not loaded
 		check = false,
 		timer = 0,
 		effectName = "Restore Fatigue",
+		effectId = "restorefatigue",
 		types = {{
 			name = "p_restore_fatigue_b",
 			count = 0,

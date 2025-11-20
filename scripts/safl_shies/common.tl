@@ -18,6 +18,7 @@ local type Timer = enum
 	"sheathe"
 	"warp"
 	"freefall"
+	"restorespell"
 end
 
 local interface CellLoc
@@ -35,6 +36,7 @@ local interface Potions
 	check: boolean
 	timer: number
 	effectName: string
+	effectId: string
 	types: {PotionArr}
 end
 
