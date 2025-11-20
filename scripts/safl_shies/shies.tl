@@ -300,7 +300,7 @@ local function modSpeedAndAthletics() -- Set shies' speed and athletics modifier
 		types.Actor.stats.attributes.speed(selfObj).modifier = 15
 		types.NPC.stats.skills.athletics(selfObj).modifier = 15
 	elseif getCoDist(selfObj.position, (getPlayerCellPos() as cmn.CellLoc).cellPos) > 300 then
-		local cSpeed = types.Actor.stats.attributes.speed(selfObj).modified * 2.25
+		local cSpeed = types.Actor.stats.attributes.speed(player).modified * 2.25
 		local cAthletics = types.NPC.stats.skills.athletics(player).modified * 2.25
 		types.Actor.stats.attributes.speed(selfObj).modifier = cSpeed
 		types.NPC.stats.skills.athletics(selfObj).modifier = cAthletics
