@@ -296,7 +296,7 @@ local function selectRestoreSpell(spells: types.ActorSpells, effectId: string, c
 	return {selectedSpell, selectedSpellDuration}
 end
 
-local function castSpell(spell: core.Spell, duration: number)
+local function castSpell1(spell: core.Spell, duration: number)
 	local currentStance = types.Actor.getStance(selfObj)
 	local currentSpell = (types.Actor.getSelectedSpell(selfObj) as core.Spell)
 	local currentEnchItem = (types.Actor.getSelectedEnchantedItem(selfObj) as core.GameObject)
@@ -326,6 +326,29 @@ local function castSpell(spell: core.Spell, duration: number)
 	types.Actor.setStance(selfObj, currentStance)]]
 end
 
+local function castSpell2(spell: core.Spell, duration: number)
+	types.Actor.activeSpells(selfObj):add({
+		id = spell.id,
+		effects = {0},
+		name = spell.name,
+		caster = selfObj,
+	})
+	attributes[2](selfObj).current = attributes[2](selfObj).current - spell.cost
+	for _, effect in pairs((spell.effects as {any: core.MagicEffectWithParams})) do
+		local vfx = effect.effect
+		selfObj:sendEvent('AddVfx', {
+        	model = types.Static.record(vfx.hitStatic).model,
+        	options = {
+            	vfxId = "vfxShiesFlee",
+            	particleTextureOverride = vfx.particle,
+            	loop = false,
+        	}
+    	})
+	end
+
+	timers["restorespell"] = duration
+end
+
 local function checkAttributes() -- Used to call various functions that affect follower's dynamic attributes like health, fatigue, and magicka
 	for i = 1, #attributes do
 		if checkAttrDamaged(attributes[i](selfObj)) == true then
@@ -335,8 +358,8 @@ local function checkAttributes() -- Used to call various functions that affect f
 												potionsArr[i].effectId,
 												attributes[2](selfObj).current,
 												attributes[i](selfObj))
-				if spell ~= nil and timers["restorespell"] <= 0 then
-					castSpell(spell[1], spell[2])
+				if spell~= nil and spell[1] ~= nil and spell[2] ~= nil and timers["restorespell"] <= 0 then
+					castSpell2(spell[1], spell[2])
 				end
 			end
 		end
