@@ -373,7 +373,7 @@ local function checkAttributes() -- Used to call various functions that affect f
 	for i = 1, #attributes do
 		if checkAttrDamaged(attributes[i](selfObj)) == true then
 			countAttrPotions(potionsArr[i]) -- Refresh count of restoration potions in follower's inventory
-		if potionsArr[i].check == false or drinkAttrPotion(attributes[i](selfObj), potionsArr[i]) == false then -- Prioritize drinking a potion over casting a spell
+			if potionsArr[i].check == false or drinkAttrPotion(attributes[i](selfObj), potionsArr[i]) == false then -- Prioritize drinking a potion over casting a spell
 				local spell = selectRestoreSpell(types.Actor.spells(selfObj),
 												potionsArr[i].effectId,
 												attributes[2](selfObj).current,
