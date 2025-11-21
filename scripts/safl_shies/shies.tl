@@ -20,7 +20,9 @@ local MOD_SPEED_DISTANCE_THRESHOLD <const> = 300 -- The distance threshold that 
 local CATCHUP_MULT <const> = 2.25 -- The value to multiply the player's speed and athletics value by before applying it as a modifier to follower if they falls behind
 local FOLLOW_MOD <const> = 15 -- The modifier to be applied to follower's speed and athletics when normally following the player
 local WANDER_MOD <const> = 40 -- The modifier to be applies to follower's speed when wandering instead of followings
+local DEFAULT_SPELL_TIMER <const> = 10 -- The time in seconds to wait until follower can cast another spell
 local DEFAULT_POTION_TIMER <const> = 60 -- The time in seconds to wait until follower can consume another potion of the same type if the potion's actual duration couldn't be found
+local SPELL_EFFECT_HANDICAP <const> = 0.75 -- When comparing the restorative effects of spells vs potions, use this multiplier as a handicap for spells to make them appear more favorable due to the fact that spell casts are less limited than potions
 local POTION_WASTE_THRESHOLD <const> = 0.25 -- The percentage threshold that determines whether a restorative potion's effects are considered wasted or not. At 0.25, if follower is only missing 25 health or less, a restore health potion with an effect greater than 100 would be considered wasted
 local ATTRIBUTE_PANIC_THRESHOLD <const> = 0.75 -- The percentage missing from an attribute before follower should ignore the potion waste threshold and consume a restorative potion anyway. At 0.75, if follower is missing more than 75% health, follower will use a restore health potion whether its effect would be considered wasted or not
 local WARP_TIMER <const> = 6 -- Default value for the warp timer
@@ -90,6 +92,14 @@ end
 
 local function getMaxAttr(attr: types.DynamicStat): number -- Get the maximum value of the specified dynamic stat
     return attr.base + attr.modifier
+end
+
+local function getAttrDiff(attr: types.DynamicStat): number -- Get the missing value of the specified dynamic stat
+	return getMaxAttr(attr) - attr.current
+end
+
+local function getPrefHealAmount(attrDiff: number, magnitude1: number, magnitude2: number): boolean -- Returns true if the first magnitude is better, false if the second magnitude is preferable
+	return (math.abs(attrDiff - magnitude1) < math.abs(attrDiff - magnitude2))
 end
 
 local function checkAttrDamaged(attr: types.DynamicStat): boolean -- Returns true if the provided attribute is not currently full
@@ -206,20 +216,6 @@ local function toggleEffect(flag: cmn.Flag, effectType: string) -- This function
 	end
 end
 
-local function countAttrPotions(potions: cmn.Potions) -- Checks follower's inventory to update the count of restore health/magicka/stamina potions they have
-	local inventory = types.Actor.inventory(selfObj)
-	local count: number = 0
-	for i = 1, #potions.types do
-		potions.types[i].count = inventory:countOf(potions.types[i].name)
-		count = count + potions.types[i].count
-	end
-	if count > 0 and potions.check == false then
-		potions.check = true
-	elseif count == 0 and potions.check == true then
-		potions.check = false
-	end
-end
-
 local function consumePotion(potionID: string, effectName: string): number -- Sends a global event to trigger follower to consume the specified potion. Returns the duration of whatever effect is specified, or 60 if the potion does not have that effect
 	local potion = types.Actor.inventory(selfObj):find(potionID)
 	local potionEffects = types.Potion.record(potion).effects
@@ -235,65 +231,87 @@ local function consumePotion(potionID: string, effectName: string): number -- Se
 	return duration
 end
 
-local function selectBestPotion(attr: types.DynamicStat, potions: {cmn.PotionArr}): string -- Find the potion whose restore amount is closest to the amount missing from the specified attribute
+local function castSpell(spell: core.Spell, castSound: string): number
+	local duration: number = DEFAULT_SPELL_TIMER
+	types.Actor.activeSpells(selfObj):add({
+		id = spell.id,
+		effects = {0},
+		name = spell.name,
+		caster = selfObj,
+	})
+	attributes[2](selfObj).current = attributes[2](selfObj).current - spell.cost
+	for _, effect in pairs((spell.effects as {any: core.MagicEffectWithParams})) do
+		local vfx = effect.effect
+		selfObj:sendEvent('AddVfx', {
+        	model = types.Static.record(vfx.castStatic).model,
+        	options = {
+            	vfxId = "followerCast" .. effect.id,
+            	particleTextureOverride = vfx.particle,
+            	loop = false,
+        	}
+    	})
+		print(vfx.id)
+		--core.sound.playSound3d(vfx.castSound, selfObj, {}) -- Due to what appears to be a bug with the lua API, it's not actually possible to retrieve any sounds for our spell effect. For now the sound must be passed in as a string
+		core.sound.playSound3d(castSound, selfObj, {})
+		if duration < effect.duration then
+			duration = effect.duration -- Get the longest duration of any of the effects supplied by this spell and use that as the duration of the spell itself
+		end
+	end
+	return duration
+end
+
+local function selectRestorePotion(potions: cmn.Potions, attrDiff: number, attrMax: number): {string, number} -- Find the potion whose restore amount is closest to the amount missing from the specified attribute
 	local potion: integer
-	local attrDiff = getMaxAttr(attr) - attr.current
-	for i = 1, #potions do
-		if potions[i].count > 0 then
+	if potions.check == false or potions.timer > 0 then
+		return nil
+	end
+	local potionArr = potions.types
+	for i = 1, #potions.types do
+		if potionArr[i].count > 0 then
 			if potion == nil then
 				potion = i
 			end
-			for j = i + 1, #potions do
-				if potions[j].count > 0 then
-					if math.abs(attrDiff - potions[potion].magnitude) > math.abs(attrDiff - potions[j].magnitude) then
+			for j = i + 1, #potionArr do
+				if potionArr[j].count > 0 then
+					if getPrefHealAmount(attrDiff, potionArr[potion].magnitude, potionArr[j].magnitude) == true then
 						potion = j
 					end
 				end
 			end
 		end
 	end
-	if ((potions[potion].magnitude * POTION_WASTE_THRESHOLD) >= attrDiff) and (attrDiff <= (getMaxAttr(attr) * ATTRIBUTE_PANIC_THRESHOLD)) then
+	if ((potionArr[potion].magnitude * POTION_WASTE_THRESHOLD) >= attrDiff) and (attrDiff <= (attrMax * ATTRIBUTE_PANIC_THRESHOLD)) then
 		return nil -- If 3/4s or more of the potion's effect will be wasted, don't consume it unless follower is missing more than 3/4s of the attribute
 	else
-		return potions[potion].name
+		return {potionArr[potion].name, potionArr[potion].magnitude}
 	end
 end
 
-local function drinkAttrPotion(attr: types.DynamicStat, potions: cmn.Potions): boolean -- Find the most applicable restore potion for the given attribute and then consume it. Returns false if a potion was not consumed
-	if potions.check == true and potions.timer <= 0 then
-		local potion = selectBestPotion(attr, potions.types)
-		if potion ~= nil then
-			potions.timer = consumePotion(potion, potions.effectName)
-			return true
-		else
-			return false
-		end
-	end
-end
-
-local function selectRestoreSpell(spells: types.ActorSpells, effectId: string, currentMagicka: number, attr: types.DynamicStat): {core.Spell, number} -- Selects the best restorative spell the NPC currently has (prioritizes magnitude over cost). Prefers the spell that restores closest to the missing amount of whichever attribute is being restored rather than just the spell with the greatest magnitude, currently ignores all side effects of casting the spell. Returns nil if no spell is found
+local function selectRestoreSpell(effectId: string, attrDiff: number, currentMagicka: number): {core.Spell, number} -- Selects the best restorative spell the NPC currently has (prioritizes magnitude over cost). Prefers the spell that restores closest to the missing amount of whichever attribute is being restored rather than just the spell with the greatest magnitude, currently ignores all side effects of casting the spell. Returns nil if no spell is found
+	local spells = types.Actor.spells(selfObj)
 	local selectedSpell: core.Spell
 	local selectedSpellMagnitude: number = 0
-	local selectedSpellDuration: number = 0
-	local attrDiff = getMaxAttr(attr) - attr.current
 	if timers["restorespell"] > 0 then return end -- Can't cast a spell again yet, still on cooldown
 	for _, spell in pairs((spells as {any: core.Spell})) do
 		if spell.type == core.magic.SPELL_TYPE.Spell or (spell.type == core.magic.SPELL_TYPE.Power and types.Actor.activeSpells(selfObj):canUsePower(spell.id) == true) then -- Only use a spell or power, no abilities. Powers will only be cast if they are not currently on cooldown
 			for _, effect in pairs((spell.effects as {any: core.MagicEffectWithParams})) do
 				if effect.id == (effectId as string) and effect.range == core.magic.RANGE.Self then -- We only care if at least one of the effects of this spell restores our chosen attribute and works on self
 					local spellMagnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration -- Find the average magnitude of the given effect for this spell
-					if ((selectedSpell == nil) or (math.abs(attrDiff - spellMagnitude) < math.abs(attrDiff - selectedSpellMagnitude))) -- Choose the spell that would be efficient for the missing amount of whichever attribute this is
+					if ((selectedSpell == nil) or getPrefHealAmount(attrDiff, spellMagnitude, selectedSpellMagnitude) == true) -- Choose the spell that would be efficient for the missing amount of whichever attribute this is
 					and (spell.cost < currentMagicka) -- Only selects this spell if we can afford to cast it
 					then
 						selectedSpell = spell
 						selectedSpellMagnitude = spellMagnitude
-						selectedSpellDuration = effect.duration
 					end
 				end
 			end
 		end
 	end
-	return {selectedSpell, selectedSpellDuration}
+	if selectedSpell ~= nil and selectedSpellMagnitude ~= nil and timers["restorespell"] <= 0 then
+		return {selectedSpell, selectedSpellMagnitude}
+	else
+		return nil
+	end
 end
 
 --[[ Unable to make the follower cast using self.controls. This, however, would be preferable to adding a spell effect using types.Actor.activeSpells if it can be made to work
@@ -326,61 +344,50 @@ end
 	types.Actor.setStance(selfObj, currentStance)
 end]]
 
-local function castSpell(spell: core.Spell, duration: number, castSound: string)
-	types.Actor.activeSpells(selfObj):add({
-		id = spell.id,
-		effects = {0},
-		name = spell.name,
-		caster = selfObj,
-	})
-	attributes[2](selfObj).current = attributes[2](selfObj).current - spell.cost
-	for _, effect in pairs((spell.effects as {any: core.MagicEffectWithParams})) do
-		local vfx = effect.effect
-		selfObj:sendEvent('AddVfx', {
-        	model = types.Static.record(vfx.castStatic).model,
-        	options = {
-            	vfxId = "followerCast" .. effect.id,
-            	particleTextureOverride = vfx.particle,
-            	loop = false,
-        	}
-    	})
-		print(vfx.id)
-		--core.sound.playSound3d(vfx.castSound, selfObj, {}) -- Due to what appears to be a bug with the lua API, it's not actually possible to retrieve any sounds for our spell effect. For now the sound must be passed in as a string
-		core.sound.playSound3d(castSound, selfObj, {})
-	end
-	timers["restorespell"] = duration
-end
-
---[[
 local function drinkPotionOrCastSpell(iter: integer)
-	local potion: string
-	local spell = selectRestoreSpell(types.Actor.spells(selfObj),
-										potionsArr[iter].effectId,
-										attributes[2](selfObj).current, -- Get current magicka
-										attributes[iter](selfObj))
-	if potionsArr[iter].check == true then
-		potion = selectBestPotion(attributes[iter](selfObj), potionsArr[iter].types)
-	end
-
-	if potionsArr[iter].check == false or drinkAttrPotion(attributes[iter](selfObj), potionsArr[iter]) == false then -- Prioritize drinking a potion over casting a spell
-		if spell~= nil and spell[1] ~= nil and spell[2] ~= nil and timers["restorespell"] <= 0 then
-			castSpell(spell[1], spell[2], "restoration cast")
+	local attrDiff = getAttrDiff(attributes[iter](selfObj))
+	local potion = selectRestorePotion(potionsArr[iter],
+										attrDiff,
+										getMaxAttr(attributes[iter](selfObj)))
+	local spell = selectRestoreSpell(potionsArr[iter].effectId,
+										attrDiff,
+										attributes[2](selfObj).current) -- Get current magicka
+	if potion == nil and spell ~= nil then -- If no applicable potions are available, use a spell
+		print("potion nil")
+		timers["restorespell"] = castSpell(spell[1], "restoration cast")
+	elseif spell == nil and potion ~= nil then -- If no applicable spells are available, use a potion
+		print("spell nil")
+		potionsArr[iter].timer = consumePotion(potion[1], potionsArr[iter].effectName)
+	elseif spell ~= nil and potion ~= nil then -- Both a spell and a potion appear to be available
+		print("neither nil")
+		if getPrefHealAmount(attrDiff, potion[2], (spell[2] * SPELL_EFFECT_HANDICAP)) == true then -- Potion is preferable, consume potion
+			potionsArr[iter].timer = consumePotion(potion[1], potionsArr[iter].effectName)
+		else -- Spell is preferable, cast spell
+			timers["restorespell"] = castSpell(spell[1], "restoration cast")
 		end
 	end
-end]]
+end
+
+local function countAttrPotions(potions: cmn.Potions) -- Checks follower's inventory to update the count of restore health/magicka/stamina potions they have
+	local inventory = types.Actor.inventory(selfObj)
+	local count: number = 0
+	for i = 1, #potions.types do
+		potions.types[i].count = inventory:countOf(potions.types[i].name)
+		count = count + potions.types[i].count
+	end
+	if count > 0 and potions.check == false then
+		potions.check = true
+	elseif count == 0 and potions.check == true then
+		potions.check = false
+	end
+end
 
 local function checkAttributes() -- Used to call various functions that affect follower's dynamic attributes like health, fatigue, and magicka
 	for i = 1, #attributes do
 		if checkAttrDamaged(attributes[i](selfObj)) == true then
 			countAttrPotions(potionsArr[i]) -- Refresh count of restoration potions in follower's inventory
-			if potionsArr[i].check == false or drinkAttrPotion(attributes[i](selfObj), potionsArr[i]) == false then -- Prioritize drinking a potion over casting a spell
-				local spell = selectRestoreSpell(types.Actor.spells(selfObj),
-												potionsArr[i].effectId,
-												attributes[2](selfObj).current,
-												attributes[i](selfObj))
-				if spell~= nil and spell[1] ~= nil and spell[2] ~= nil and timers["restorespell"] <= 0 then
-					castSpell(spell[1], spell[2], "restoration cast")
-				end
+			if timers["restorespell"] <= 0 and potionsArr[i].timer <= 0 then
+				drinkPotionOrCastSpell(i)
 			end
 		end
 	end
