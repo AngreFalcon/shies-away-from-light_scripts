@@ -259,7 +259,7 @@ local function selectBestPotion(attr: types.DynamicStat, potions: {cmn.PotionArr
 	end
 end
 
-local function drinkAttrPotion(potions: cmn.Potions, attr: types.DynamicStat): boolean -- Find the most applicable restore potion for the given attribute and then consume it. Returns false if a potion was not consumed
+local function drinkAttrPotion(attr: types.DynamicStat, potions: cmn.Potions): boolean -- Find the most applicable restore potion for the given attribute and then consume it. Returns false if a potion was not consumed
 	if potions.check == true and potions.timer <= 0 then
 		local potion = selectBestPotion(attr, potions.types)
 		if potion ~= nil then
@@ -351,11 +351,29 @@ local function castSpell(spell: core.Spell, duration: number, castSound: string)
 	timers["restorespell"] = duration
 end
 
+--[[
+local function drinkPotionOrCastSpell(iter: integer)
+	local potion: string
+	local spell = selectRestoreSpell(types.Actor.spells(selfObj),
+										potionsArr[iter].effectId,
+										attributes[2](selfObj).current, -- Get current magicka
+										attributes[iter](selfObj))
+	if potionsArr[iter].check == true then
+		potion = selectBestPotion(attributes[iter](selfObj), potionsArr[iter].types)
+	end
+
+	if potionsArr[iter].check == false or drinkAttrPotion(attributes[iter](selfObj), potionsArr[iter]) == false then -- Prioritize drinking a potion over casting a spell
+		if spell~= nil and spell[1] ~= nil and spell[2] ~= nil and timers["restorespell"] <= 0 then
+			castSpell(spell[1], spell[2], "restoration cast")
+		end
+	end
+end]]
+
 local function checkAttributes() -- Used to call various functions that affect follower's dynamic attributes like health, fatigue, and magicka
 	for i = 1, #attributes do
 		if checkAttrDamaged(attributes[i](selfObj)) == true then
 			countAttrPotions(potionsArr[i]) -- Refresh count of restoration potions in follower's inventory
-			if potionsArr[i].check == false or drinkAttrPotion(potionsArr[i], attributes[i](selfObj)) == false then -- Prioritize drinking a potion over casting a spell
+		if potionsArr[i].check == false or drinkAttrPotion(attributes[i](selfObj), potionsArr[i]) == false then -- Prioritize drinking a potion over casting a spell
 				local spell = selectRestoreSpell(types.Actor.spells(selfObj),
 												potionsArr[i].effectId,
 												attributes[2](selfObj).current,
