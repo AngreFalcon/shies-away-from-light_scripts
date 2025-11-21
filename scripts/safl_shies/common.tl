@@ -18,7 +18,6 @@ local type Timer = enum
 	"sheathe"
 	"warp"
 	"freefall"
-	"restorespell"
 end
 
 local interface CellLoc
@@ -26,18 +25,11 @@ local interface CellLoc
 	cellPos: util.Vector3
 end
 
-local interface PotionArr
-	name: string
-	count: number
-	magnitude: number
-end
-
-local interface Potions
-	check: boolean
-	timer: number
+local interface RestoreAttr
+	potionTimer: number
+	spellTimer: number
 	effectName: string
 	effectId: string
-	types: {PotionArr}
 end
 
 local interface SaveData
@@ -46,7 +38,7 @@ local interface SaveData
 	player: core.GameObject
 	checks: {Flag: boolean}
 	timers: {Timer: number}
-	potionsArr: {Potions}
+	restoreAttr: {RestoreAttr}
 	posA: CellLoc
 	posB: CellLoc
 	posC: CellLoc
@@ -59,7 +51,6 @@ return {
 	Flag = Flag,
 	Timer = Timer,
     SaveData = SaveData,
-    Potions = Potions,
-	PotionArr = PotionArr,
+	RestoreAttr = RestoreAttr,
 	CellLoc = CellLoc
 }
