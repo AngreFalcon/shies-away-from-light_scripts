@@ -351,14 +351,14 @@ local function selectRestoreEnchantment(effectId: string, attrDiff: number, attr
 	local inventory = types.Actor.inventory(selfObj)
 	local selectedEnchantment: types.BookRecord
 	local selectedEnchantMagnitude: number
-	for _, scroll in pairs(((inventory:getAll(types.Book) as types.Book):record()) as {any: types.BookRecord}) do
-		if scroll.isScroll == true then
-			local enchant: core.Enchantment = (core.magic.enchantments.records as {string: core.Enchantment})[scroll.enchant]
+	for _, item in pairs(((inventory:getAll(types.Book) as types.Book):record()) as {any: types.BookRecord}) do
+		local enchant: core.Enchantment = (core.magic.enchantments.records as {string: core.Enchantment})[item.enchant]
+		if enchant.type == core.magic.ENCHANTMENT_TYPE.CastOnce then -- As far as we're concerned here, scrolls should be one time use only. Ignore any that aren't.
 			for _, effect in pairs(enchant as {any: core.MagicEffectWithParams}) do
 				if effect.id == effectId then
 					local scrollMagnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration -- Find the average magnitude of the given effect for this scroll
 					if ((selectedEnchantment == nil) or preferFirstHealAmount(attrDiff, scrollMagnitude, selectedEnchantMagnitude) == true) then -- Choose the scroll that would be efficient for the missing amount of whichever attribute this is
-						selectedEnchantment = scroll
+						selectedEnchantment = item
 						selectedEnchantMagnitude = scrollMagnitude
 					end
 				end
@@ -407,12 +407,14 @@ local function selectRestoreScroll(effectId: string, attrDiff: number, attrMax: 
 	for _, scroll in pairs(((inventory:getAll(types.Book) as types.Book):record()) as {any: types.BookRecord}) do
 		if scroll.isScroll == true then
 			local enchant: core.Enchantment = (core.magic.enchantments.records as {string: core.Enchantment})[scroll.enchant]
-			for _, effect in pairs(enchant as {any: core.MagicEffectWithParams}) do
-				if effect.id == effectId then
-					local scrollMagnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration -- Find the average magnitude of the given effect for this scroll
-					if ((selectedScroll == nil) or preferFirstHealAmount(attrDiff, scrollMagnitude, selectedScrollMagnitude) == true) then -- Choose the scroll that would be efficient for the missing amount of whichever attribute this is
-						selectedScroll = scroll
-						selectedScrollMagnitude = scrollMagnitude
+			if enchant.type == core.magic.ENCHANTMENT_TYPE.CastOnce then -- As far as we're concerned here, scrolls should be one time use only. Ignore any that aren't.
+				for _, effect in pairs(enchant as {any: core.MagicEffectWithParams}) do
+					if effect.id == effectId then
+						local scrollMagnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration -- Find the average magnitude of the given effect for this scroll
+						if ((selectedScroll == nil) or preferFirstHealAmount(attrDiff, scrollMagnitude, selectedScrollMagnitude) == true) then -- Choose the scroll that would be efficient for the missing amount of whichever attribute this is
+							selectedScroll = scroll
+							selectedScrollMagnitude = scrollMagnitude
+						end
 					end
 				end
 			end
@@ -429,53 +431,64 @@ local function selectRestoreScroll(effectId: string, attrDiff: number, attrMax: 
 end
 
 local function drinkPotionOrCastSpell(iter: integer)
+	local enum RESTORE_METHOD
+	  	"enchantment"
+	  	"spell"
+	  	"potion"
+	  	"scroll"
+	end
+	local interface RestoreMethod
+	  	name: RESTORE_METHOD
+	  	data: any
+	  	magnitude: number
+	end
+
+	local methodAction: {RESTORE_METHOD: function} = {
+	  	["enchantment"] = function(method: RestoreMethod) --[[ use enchantment ]] end,
+	  	["spell"] = function(method: RestoreMethod) restoreAttr[iter].spellTimer = castSpell((method.data as core.Spell), "restoration cast") end,
+	  	["potion"] = function(method: RestoreMethod) restoreAttr[iter].potionTimer = consumePotion((method.data as string), restoreAttr[iter].effectName) end,
+	  	["scroll"] = function(method: RestoreMethod) restoreAttr[iter].scrollTimer = useScroll((method.data as string), restoreAttr[iter].effectName) end,
+	}
 	local attrDiff = getAttrDiff(attributes[iter](selfObj))
-	local restoreMethods: {string: {any, number}}
+	local restoreMethods: {RestoreMethod} = {}	
 	if restoreAttr[iter].enchantmentTimer <= 0 then
-		restoreMethods["enchantment"] = nil -- Preparing to implement enchanted item usage
+	  	table.insert(restoreMethods, {
+	  	  	name = "enchantment", -- Preparing to implement enchanted item usage
+	  	})
 	end
 	if restoreAttr[iter].spellTimer <= 0 and attributes[2](selfObj).current > 0 then
-		restoreMethods["spell"] = selectRestoreSpell(restoreAttr[iter].effectId, attrDiff, attributes[2](selfObj).current)
-		restoreMethods["spell"][2] = restoreMethods["spell"][2] * SPELL_EFFECT_HANDICAP
+	  	local spell = selectRestoreSpell(restoreAttr[iter].effectId, attrDiff, attributes[2](selfObj).current)
+	  	table.insert(restoreMethods, {
+	  	  	name = "spell",
+	  	  	data = spell[1],
+	  	  	magnitude = spell[2] * SPELL_EFFECT_HANDICAP
+	  	})
 	end
 	if restoreAttr[iter].potionTimer <= 0 then
-		restoreMethods["potion"] = selectRestorePotion(restoreAttr[iter].effectId, attrDiff, getMaxAttr(attributes[iter](selfObj)))
+	  	local potion = selectRestorePotion(restoreAttr[iter].effectId, attrDiff, getMaxAttr(attributes[iter](selfObj)))
+	  	table.insert(restoreMethods, {
+	  	  	name = "potion",
+	  	  	data = potion[1],
+	  	  	magnitude = potion[2]
+	  	})
 	end
 	if restoreAttr[iter].scrollTimer <= 0 then
-		restoreMethods["scroll"] = selectRestoreScroll(restoreAttr[iter].effectId, attrDiff, getMaxAttr(attributes[iter](selfObj)))
+	  	local scroll = selectRestoreScroll(restoreAttr[iter].effectId, attrDiff, getMaxAttr(attributes[iter](selfObj)))
+	  	table.insert(restoreMethods, {
+	  	  	name = "scroll",
+	  	  	data = scroll[1],
+	  	  	magnitude = scroll[2]
+	  	})
 	end
+	if #restoreMethods == 0 then return end
 
-	for k1, v1 in pairs(restoreMethods) do
-		for k2, v2 in pairs(restoreMethods) do
-			if k1 ~= k2 then
-				if preferFirstHealAmount(attrDiff, restoreMethods[k1][2], restoreMethods[k2][2]) == false then
-					
-				end
-			end
-		end
+	local method: RestoreMethod = restoreMethods[1]
+	for k1 = 2, #restoreMethods do
+	 	if preferFirstHealAmount(attrDiff, method.magnitude, restoreMethods[k1].magnitude) == false then
+	  	  	method = restoreMethods[k1]
+  	  	end
 	end
-
-	if restoreMethods["enchantment"] ~= nil
-	and ((restoreMethods["spell"] == nil) or (preferFirstHealAmount(attrDiff, restoreMethods["enchantment"][2], restoreMethods["spell"][2]) == true))
-	and ((restoreMethods["potion"] == nil) or (preferFirstHealAmount(attrDiff, restoreMethods["enchantment"][2], restoreMethods["potion"][2]) == true))
-	and ((restoreMethods["scroll"] == nil) or (preferFirstHealAmount(attrDiff, restoreMethods["enchantment"][2], restoreMethods["scroll"][2]) == true))
-	then
-		-- use enchantment
-	elseif restoreMethods["spell"] ~= nil
-	and ((restoreMethods["enchantment"] == nil) or (preferFirstHealAmount(attrDiff, restoreMethods["spell"][2], restoreMethods["enchantment"][2]) == true))
-	and ((restoreMethods["potion"] == nil) or (preferFirstHealAmount(attrDiff, restoreMethods["spell"][2], restoreMethods["potion"][2]) == true))
-	and ((restoreMethods["scroll"] == nil) or (preferFirstHealAmount(attrDiff, restoreMethods["spell"][2], restoreMethods["scroll"][2]) == true))
-	then
-		restoreAttr[iter].spellTimer = castSpell((restoreMethods["spell"][1] as core.Spell), "restoration cast")
-	elseif restoreMethods["potion"] ~= nil
-	and ((restoreMethods["enchantment"] == nil) or (preferFirstHealAmount(attrDiff, restoreMethods["potion"][2], restoreMethods["enchantment"][2]) == true))
-	and ((restoreMethods["spell"] == nil) or (preferFirstHealAmount(attrDiff, restoreMethods["potion"][2], restoreMethods["spell"][2]) == true))
-	and ((restoreMethods["scroll"] == nil) or (preferFirstHealAmount(attrDiff, restoreMethods["potion"][2], restoreMethods["scroll"][2]) == true))
-	then
-		restoreAttr[iter].potionTimer = consumePotion((restoreMethods["potion"][1] as string), restoreAttr[iter].effectName)
-	elseif restoreMethods["scroll"] ~= nil then
-		restoreAttr[iter].scrollTimer = useScroll((restoreMethods["scroll"][1] as string), restoreAttr[iter].effectName)
-	end
+	methodAction[method.name](method)
 end
 
 local function checkAttributes() -- Used to call various functions that affect follower's dynamic attributes like health, fatigue, and magicka
