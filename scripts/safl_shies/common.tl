@@ -28,6 +28,8 @@ end
 local interface RestoreAttr
 	potionTimer: number
 	spellTimer: number
+	scrollTimer: number
+	enchantmentTimer: number
 	effectName: string
 	effectId: string
 end

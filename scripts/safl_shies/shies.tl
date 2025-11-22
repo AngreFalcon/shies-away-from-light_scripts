@@ -22,6 +22,8 @@ local FOLLOW_MOD <const> = 15 -- The modifier to be applied to follower's speed 
 local WANDER_MOD <const> = 40 -- The modifier to be applies to follower's speed when wandering instead of followings
 local DEFAULT_SPELL_TIMER <const> = 10 -- The time in seconds to wait until follower can cast another spell
 local DEFAULT_POTION_TIMER <const> = 60 -- The time in seconds to wait until follower can consume another potion of the same type if the potion's actual duration couldn't be found
+local DEFAULT_SCROLL_TIMER <const> = 60 -- The time in seconds to wait until follower can use another scroll of the same type if the scroll's actual duration couldn't be found
+local DEFAULT_ENCHANTMENT_TIMER <const> = 60 -- The time in seconds to wait until follower can use another enchanted item of the same type if the item's actual duration couldn't be found
 local SPELL_EFFECT_HANDICAP <const> = 0.75 -- When comparing the restorative effects of spells vs potions, use this multiplier as a handicap for spells to make them appear more favorable due to the fact that spell casts are less limited than potions
 local POTION_WASTE_THRESHOLD <const> = 0.25 -- The percentage threshold that determines whether a restorative potion's effects are considered wasted or not. At 0.25, if follower is only missing 25 health or less, a restore health potion with an effect greater than 100 would be considered wasted
 local ATTRIBUTE_PANIC_THRESHOLD <const> = 0.75 -- The percentage missing from an attribute before follower should ignore the potion waste threshold and consume a restorative potion anyway. At 0.75, if follower is missing more than 75% health, follower will use a restore health potion whether its effect would be considered wasted or not
@@ -98,7 +100,7 @@ local function getAttrDiff(attr: types.DynamicStat): number -- Get the missing v
 	return getMaxAttr(attr) - attr.current
 end
 
-local function getPrefHealAmount(attrDiff: number, magnitude1: number, magnitude2: number): boolean -- Returns true if the first magnitude is better, false if the second magnitude is preferable
+local function preferFirstHealAmount(attrDiff: number, magnitude1: number, magnitude2: number): boolean -- Returns true if the first magnitude is better, false if the second magnitude is preferable
 	return (math.abs(attrDiff - magnitude1) < math.abs(attrDiff - magnitude2))
 end
 
@@ -215,22 +217,7 @@ local function toggleEffect(flag: cmn.Flag, effectType: string) -- This function
 	end
 end
 
-local function consumePotion(potionID: string, effectName: string): number -- Sends a global event to trigger follower to consume the specified potion. Returns the duration of whatever effect is specified, or 60 if the potion does not have that effect
-	local potion = types.Actor.inventory(selfObj):find(potionID)
-	local potionEffects = types.Potion.record(potion).effects
-	local duration: number = DEFAULT_POTION_TIMER
-	if effectName ~= nil then
-		for i = 1, #potionEffects do
-			if potionEffects[i].effect.name == effectName then
-				duration = potionEffects[i].duration
-			end
-		end
-	end
-	core.sendGlobalEvent("UseItem", {object = potion, actor = selfObj})
-	return duration
-end
-
-local function castSpell(spell: core.Spell, castSound: string): number
+local function castSpell(spell: core.Spell, castSound: string): number -- Applies the effect of the specified spell to the follower, including vfx and sound, and then consumes follower's magicka equal to the cost of the spell. 
 	local duration: number = DEFAULT_SPELL_TIMER
 	types.Actor.activeSpells(selfObj):add({ -- Add the spell's effect to the follower's list of spell effect that are currently applied
 		id = spell.id,
@@ -249,13 +236,58 @@ local function castSpell(spell: core.Spell, castSound: string): number
             	loop = false,
         	}
     	})
-		print(vfx.id)
 		--core.sound.playSound3d(vfx.castSound, selfObj, {}) -- Due to what appears to be a bug with the lua API, it's not actually possible to retrieve any sounds for our spell effect. For now the sound must be passed in as a string
 		core.sound.playSound3d(castSound, selfObj, {})
 		if duration < effect.duration then
 			duration = effect.duration -- Get the longest duration of any of the effects supplied by this spell and use that as the duration of the spell itself
 		end
 	end
+	return duration
+end
+
+local function useEnchantment(potionID: string, effectName: string): number -- Sends a global event to trigger follower to use the specified enchantment. Returns the duration of whatever effect is specified, or 60 if the scroll does not have that effect
+	local enchantment = types.Actor.inventory(selfObj):find(potionID)
+	local enchantEffects = types.Potion.record(enchantment).effects
+	local duration: number = DEFAULT_ENCHANTMENT_TIMER
+	if effectName ~= nil then
+		for i = 1, #enchantEffects do
+			if enchantEffects[i].effect.name == effectName then
+				duration = enchantEffects[i].duration
+			end
+		end
+	end
+	core.sendGlobalEvent("UseItem", {object = enchantment, actor = selfObj})
+	return duration
+end
+
+local function consumePotion(potionID: string, effectName: string): number -- Sends a global event to trigger follower to consume the specified potion. Returns the duration of whatever effect is specified, or 60 if the potion does not have that effect
+	local potion = types.Actor.inventory(selfObj):find(potionID)
+	local potionEffects = types.Potion.record(potion).effects
+	local duration: number = DEFAULT_POTION_TIMER
+	if effectName ~= nil then
+		for i = 1, #potionEffects do
+			if potionEffects[i].effect.name == effectName then
+				duration = potionEffects[i].duration
+				break
+			end
+		end
+	end
+	core.sendGlobalEvent("UseItem", {object = potion, actor = selfObj})
+	return duration
+end
+
+local function useScroll(potionID: string, effectName: string): number -- Sends a global event to trigger follower to use the specified scroll. Returns the duration of whatever effect is specified, or 60 if the scroll does not have that effect
+	local scroll = types.Actor.inventory(selfObj):find(potionID)
+	local scrollEffects = types.Potion.record(scroll).effects
+	local duration: number = DEFAULT_SCROLL_TIMER
+	if effectName ~= nil then
+		for i = 1, #scrollEffects do
+			if scrollEffects[i].effect.name == effectName then
+				duration = scrollEffects[i].duration
+			end
+		end
+	end
+	core.sendGlobalEvent("UseItem", {object = scroll, actor = selfObj})
 	return duration
 end
 
@@ -289,41 +321,16 @@ end
 	types.Actor.setStance(selfObj, currentStance)
 end]]
 
-local function selectRestorePotion(effectId: string, attrDiff: number, attrMax: number): {string, number} -- Find the potion whose restore amount is closest to the amount missing from the specified attribute
-	local inventory = types.Actor.inventory(selfObj)
-	local selectedPotion: types.PotionRecord
-	local selectedPotionMagnitude: number
-	for _, potion in pairs(((inventory:getAll(types.Potion) as types.Potion):record()) as {any: types.PotionRecord}) do
-		for _, effect in pairs(potion.effects as {any: core.MagicEffectWithParams}) do
-			if effect.id == effectId then
-				local potionMagnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration -- Find the average magnitude of the given effect for this potion
-				if ((selectedPotion == nil) or getPrefHealAmount(attrDiff, potionMagnitude, selectedPotionMagnitude) == true) then -- Choose the potion that would be efficient for the missing amount of whichever attribute this is
-					selectedPotion = potion
-					selectedPotionMagnitude = potionMagnitude
-				end
-			end
-		end
-	end
-	if selectedPotion ~= nil and selectedPotionMagnitude ~= nil
-	and (((selectedPotionMagnitude * POTION_WASTE_THRESHOLD) < attrDiff) -- Only select potion if less than 25% of its effect will be wasted
-	or (attrDiff > (attrMax * ATTRIBUTE_PANIC_THRESHOLD))) -- However, if follower is missing more than 75% of their attribute, ignore the waste threshold
-	then
-		return {selectedPotion.id, selectedPotionMagnitude}
-	else
-		return nil
-	end
-end
-
 local function selectRestoreSpell(effectId: string, attrDiff: number, currentMagicka: number): {core.Spell, number} -- Selects the best restorative spell the NPC currently has (prioritizes magnitude over cost). Prefers the spell that restores closest to the missing amount of whichever attribute is being restored rather than just the spell with the greatest magnitude, currently ignores all side effects of casting the spell. Returns nil if no spell is found
 	local spells = types.Actor.spells(selfObj)
 	local selectedSpell: core.Spell
-	local selectedSpellMagnitude: number = 0
+	local selectedSpellMagnitude: number
 	for _, spell in pairs((spells as {any: core.Spell})) do
 		if spell.type == core.magic.SPELL_TYPE.Spell or (spell.type == core.magic.SPELL_TYPE.Power and types.Actor.activeSpells(selfObj):canUsePower(spell.id) == true) then -- Only use a spell or power, no abilities. Powers will only be cast if they are not currently on cooldown
 			for _, effect in pairs((spell.effects as {any: core.MagicEffectWithParams})) do
 				if effect.id == (effectId as string) and effect.range == core.magic.RANGE.Self then -- We only care if at least one of the effects of this spell restores our chosen attribute and works on self
 					local spellMagnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration -- Find the average magnitude of the given effect for this spell
-					if ((selectedSpell == nil) or getPrefHealAmount(attrDiff, spellMagnitude, selectedSpellMagnitude) == true) -- Choose the spell that would be efficient for the missing amount of whichever attribute this is
+					if ((selectedSpell == nil) or preferFirstHealAmount(attrDiff, spellMagnitude, selectedSpellMagnitude) == true) -- Choose the spell that would be efficient for the missing amount of whichever attribute this is
 					and (spell.cost < currentMagicka) -- Only selects this spell if we can afford to cast it
 					then
 						selectedSpell = spell
@@ -340,27 +347,134 @@ local function selectRestoreSpell(effectId: string, attrDiff: number, currentMag
 	end
 end
 
+local function selectRestoreEnchantment(effectId: string, attrDiff: number, attrMax: number): {string, number} -- Find whichever item is enchanted with an effect that has the most suitable restore health/magicka/fatigue amount out of all equipment in the follower's inventory
+	local inventory = types.Actor.inventory(selfObj)
+	local selectedEnchantment: types.BookRecord
+	local selectedEnchantMagnitude: number
+	for _, scroll in pairs(((inventory:getAll(types.Book) as types.Book):record()) as {any: types.BookRecord}) do
+		if scroll.isScroll == true then
+			local enchant: core.Enchantment = (core.magic.enchantments.records as {string: core.Enchantment})[scroll.enchant]
+			for _, effect in pairs(enchant as {any: core.MagicEffectWithParams}) do
+				if effect.id == effectId then
+					local scrollMagnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration -- Find the average magnitude of the given effect for this scroll
+					if ((selectedEnchantment == nil) or preferFirstHealAmount(attrDiff, scrollMagnitude, selectedEnchantMagnitude) == true) then -- Choose the scroll that would be efficient for the missing amount of whichever attribute this is
+						selectedEnchantment = scroll
+						selectedEnchantMagnitude = scrollMagnitude
+					end
+				end
+			end
+		end
+	end
+	if selectedEnchantment ~= nil and selectedEnchantMagnitude ~= nil
+	and (((selectedEnchantMagnitude * POTION_WASTE_THRESHOLD) < attrDiff) -- Only select potion if less than 25% of its effect will be wasted
+	or (attrDiff > (attrMax * ATTRIBUTE_PANIC_THRESHOLD))) -- However, if follower is missing more than 75% of their attribute, ignore the waste threshold
+	then
+		return {selectedEnchantment.id, selectedEnchantMagnitude}
+	else
+		return nil
+	end
+end
+
+local function selectRestorePotion(effectId: string, attrDiff: number, attrMax: number): {string, number} -- Find the potion whose restore amount is closest to the amount missing from the specified attribute
+	local inventory = types.Actor.inventory(selfObj)
+	local selectedPotion: types.PotionRecord
+	local selectedPotionMagnitude: number
+	for _, potion in pairs(((inventory:getAll(types.Potion) as types.Potion):record()) as {any: types.PotionRecord}) do
+		for _, effect in pairs(potion.effects as {any: core.MagicEffectWithParams}) do
+			if effect.id == effectId then
+				local potionMagnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration -- Find the average magnitude of the given effect for this potion
+				if ((selectedPotion == nil) or preferFirstHealAmount(attrDiff, potionMagnitude, selectedPotionMagnitude) == true) then -- Choose the potion that would be efficient for the missing amount of whichever attribute this is
+					selectedPotion = potion
+					selectedPotionMagnitude = potionMagnitude
+				end
+			end
+		end
+	end
+	if selectedPotion ~= nil and selectedPotionMagnitude ~= nil
+	and (((selectedPotionMagnitude * POTION_WASTE_THRESHOLD) < attrDiff) -- Only select potion if less than 25% of its effect will be wasted
+	or (attrDiff > (attrMax * ATTRIBUTE_PANIC_THRESHOLD))) -- However, if follower is missing more than 75% of their attribute, ignore the waste threshold
+	then
+		return {selectedPotion.id, selectedPotionMagnitude}
+	else
+		return nil
+	end
+end
+
+local function selectRestoreScroll(effectId: string, attrDiff: number, attrMax: number): {string, number} -- Find whichever scroll is enchanted with an effect that has the most suitable restore health/magicka/fatigue amount out of all scrolls in the follower's inventory
+	local inventory = types.Actor.inventory(selfObj)
+	local selectedScroll: types.BookRecord
+	local selectedScrollMagnitude: number
+	for _, scroll in pairs(((inventory:getAll(types.Book) as types.Book):record()) as {any: types.BookRecord}) do
+		if scroll.isScroll == true then
+			local enchant: core.Enchantment = (core.magic.enchantments.records as {string: core.Enchantment})[scroll.enchant]
+			for _, effect in pairs(enchant as {any: core.MagicEffectWithParams}) do
+				if effect.id == effectId then
+					local scrollMagnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration -- Find the average magnitude of the given effect for this scroll
+					if ((selectedScroll == nil) or preferFirstHealAmount(attrDiff, scrollMagnitude, selectedScrollMagnitude) == true) then -- Choose the scroll that would be efficient for the missing amount of whichever attribute this is
+						selectedScroll = scroll
+						selectedScrollMagnitude = scrollMagnitude
+					end
+				end
+			end
+		end
+	end
+	if selectedScroll ~= nil and selectedScrollMagnitude ~= nil
+	and (((selectedScrollMagnitude * POTION_WASTE_THRESHOLD) < attrDiff) -- Only select potion if less than 25% of its effect will be wasted
+	or (attrDiff > (attrMax * ATTRIBUTE_PANIC_THRESHOLD))) -- However, if follower is missing more than 75% of their attribute, ignore the waste threshold
+	then
+		return {selectedScroll.id, selectedScrollMagnitude}
+	else
+		return nil
+	end
+end
+
 local function drinkPotionOrCastSpell(iter: integer)
 	local attrDiff = getAttrDiff(attributes[iter](selfObj))
-	local potion: {string, number}
-	local spell: {core.Spell, number}
-	if restoreAttr[iter].potionTimer <= 0 then
-		potion = selectRestorePotion(restoreAttr[iter].effectId, attrDiff, getMaxAttr(attributes[iter](selfObj)))
+	local restoreMethods: {string: {any, number}}
+	if restoreAttr[iter].enchantmentTimer <= 0 then
+		restoreMethods["enchantment"] = nil -- Preparing to implement enchanted item usage
 	end
 	if restoreAttr[iter].spellTimer <= 0 and attributes[2](selfObj).current > 0 then
-		spell = selectRestoreSpell(restoreAttr[iter].effectId, attrDiff, attributes[2](selfObj).current)
+		restoreMethods["spell"] = selectRestoreSpell(restoreAttr[iter].effectId, attrDiff, attributes[2](selfObj).current)
+		restoreMethods["spell"][2] = restoreMethods["spell"][2] * SPELL_EFFECT_HANDICAP
+	end
+	if restoreAttr[iter].potionTimer <= 0 then
+		restoreMethods["potion"] = selectRestorePotion(restoreAttr[iter].effectId, attrDiff, getMaxAttr(attributes[iter](selfObj)))
+	end
+	if restoreAttr[iter].scrollTimer <= 0 then
+		restoreMethods["scroll"] = selectRestoreScroll(restoreAttr[iter].effectId, attrDiff, getMaxAttr(attributes[iter](selfObj)))
 	end
 
-	if potion == nil and spell ~= nil then -- If no applicable potions are available, use a spell
-		restoreAttr[iter].spellTimer = castSpell(spell[1], "restoration cast")
-	elseif spell == nil and potion ~= nil then -- If no applicable spells are available, use a potion
-		restoreAttr[iter].potionTimer = consumePotion(potion[1], restoreAttr[iter].effectName)
-	elseif spell ~= nil and potion ~= nil then -- Both a spell and a potion appear to be available
-		if getPrefHealAmount(attrDiff, potion[2], (spell[2] * SPELL_EFFECT_HANDICAP)) == true then
-			restoreAttr[iter].potionTimer = consumePotion(potion[1], restoreAttr[iter].effectName)
-		else
-			restoreAttr[iter].spellTimer = castSpell(spell[1], "restoration cast")
+	for k1, v1 in pairs(restoreMethods) do
+		for k2, v2 in pairs(restoreMethods) do
+			if k1 ~= k2 then
+				if preferFirstHealAmount(attrDiff, restoreMethods[k1][2], restoreMethods[k2][2]) == false then
+					
+				end
+			end
 		end
+	end
+
+	if restoreMethods["enchantment"] ~= nil
+	and ((restoreMethods["spell"] == nil) or (preferFirstHealAmount(attrDiff, restoreMethods["enchantment"][2], restoreMethods["spell"][2]) == true))
+	and ((restoreMethods["potion"] == nil) or (preferFirstHealAmount(attrDiff, restoreMethods["enchantment"][2], restoreMethods["potion"][2]) == true))
+	and ((restoreMethods["scroll"] == nil) or (preferFirstHealAmount(attrDiff, restoreMethods["enchantment"][2], restoreMethods["scroll"][2]) == true))
+	then
+		-- use enchantment
+	elseif restoreMethods["spell"] ~= nil
+	and ((restoreMethods["enchantment"] == nil) or (preferFirstHealAmount(attrDiff, restoreMethods["spell"][2], restoreMethods["enchantment"][2]) == true))
+	and ((restoreMethods["potion"] == nil) or (preferFirstHealAmount(attrDiff, restoreMethods["spell"][2], restoreMethods["potion"][2]) == true))
+	and ((restoreMethods["scroll"] == nil) or (preferFirstHealAmount(attrDiff, restoreMethods["spell"][2], restoreMethods["scroll"][2]) == true))
+	then
+		restoreAttr[iter].spellTimer = castSpell((restoreMethods["spell"][1] as core.Spell), "restoration cast")
+	elseif restoreMethods["potion"] ~= nil
+	and ((restoreMethods["enchantment"] == nil) or (preferFirstHealAmount(attrDiff, restoreMethods["potion"][2], restoreMethods["enchantment"][2]) == true))
+	and ((restoreMethods["spell"] == nil) or (preferFirstHealAmount(attrDiff, restoreMethods["potion"][2], restoreMethods["spell"][2]) == true))
+	and ((restoreMethods["scroll"] == nil) or (preferFirstHealAmount(attrDiff, restoreMethods["potion"][2], restoreMethods["scroll"][2]) == true))
+	then
+		restoreAttr[iter].potionTimer = consumePotion((restoreMethods["potion"][1] as string), restoreAttr[iter].effectName)
+	elseif restoreMethods["scroll"] ~= nil then
+		restoreAttr[iter].scrollTimer = useScroll((restoreMethods["scroll"][1] as string), restoreAttr[iter].effectName)
 	end
 end
 
@@ -564,6 +678,8 @@ local function onUpdate(dt: number) -- Called every frame while the script is lo
 		return
 	end
 	getPlayerLeader()
+    checkAttributes()
+	updateTimers(dt)
 	
 	shiesCheckAttributes()
 	if checks["incapacitated"] == true then
@@ -571,21 +687,17 @@ local function onUpdate(dt: number) -- Called every frame while the script is lo
 		-- However, if this mechanic is extended in the future, passing a boolean parameter as the get up condition makes this trivial
 		shiesIncapacitated((types.Player.quests(player) as {string: cmn.PlayerQuest})["SAFL_ShiesFled"].stage >= SHIES_FLED_FOUND_STAGE)
 	end
-    checkAttributes()
 
 	if checks["fly"] == false and types.Actor.isOnGround(selfObj) == false then
 		freeFall()
 	end
-
-	updateTimers(dt)
-
 	if isFollowing() then
 		setSneak()
 		toggleEffect("fly", (core.magic.EFFECT_TYPE.Levitate as string))
 		toggleEffect("ww", (core.magic.EFFECT_TYPE.WaterWalking as string))
 		forceZLevel()
 		warpToPlayer()
-	elseif player ~= nil then
+	elseif player ~= nil then -- This condition should be reserved for only function calls that take place when the follower is temporarily not following the player e.g., the follower has not been dismissed. Behaviors that occur when the follower has been dismissed should be placed outside of this condition block
 		maintainDistance()
 		nudge(dt)
 	end
@@ -608,18 +720,24 @@ local function onInit() -- Called when the script is created but not loaded
 	restoreAttr[1] = {
 		potionTimer = 0,
 		spellTimer = 0,
+		scrollTimer = 0,
+		enchantmentTimer = 0,
 		effectName = "Restore Health",
 		effectId = "restorehealth",
 	}
 	restoreAttr[2] = {
 		potionTimer = 0,
 		spellTimer = 0,
+		scrollTimer = 0,
+		enchantmentTimer = 0,
 		effectName = "Restore Magicka",
 		effectId = "restoremagicka",
 	}
 	restoreAttr[3] = {
 		potionTimer = 0,
 		spellTimer = 0,
+		scrollTimer = 0,
+		enchantmentTimer = 0,
 		effectName = "Restore Fatigue",
 		effectId = "restorefatigue",
 	}
