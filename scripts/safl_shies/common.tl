@@ -18,6 +18,7 @@ local type Timer = enum
 	"sheathe"
 	"warp"
 	"freefall"
+	"restorecooldown"
 end
 
 local interface CellLoc

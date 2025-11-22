@@ -25,10 +25,14 @@ local DEFAULT_POTION_TIMER <const> = 60 -- The time in seconds to wait until fol
 local DEFAULT_SCROLL_TIMER <const> = 60 -- The time in seconds to wait until follower can use another scroll of the same type if the scroll's actual duration couldn't be found
 local DEFAULT_ENCHANTMENT_TIMER <const> = 60 -- The time in seconds to wait until follower can use another enchanted item of the same type if the item's actual duration couldn't be found
 local SPELL_EFFECT_HANDICAP <const> = 0.75 -- When comparing the restorative effects of spells vs potions, use this multiplier as a handicap for spells to make them appear more favorable due to the fact that spell casts are less limited than potions
+local ENCHANT_EFFECT_HANDICAP <const> = 1 -- When comparing the restorative effects of spells vs potions, use this multiplier as a handicap for spells to make them appear more favorable due to the fact that spell casts are less limited than potions
+local POTION_EFFECT_HANDICAP <const> = 1 -- When comparing the restorative effects of spells vs potions, use this multiplier as a handicap for spells to make them appear more favorable due to the fact that spell casts are less limited than potions
+local SCROLL_EFFECT_HANDICAP <const> = 1 -- When comparing the restorative effects of spells vs potions, use this multiplier as a handicap for spells to make them appear more favorable due to the fact that spell casts are less limited than potions
 local POTION_WASTE_THRESHOLD <const> = 0.25 -- The percentage threshold that determines whether a restorative potion's effects are considered wasted or not. At 0.25, if follower is only missing 25 health or less, a restore health potion with an effect greater than 100 would be considered wasted
 local ATTRIBUTE_PANIC_THRESHOLD <const> = 0.75 -- The percentage missing from an attribute before follower should ignore the potion waste threshold and consume a restorative potion anyway. At 0.75, if follower is missing more than 75% health, follower will use a restore health potion whether its effect would be considered wasted or not
 local WARP_TIMER <const> = 6 -- Default value for the warp timer
 local SHEATHE_TIMER <const> = 4.4 -- Default value for the sheathe timer
+local RESTORE_COOLDOWN <const> = 10 -- The number of seconds to wait before attempting any restore method again, regardless of the individual methods' cooldown timers. This prevents spamming of all 4 restore methods the moment any damage is taken
 local MAINTAIN_DISTANCE_LOWER_THRESHOLD <const> = 70 -- The lower distance threshold that forces follower to wander away from the player
 local MAINTAIN_DISTANCE_UPPER_THRESHOLD <const> = 100 -- The upper distance threshold that makes companion follow the player again after moving away
 local WANDER_DISTANCE <const> = 300 -- The distance parameter for follower's wander package when maintaining their distance
@@ -159,12 +163,22 @@ end
 
 local function updateTimers(dt: number) -- This function updates our various timers by dt, the time passed since this script's last executions
 	for i = 1, #restoreAttr do
-		if restoreAttr[i].potionTimer > 0 then
-			restoreAttr[i].potionTimer = restoreAttr[i].potionTimer - dt
-		end
 		if restoreAttr[i].spellTimer > 0 then
 			restoreAttr[i].spellTimer = restoreAttr[i].spellTimer - dt
 		end
+		if restoreAttr[i].enchantmentTimer > 0 then
+			restoreAttr[i].enchantmentTimer = restoreAttr[i].enchantmentTimer - dt
+		end
+		if restoreAttr[i].potionTimer > 0 then
+			restoreAttr[i].potionTimer = restoreAttr[i].potionTimer - dt
+		end
+		if restoreAttr[i].scrollTimer > 0 then
+			restoreAttr[i].scrollTimer = restoreAttr[i].scrollTimer - dt
+		end
+	end
+	
+	if timers["restorecooldown"] > 0 then
+		timers["restorecooldown"] = timers["restorecooldown"] - dt
 	end
 
 	if timers["warp"] > 0 then
@@ -452,11 +466,6 @@ local function drinkPotionOrCastSpell(iter: integer)
 	}
 	local attrDiff = getAttrDiff(attributes[iter](selfObj))
 	local restoreMethods: {RestoreMethod} = {}	
-	if restoreAttr[iter].enchantmentTimer <= 0 then
-	  	table.insert(restoreMethods, {
-	  	  	name = "enchantment", -- Preparing to implement enchanted item usage
-	  	})
-	end
 	if restoreAttr[iter].spellTimer <= 0 and attributes[2](selfObj).current > 0 then
 	  	local spell = selectRestoreSpell(restoreAttr[iter].effectId, attrDiff, attributes[2](selfObj).current)
 	  	table.insert(restoreMethods, {
@@ -465,12 +474,17 @@ local function drinkPotionOrCastSpell(iter: integer)
 	  	  	magnitude = spell[2] * SPELL_EFFECT_HANDICAP
 	  	})
 	end
+	if restoreAttr[iter].enchantmentTimer <= 0 then
+	  	table.insert(restoreMethods, {
+	  	  	name = "enchantment", -- Preparing to implement enchanted item usage
+	  	})
+	end
 	if restoreAttr[iter].potionTimer <= 0 then
 	  	local potion = selectRestorePotion(restoreAttr[iter].effectId, attrDiff, getMaxAttr(attributes[iter](selfObj)))
 	  	table.insert(restoreMethods, {
 	  	  	name = "potion",
 	  	  	data = potion[1],
-	  	  	magnitude = potion[2]
+	  	  	magnitude = potion[2] * POTION_EFFECT_HANDICAP
 	  	})
 	end
 	if restoreAttr[iter].scrollTimer <= 0 then
@@ -478,7 +492,7 @@ local function drinkPotionOrCastSpell(iter: integer)
 	  	table.insert(restoreMethods, {
 	  	  	name = "scroll",
 	  	  	data = scroll[1],
-	  	  	magnitude = scroll[2]
+	  	  	magnitude = scroll[2] * SCROLL_EFFECT_HANDICAP
 	  	})
 	end
 	if #restoreMethods == 0 then return end
@@ -490,6 +504,7 @@ local function drinkPotionOrCastSpell(iter: integer)
   	  	end
 	end
 	methodAction[method.name](method)
+	timers["restorecooldown"] = RESTORE_COOLDOWN
 end
 
 local function checkAttributes() -- Used to call various functions that affect follower's dynamic attributes like health, fatigue, and magicka
@@ -731,6 +746,7 @@ local function onInit() -- Called when the script is created but not loaded
 	timers["sheathe"] = 0
 	timers["warp"] = 0
 	timers["freefall"] = 0
+	timers["restorecooldown"] = 0
 	restoreAttr[1] = {
 		potionTimer = 0,
 		spellTimer = 0,
