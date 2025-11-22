@@ -347,7 +347,7 @@ local function drinkPotionOrCastSpell(iter: integer)
 	if restoreAttr[iter].potionTimer <= 0 then
 		potion = selectRestorePotion(restoreAttr[iter].effectId, attrDiff, getMaxAttr(attributes[iter](selfObj)))
 	end
-	if restoreAttr[iter].spellTimer <= 0 then
+	if restoreAttr[iter].spellTimer <= 0 and attributes[2](selfObj).current > 0 then
 		spell = selectRestoreSpell(restoreAttr[iter].effectId, attrDiff, attributes[2](selfObj).current)
 	end
 
