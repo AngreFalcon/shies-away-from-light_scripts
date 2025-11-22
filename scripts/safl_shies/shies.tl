@@ -245,9 +245,10 @@ local function castSpell(spell: core.Spell, castSound: string): number -- Applie
 	return duration
 end
 
+--[[
 local function useEnchantment(potionID: string, effectName: string): number -- Sends a global event to trigger follower to use the specified enchantment. Returns the duration of whatever effect is specified, or 60 if the scroll does not have that effect
-	local enchantment = types.Actor.inventory(selfObj):find(potionID)
-	local enchantEffects = types.Potion.record(enchantment).effects
+	local item = types.Actor.inventory(selfObj):find(potionID)
+	local itemEffects: {core.MagicEffectWithParams} = (core.magic.enchantments.records as {string: core.Enchantment})[item:record().enchant].effects
 	local duration: number = DEFAULT_ENCHANTMENT_TIMER
 	if effectName ~= nil then
 		for i = 1, #enchantEffects do
@@ -258,7 +259,7 @@ local function useEnchantment(potionID: string, effectName: string): number -- S
 	end
 	core.sendGlobalEvent("UseItem", {object = enchantment, actor = selfObj})
 	return duration
-end
+end]]
 
 local function consumePotion(potionID: string, effectName: string): number -- Sends a global event to trigger follower to consume the specified potion. Returns the duration of whatever effect is specified, or 60 if the potion does not have that effect
 	local potion = types.Actor.inventory(selfObj):find(potionID)
@@ -276,9 +277,9 @@ local function consumePotion(potionID: string, effectName: string): number -- Se
 	return duration
 end
 
-local function useScroll(potionID: string, effectName: string): number -- Sends a global event to trigger follower to use the specified scroll. Returns the duration of whatever effect is specified, or 60 if the scroll does not have that effect
-	local scroll = types.Actor.inventory(selfObj):find(potionID)
-	local scrollEffects = types.Potion.record(scroll).effects
+local function useScroll(scrollID: string, effectName: string): number -- Sends a global event to trigger follower to use the specified scroll. Returns the duration of whatever effect is specified, or 60 if the scroll does not have that effect
+	local scroll = (types.Actor.inventory(selfObj):find(scrollID) as types.Book)
+	local scrollEffects: {core.MagicEffectWithParams} = (core.magic.enchantments.records as {string: core.Enchantment})[scroll:record().enchant].effects
 	local duration: number = DEFAULT_SCROLL_TIMER
 	if effectName ~= nil then
 		for i = 1, #scrollEffects do
