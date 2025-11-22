@@ -232,14 +232,14 @@ end
 
 local function castSpell(spell: core.Spell, castSound: string): number
 	local duration: number = DEFAULT_SPELL_TIMER
-	types.Actor.activeSpells(selfObj):add({
+	types.Actor.activeSpells(selfObj):add({ -- Add the spell's effect to the follower's list of spell effect that are currently applied
 		id = spell.id,
 		effects = {0},
 		name = spell.name,
 		caster = selfObj,
 	})
-	attributes[2](selfObj).current = attributes[2](selfObj).current - spell.cost
-	for _, effect in pairs((spell.effects as {any: core.MagicEffectWithParams})) do
+	attributes[2](selfObj).current = attributes[2](selfObj).current - spell.cost -- Subtract the cost of the spell from the follower's current magicka
+	for _, effect in pairs((spell.effects as {any: core.MagicEffectWithParams})) do -- For every effect provided by this spell, play an appropriate vfx and sound
 		local vfx = effect.effect
 		selfObj:sendEvent('AddVfx', {
         	model = types.Static.record(vfx.castStatic).model,
@@ -258,6 +258,36 @@ local function castSpell(spell: core.Spell, castSound: string): number
 	end
 	return duration
 end
+
+--[[ Unable to make the follower cast using self.controls. This, however, would be preferable to adding a spell effect using types.Actor.activeSpells if it can be made to work
+	local function castSpell1(spell: core.Spell, duration: number)
+	local currentStance = types.Actor.getStance(selfObj)
+	--local currentSpell = (types.Actor.getSelectedSpell(selfObj) as core.Spell)
+	--local currentEnchItem = (types.Actor.getSelectedEnchantedItem(selfObj) as core.GameObject)
+
+	print(spell.id)
+	types.Actor.setSelectedSpell(selfObj, spell)
+	print((types.Actor.getSelectedSpell(selfObj) as core.Spell).id)
+	-- spell is properly selected
+
+	print(currentStance)
+	types.Actor.setStance(selfObj, types.Actor.STANCE.Spell)
+	print(types.Actor.getStance(selfObj))
+	-- stance is properly set
+	
+	(selfObj as self).controls.use = (selfObj as self).ATTACK_TYPE.Any
+	-- spell is not cast
+
+	timers["restorespell"] = duration
+
+	-- Restore state from before casting restore spell
+	if currentSpell ~= nil then
+		types.Actor.setSelectedSpell(selfObj, currentSpell)
+	elseif currentEnchItem ~= nil then
+		types.Actor.setSelectedEnchantedItem(selfObj, currentEnchItem)
+	end
+	types.Actor.setStance(selfObj, currentStance)
+end]]
 
 local function selectRestorePotion(effectId: string, attrDiff: number, attrMax: number): {string, number} -- Find the potion whose restore amount is closest to the amount missing from the specified attribute
 	local inventory = types.Actor.inventory(selfObj)
@@ -309,36 +339,6 @@ local function selectRestoreSpell(effectId: string, attrDiff: number, currentMag
 		return nil
 	end
 end
-
---[[ Unable to make the follower cast using self.controls. This, however, would be preferable to adding a spell effect using types.Actor.activeSpells if it can be made to work
-	local function castSpell1(spell: core.Spell, duration: number)
-	local currentStance = types.Actor.getStance(selfObj)
-	--local currentSpell = (types.Actor.getSelectedSpell(selfObj) as core.Spell)
-	--local currentEnchItem = (types.Actor.getSelectedEnchantedItem(selfObj) as core.GameObject)
-
-	print(spell.id)
-	types.Actor.setSelectedSpell(selfObj, spell)
-	print((types.Actor.getSelectedSpell(selfObj) as core.Spell).id)
-	-- spell is properly selected
-
-	print(currentStance)
-	types.Actor.setStance(selfObj, types.Actor.STANCE.Spell)
-	print(types.Actor.getStance(selfObj))
-	-- stance is properly set
-	
-	(selfObj as self).controls.use = (selfObj as self).ATTACK_TYPE.Any
-	-- spell is not cast
-
-	timers["restorespell"] = duration
-
-	-- Restore state from before casting restore spell
-	if currentSpell ~= nil then
-		types.Actor.setSelectedSpell(selfObj, currentSpell)
-	elseif currentEnchItem ~= nil then
-		types.Actor.setSelectedEnchantedItem(selfObj, currentEnchItem)
-	end
-	types.Actor.setStance(selfObj, currentStance)
-end]]
 
 local function drinkPotionOrCastSpell(iter: integer)
 	local attrDiff = getAttrDiff(attributes[iter](selfObj))
@@ -690,11 +690,6 @@ return {
             attributes[1](selfObj).current = 1
         end,
 		["shiesActivated"] = function()
-		 	for k, v in pairs(MWVars) do
-				print(k)
-				print(v)
-				print("--")
-		 	end
 		end,
 		["playerSneak"] = function(sneaking: boolean)
 			if sneaking ~= nil then
