@@ -238,21 +238,6 @@ local function toggleEffect(flag: cmn.Flag, effectType: string) -- This function
 	end
 end
 
---[[local function useEnchantment(potionID: string, effectName: string): number -- Sends a global event to trigger follower to use the specified enchantment. Returns the duration of whatever effect is specified, or 60 if the scroll does not have that effect
-	local item = types.Actor.inventory(selfObj):find(potionID)
-	local itemEffects: {core.MagicEffectWithParams} = (core.magic.enchantments.records as {string: core.Enchantment})[item:record().enchant].effects
-	local duration: number = DEFAULT_ENCHANTMENT_TIMER
-	if effectName ~= nil then
-		for i = 1, #enchantEffects do
-			if enchantEffects[i].effect.name == effectName then
-				duration = enchantEffects[i].duration
-			end
-		end
-	end
-	core.sendGlobalEvent("UseItem", {object = enchantment, actor = selfObj})
-	return duration
-end]]
-
 local function castSpell(spell: core.Spell, castSound: string): number -- Applies the effect of the specified spell to the follower, including vfx and sound, and then consumes follower's magicka equal to the cost of the spell. 
 	local duration: number = DEFAULT_CD.SPELL
 	types.Actor.activeSpells(selfObj):add({ -- Add the spell's effect to the follower's list of spell effect that are currently applied
@@ -261,6 +246,8 @@ local function castSpell(spell: core.Spell, castSound: string): number -- Applie
 		name = spell.name,
 		caster = selfObj,
 	})
+	-- This should be the correct way to do this. However, it appears this event does not work properly, possibly a feature that's not present in openmw 0.50?
+	-- selfObj:sendEvent('ModifyStat', {name = 'magicka', amount = -10}) -- Subtract the cost of the spell from the follower's current magicka
 	attributes[2](selfObj).current = attributes[2](selfObj).current - spell.cost -- Subtract the cost of the spell from the follower's current magicka
 	for _, effect in pairs((spell.effects as {any: core.MagicEffectWithParams})) do -- For every effect provided by this spell, play an appropriate vfx and sound
 		local vfx = effect.effect
@@ -297,8 +284,8 @@ local function consumePotion(potionID: string, effectName: string): number -- Se
 	return duration
 end
 
-local function useScroll(scrollID: string, effectName: string): number -- Sends a global event to trigger follower to use the specified scroll. Returns the duration of whatever effect is specified, or 60 if the scroll does not have that effect
-	local scroll = (types.Actor.inventory(selfObj):find(scrollID) as types.Book)
+--[[local function useScroll(scrollID: string, effectName: string): number -- Sends a global event to trigger follower to use the specified scroll. Returns the duration of whatever effect is specified, or 60 if the scroll does not have that effect
+	local scroll = types.Actor.inventory(selfObj):find(scrollID)
 	local scrollEffects: {core.MagicEffectWithParams} = (core.magic.enchantments.records as {string: core.Enchantment})[types.Book.record(scroll).enchant].effects
 	local duration: number = DEFAULT_CD.SCROLL
 	if effectName ~= nil then
@@ -310,9 +297,9 @@ local function useScroll(scrollID: string, effectName: string): number -- Sends 
 	end
 	core.sendGlobalEvent("UseItem", {object = scroll, actor = selfObj}) -- This doesn't actually cast the scroll's spell or consume the scroll, but it does avoid errors
 	return duration
-end
+end]]
 
-local function selectEnchArmor(effectId: string, attrDiff: number): {string, number}
+--[[local function selectEnchArmor(effectId: string, attrDiff: number): {string, number}
 	local inventory = types.Actor.inventory(selfObj)
 	local selectedItem: types.ArmorRecord
 	local selectedMagnitude: number
@@ -338,9 +325,9 @@ local function selectEnchArmor(effectId: string, attrDiff: number): {string, num
 	else
 		return nil
 	end
-end
+end]]
 
-local function selectEnchClothing(effectId: string, attrDiff: number): {string, number}
+--[[local function selectEnchClothing(effectId: string, attrDiff: number): {string, number}
 	local inventory = types.Actor.inventory(selfObj)
 	local selectedItem: types.ClothingRecord
 	local selectedMagnitude: number
@@ -366,9 +353,9 @@ local function selectEnchClothing(effectId: string, attrDiff: number): {string, 
 	else
 		return nil
 	end
-end
+end]]
 
-local function selectEnchWeapon(effectId: string, attrDiff: number): {string, number}
+--[[local function selectEnchWeapon(effectId: string, attrDiff: number): {string, number}
 	local inventory = types.Actor.inventory(selfObj)
 	local selectedItem: types.WeaponRecord
 	local selectedMagnitude: number
@@ -394,7 +381,7 @@ local function selectEnchWeapon(effectId: string, attrDiff: number): {string, nu
 	else
 		return nil
 	end
-end
+end]]
 
 --[[ Unable to make the follower cast using self.controls. This, however, would be preferable to adding a spell effect using types.Actor.activeSpells if it can be made to work
 	local function castSpell1(spell: core.Spell, duration: number)
@@ -478,7 +465,7 @@ local function selectRestorePotion(effectId: string, attrDiff: number, attrMax: 
 	end
 end
 
-local function selectRestoreScroll(effectId: string, attrDiff: number, attrMax: number): {string, number} -- Find whichever scroll is enchanted with an effect that has the most suitable restore health/magicka/fatigue amount out of all scrolls in the follower's inventory
+--[[local function selectRestoreScroll(effectId: string, attrDiff: number, attrMax: number): {string, number} -- Find whichever scroll is enchanted with an effect that has the most suitable restore health/magicka/fatigue amount out of all scrolls in the follower's inventory
 	local inventory = types.Actor.inventory(selfObj)
 	local selectedScroll: types.BookRecord
 	local selectedMagnitude: number
@@ -508,9 +495,9 @@ local function selectRestoreScroll(effectId: string, attrDiff: number, attrMax: 
 	else
 		return nil
 	end
-end
+end]]
 
-local function chooseRestoreMethod(iter: integer)
+local function chooseRestoreMethod(iter: integer) -- Intelligently selects the most appropriate healing method to use when health is low based on what spells, potions, scrolls, and enchantments are available. As of OpenMW 0.50, scrolls and enchantments are not available due to API limitations
 	local enum RESTORE_METHOD
 	  	"encharmor"
 		"enchclothing"
@@ -526,16 +513,16 @@ local function chooseRestoreMethod(iter: integer)
 	end
 
 	local methodAction: {RESTORE_METHOD: function} = {
-	  	["encharmor"] = function(method: RestoreMethod) restoreAttr[iter].enchantmentTimer = 0 end,
-	  	["enchclothing"] = function(method: RestoreMethod) restoreAttr[iter].enchantmentTimer = 0 end,
-	  	["enchweapon"] = function(method: RestoreMethod) restoreAttr[iter].enchantmentTimer = 0 end,
+	  	--["encharmor"] = function(method: RestoreMethod) restoreAttr[iter].enchantmentTimer = 0 end,
+	  	--["enchclothing"] = function(method: RestoreMethod) restoreAttr[iter].enchantmentTimer = 0 end,
+	  	--["enchweapon"] = function(method: RestoreMethod) restoreAttr[iter].enchantmentTimer = 0 end,
 	  	["spell"] = function(method: RestoreMethod) restoreAttr[iter].spellTimer = castSpell((method.data as core.Spell), "restoration cast") end,
 	  	["potion"] = function(method: RestoreMethod) restoreAttr[iter].potionTimer = consumePotion((method.data as string), restoreAttr[iter].effectName) end,
-	  	["scroll"] = function(method: RestoreMethod) restoreAttr[iter].scrollTimer = useScroll((method.data as string), restoreAttr[iter].effectName) end,
+	  	--["scroll"] = function(method: RestoreMethod) restoreAttr[iter].scrollTimer = useScroll((method.data as string), restoreAttr[iter].effectName) end,
 	}
 	local attrDiff = getAttrDiff(attributes[iter](selfObj))
 	local restoreMethods: {RestoreMethod} = {}
-	if restoreAttr[iter].enchantmentTimer <= 0 then
+	--[[if restoreAttr[iter].enchantmentTimer <= 0 then
 		local armor = selectEnchArmor(restoreAttr[iter].effectId, attrDiff)
 		if armor ~= nil then
 	  		table.insert(restoreMethods, {
@@ -560,7 +547,7 @@ local function chooseRestoreMethod(iter: integer)
 				magnitude = weapon[2] * RESTORE_WEIGHTS.ENCHANTMENT
 	  		})
 		end
-	end
+	end]]
 	if restoreAttr[iter].spellTimer <= 0 and attributes[2](selfObj).current > 0 then
 	  	local spell = selectRestoreSpell(restoreAttr[iter].effectId, attrDiff, attributes[2](selfObj).current)
 		if spell ~= nil then
@@ -581,7 +568,7 @@ local function chooseRestoreMethod(iter: integer)
 	  		})
 		end
 	end
-	if restoreAttr[iter].scrollTimer <= 0 then
+	--[[if restoreAttr[iter].scrollTimer <= 0 then
 	  	local scroll = selectRestoreScroll(restoreAttr[iter].effectId, attrDiff, getMaxAttr(attributes[iter](selfObj)))
 		if scroll ~= nil then
 		  	table.insert(restoreMethods, {
@@ -590,7 +577,7 @@ local function chooseRestoreMethod(iter: integer)
 	  	  		magnitude = scroll[2] * RESTORE_WEIGHTS.SCROLL
 	  		})
 		end
-	end
+	end]]
 	if #restoreMethods == 0 then return end
 
 	local method: RestoreMethod = restoreMethods[1]
