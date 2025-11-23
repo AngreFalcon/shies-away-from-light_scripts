@@ -362,32 +362,87 @@ local function selectRestoreSpell(effectId: string, attrDiff: number, currentMag
 	end
 end
 
-local function selectRestoreEnchantment(effectId: string, attrDiff: number, attrMax: number): {string, number} -- Find whichever item is enchanted with an effect that has the most suitable restore health/magicka/fatigue amount out of all equipment in the follower's inventory
-	local inventory = types.Actor.inventory(selfObj)
-	local selectedEnchantment: types.BookRecord
-	local selectedEnchantMagnitude: number
-	for _, item in pairs(((inventory:getAll(types.Book) as types.Book):record()) as {any: types.BookRecord}) do
+local function getEnchArmor(inventory: core.Inventory, effectId: string, attrDiff: number): {string, number}
+	local selectedArmor: types.ArmorRecord
+	local selectedMagnitude: number
+	for _, item in pairs(((inventory:getAll(types.Armor) as types.Armor):record()) as {any: types.ArmorRecord}) do
 		local enchant: core.Enchantment = (core.magic.enchantments.records as {string: core.Enchantment})[item.enchant]
-		if enchant.type == core.magic.ENCHANTMENT_TYPE.CastOnce then -- As far as we're concerned here, scrolls should be one time use only. Ignore any that aren't.
+		if enchant.type == core.magic.ENCHANTMENT_TYPE.CastOnUse then
 			for _, effect in pairs(enchant as {any: core.MagicEffectWithParams}) do
 				if effect.id == effectId then
-					local scrollMagnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration -- Find the average magnitude of the given effect for this scroll
-					if ((selectedEnchantment == nil) or preferFirstHealAmount(attrDiff, scrollMagnitude, selectedEnchantMagnitude) == true) then -- Choose the scroll that would be efficient for the missing amount of whichever attribute this is
-						selectedEnchantment = item
-						selectedEnchantMagnitude = scrollMagnitude
+					local enchantMagnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration -- Find the average magnitude of the given effect for this scroll
+					if ((selectedArmor == nil) or preferFirstHealAmount(attrDiff, enchantMagnitude, selectedMagnitude) == true) then -- Choose the scroll that would be efficient for the missing amount of whichever attribute this is
+						selectedArmor = item
+						selectedMagnitude = enchantMagnitude
 					end
 				end
 			end
 		end
 	end
-	if selectedEnchantment ~= nil and selectedEnchantMagnitude ~= nil
-	and (((selectedEnchantMagnitude * POTION_WASTE_THRESHOLD) < attrDiff) -- Only select potion if less than 25% of its effect will be wasted
-	or (attrDiff > (attrMax * ATTRIBUTE_PANIC_THRESHOLD))) -- However, if follower is missing more than 75% of their attribute, ignore the waste threshold
-	then
-		return {selectedEnchantment.id, selectedEnchantMagnitude}
+	if selectedArmor ~= nil and selectedMagnitude ~= nil then
+		return {selectedArmor.id, selectedMagnitude}
 	else
 		return nil
 	end
+end
+
+local function getEnchClothing(inventory: core.Inventory, effectId: string, attrDiff: number): {string, number}
+	local selectedClothing: types.ClothingRecord
+	local selectedMagnitude: number
+	for _, item in pairs(((inventory:getAll(types.Clothing) as types.Clothing):record()) as {any: types.ClothingRecord}) do
+		local enchant: core.Enchantment = (core.magic.enchantments.records as {string: core.Enchantment})[item.enchant]
+		if enchant.type == core.magic.ENCHANTMENT_TYPE.CastOnUse then
+			for _, effect in pairs(enchant as {any: core.MagicEffectWithParams}) do
+				if effect.id == effectId then
+					local enchantMagnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration -- Find the average magnitude of the given effect for this scroll
+					if ((selectedClothing == nil) or preferFirstHealAmount(attrDiff, enchantMagnitude, selectedMagnitude) == true) then -- Choose the scroll that would be efficient for the missing amount of whichever attribute this is
+						selectedClothing = item
+						selectedMagnitude = enchantMagnitude
+					end
+				end
+			end
+		end
+	end
+	if selectedClothing ~= nil and selectedMagnitude ~= nil then
+		return {selectedClothing.id, selectedMagnitude}
+	else
+		return nil
+	end
+end
+
+local function getEnchWeapon(inventory: core.Inventory, effectId: string, attrDiff: number): {string, number}
+	local selectedWeapon: types.WeaponRecord
+	local selectedMagnitude: number
+	for _, item in pairs(((inventory:getAll(types.Weapon) as types.Weapon):record()) as {any: types.WeaponRecord}) do
+		local enchant: core.Enchantment = (core.magic.enchantments.records as {string: core.Enchantment})[item.enchant]
+		if enchant.type == core.magic.ENCHANTMENT_TYPE.CastOnUse then
+			for _, effect in pairs(enchant as {any: core.MagicEffectWithParams}) do
+				if effect.id == effectId then
+					local enchantMagnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration -- Find the average magnitude of the given effect for this enchant
+					if ((selectedWeapon == nil) or preferFirstHealAmount(attrDiff, enchantMagnitude, selectedMagnitude) == true) then -- Choose the enchant that would be efficient for the missing amount of whichever attribute this is
+						selectedWeapon = item
+						selectedMagnitude = enchantMagnitude
+					end
+				end
+			end
+		end
+	end
+	if selectedWeapon ~= nil and selectedMagnitude ~= nil then
+		return {selectedWeapon.id, selectedMagnitude}
+	else
+		return nil
+	end
+end
+
+local function selectRestoreEnchantment(effectId: string, attrDiff: number): {string, number} -- Find whichever item is enchanted with an effect that has the most suitable restore health/magicka/fatigue amount out of all equipment in the follower's inventory
+	local inventory = types.Actor.inventory(selfObj)
+	local armor = getEnchArmor(inventory, effectId, attrDiff)
+	local clothing = getEnchClothing(inventory, effectId, attrDiff)
+	local weapon = getEnchWeapon(inventory, effectId, attrDiff)
+
+	
+
+
 end
 
 local function selectRestorePotion(effectId: string, attrDiff: number, attrMax: number): {string, number} -- Find the potion whose restore amount is closest to the amount missing from the specified attribute
