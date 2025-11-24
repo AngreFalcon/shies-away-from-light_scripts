@@ -3,7 +3,6 @@ local types = require('openmw.types')
 local self = require('openmw.self')
 local core = require('openmw.core')
 local ai = require('openmw.interfaces').AI
-local sp = require('openmw.interfaces').SkillProgression
 local time = require('openmw_aux.time')
 local util = require('openmw.util')
 local anim = require('openmw.animation')
@@ -54,7 +53,8 @@ local BOOL <const> = { -- MWScript does not have boolean types, so all MWVars ar
 	FALSE = 0
 }
 local NUDGE_DELAY <const> = 4 -- The number of seconds follower should wander after being nudged before following the player again
-local DELAY <const> = 0.5 * time.second -- The number of seconds to wait before executing our delayed, non-priority functions
+local DELAY1 <const> = 0.5 * time.second -- The number of seconds to wait before executing our delayed, non-priority functions
+local DELAY2 <const> = 5 * time.second -- The number of seconds to wait before executing our delayed, non-priority functions
 
 -- Shies Constants
 local SHIES <const> = {
@@ -216,30 +216,6 @@ end
 --
 
 -- Gameplay functions -- Functions that modify follower's gameplay behavior
-local function progressSkill(skillName: string, modifier?: number) -- Increases the level progress of the specified skill
-	modifier = modifier or 1
-	local progress = types.NPC.stats.skills.restoration(selfObj).progress
-	--progress = progress +
-
-	--[[progress[skill] += skillGain
-	progressRequirement = 1 + playerSkills[skill]
-
-	if skill in player.majorSkills:
-    	progressRequirement *= fMajorSkillBonus
-	elif skill in player.minorSkills:
-	    progressRequirement *= fMinorSkillBonus
-	elif skill in player.miscSkills:
-	    progressRequirement *= fMiscSkillBonus
-
-	if skill in player.class.specialization.skills:
-	    progressRequirement *= fSpecialSkillBonus
-
-	if int(progress[skill]) >= int(progressRequirement):
-	    progress[skill] = 0
-	    playerSkills[skill] increased by 1, triggering further functions]]
-
-end
-
 local function setSneak() -- Make sure if the player is sneaking, follower sneaks as well
 	if player ~= nil then
 		player:sendEvent("getSneakVal", selfObj)
@@ -297,13 +273,7 @@ local function castSpell(spell: core.Spell, castSound: string): number -- Applie
 		if duration < effect.duration then
 			duration = effect.duration -- Get the longest duration of any of the effects supplied by this spell and use that as the duration of the spell itself
 		end
-		print(types.NPC.stats.skills.restoration(selfObj).progress)
-		I.SkillProgression.skillUsed(vfx.school, {
-			useType = sp.SKILL_USE_TYPES.Spellcast_Success,
-			scale = SKILL_LEVEL_MULT
-		})
 		--types.NPC.stats.skills.restoration(selfObj).progress = types.NPC.stats.skills.restoration(selfObj).progress + 0.01
-		print(types.NPC.stats.skills.restoration(selfObj).progress)
 	end
 	return duration
 end
@@ -791,22 +761,21 @@ local function modSpeedAndAthletics() -- Set follower's speed and athletics modi
 end
 --
 
---[[ Handler functions - Functions that will be called directly by OpenMW
-I.SkillProgression.addSkillUsedHandler(function(skillid, options: {string: any})
-	--if playerskill >> shiesskill then
-		local oldSkillGain = options.skillGain as number
-		options.skillGain = oldSkillGain * ((options.scale as number) + 2.0)
-	--end
-end)]]
-
-time.runRepeatedly( -- This function runs once every x seconds, where x = DELAY
+-- Handler functions - Functions that will be called directly by OpenMW
+time.runRepeatedly( -- This function runs once every x seconds, where x = DELAY1
 	function() 
 		if isFollowing() then
 			modSpeedAndAthletics()
 		elseif player ~= nil then
 			setDefaultSpeed()
 		end
-	end, DELAY, {}
+	end, DELAY1, {}
+)
+
+time.runRepeatedly( -- This function runs once every x seconds, where x = DELAY2
+	function()
+
+	end, DELAY2, {}
 )
 
 local function onUpdate(dt: number) -- Called every frame while the script is loaded
