@@ -3,6 +3,7 @@ local types = require('openmw.types')
 local self = require('openmw.self')
 local core = require('openmw.core')
 local ai = require('openmw.interfaces').AI
+local sp = require('openmw.interfaces').SkillProgression
 local time = require('openmw_aux.time')
 local util = require('openmw.util')
 local anim = require('openmw.animation')
@@ -11,11 +12,12 @@ local cmn = require('scripts.safl_shies.common')
 -- Credit to Grumpy and Kateri for their companion mwscripts, which were used as the foundation from which this script was built
 
 -- Aliases
-local attributes = {types.Actor.stats.dynamic.health,types.Actor.stats.dynamic.magicka,types.Actor.stats.dynamic.fatigue}
+local attributes = {types.Actor.stats.dynamic.health, types.Actor.stats.dynamic.magicka, types.Actor.stats.dynamic.fatigue}
 local selfObj = self as core.GameObject
 
 -- Constants
 local SCRIPT_VERSION <const> = 1 -- Increment whenever onSave is changed
+local SKILL_LEVEL_MULT <const> = 1.5 -- The multiplier to apply to all skill increases
 local STAT_MOD = {
 	CATCHUP_MULT = 2.25, -- The value to multiply the player's speed and athletics value by before applying it as a modifier to follower if they falls behind
 	FOLLOW = 15, -- The modifier to be applied to follower's speed and athletics when normally following the player
@@ -214,6 +216,30 @@ end
 --
 
 -- Gameplay functions -- Functions that modify follower's gameplay behavior
+local function progressSkill(skillName: string, modifier?: number) -- Increases the level progress of the specified skill
+	modifier = modifier or 1
+	local progress = types.NPC.stats.skills.restoration(selfObj).progress
+	--progress = progress +
+
+	--[[progress[skill] += skillGain
+	progressRequirement = 1 + playerSkills[skill]
+
+	if skill in player.majorSkills:
+    	progressRequirement *= fMajorSkillBonus
+	elif skill in player.minorSkills:
+	    progressRequirement *= fMinorSkillBonus
+	elif skill in player.miscSkills:
+	    progressRequirement *= fMiscSkillBonus
+
+	if skill in player.class.specialization.skills:
+	    progressRequirement *= fSpecialSkillBonus
+
+	if int(progress[skill]) >= int(progressRequirement):
+	    progress[skill] = 0
+	    playerSkills[skill] increased by 1, triggering further functions]]
+
+end
+
 local function setSneak() -- Make sure if the player is sneaking, follower sneaks as well
 	if player ~= nil then
 		player:sendEvent("getSneakVal", selfObj)
@@ -242,47 +268,20 @@ local function toggleEffect(flag: cmn.Flag, effectType: string) -- This function
 	end
 end
 
---[[ Unable to make the follower cast using self.controls. This, however, would be preferable to adding a spell effect using types.Actor.activeSpells if it can be made to work
-	local function castSpell1(spell: core.Spell, duration: number)
-	local currentStance = types.Actor.getStance(selfObj)
-	--local currentSpell = (types.Actor.getSelectedSpell(selfObj) as core.Spell)
-	--local currentEnchItem = (types.Actor.getSelectedEnchantedItem(selfObj) as core.GameObject)
-
-	print(spell.id)
-	types.Actor.setSelectedSpell(selfObj, spell)
-	print((types.Actor.getSelectedSpell(selfObj) as core.Spell).id)
-	-- spell is properly selected
-
-	print(currentStance)
-	types.Actor.setStance(selfObj, types.Actor.STANCE.Spell)
-	print(types.Actor.getStance(selfObj))
-	-- stance is properly set
-	
-	(selfObj as self).controls.use = (selfObj as self).ATTACK_TYPE.Any
-	-- spell is not cast
-
-	timers["restorespell"] = duration
-
-	-- Restore state from before casting restore spell
-	if currentSpell ~= nil then
-		types.Actor.setSelectedSpell(selfObj, currentSpell)
-	elseif currentEnchItem ~= nil then
-		types.Actor.setSelectedEnchantedItem(selfObj, currentEnchItem)
-	end
-	types.Actor.setStance(selfObj, currentStance)
-end]]
-
 local function castSpell(spell: core.Spell, castSound: string): number -- Applies the effect of the specified spell to the follower, including vfx and sound, and then consumes follower's magicka equal to the cost of the spell. 
 	local duration: number = DEFAULT_CD.SPELL
+	-- This should be the correct way to do this. However, it appears this event does not work properly, possibly a feature that's not present in openmw 0.50?
+	-- selfObj:sendEvent('ModifyStat', {name = 'magicka', amount = -10}) -- Subtract the cost of the spell from the follower's current magicka
+	attributes[2](selfObj).current = attributes[2](selfObj).current - spell.cost -- Subtract the cost of the spell from the follower's current magicka
+	if false then
+		return 0
+	end
 	types.Actor.activeSpells(selfObj):add({ -- Add the spell's effect to the follower's list of spell effect that are currently applied
 		id = spell.id,
 		effects = {0},
 		name = spell.name,
 		caster = selfObj,
 	})
-	-- This should be the correct way to do this. However, it appears this event does not work properly, possibly a feature that's not present in openmw 0.50?
-	-- selfObj:sendEvent('ModifyStat', {name = 'magicka', amount = -10}) -- Subtract the cost of the spell from the follower's current magicka
-	attributes[2](selfObj).current = attributes[2](selfObj).current - spell.cost -- Subtract the cost of the spell from the follower's current magicka
 	for _, effect in pairs((spell.effects as {any: core.MagicEffectWithParams})) do -- For every effect provided by this spell, play an appropriate vfx and sound
 		local vfx = effect.effect
 		selfObj:sendEvent('AddVfx', {
@@ -298,6 +297,13 @@ local function castSpell(spell: core.Spell, castSound: string): number -- Applie
 		if duration < effect.duration then
 			duration = effect.duration -- Get the longest duration of any of the effects supplied by this spell and use that as the duration of the spell itself
 		end
+		print(types.NPC.stats.skills.restoration(selfObj).progress)
+		I.SkillProgression.skillUsed(vfx.school, {
+			useType = sp.SKILL_USE_TYPES.Spellcast_Success,
+			scale = SKILL_LEVEL_MULT
+		})
+		--types.NPC.stats.skills.restoration(selfObj).progress = types.NPC.stats.skills.restoration(selfObj).progress + 0.01
+		print(types.NPC.stats.skills.restoration(selfObj).progress)
 	end
 	return duration
 end
@@ -785,7 +791,14 @@ local function modSpeedAndAthletics() -- Set follower's speed and athletics modi
 end
 --
 
--- Handler functions - Functions that will be called directly by OpenMW
+--[[ Handler functions - Functions that will be called directly by OpenMW
+I.SkillProgression.addSkillUsedHandler(function(skillid, options: {string: any})
+	--if playerskill >> shiesskill then
+		local oldSkillGain = options.skillGain as number
+		options.skillGain = oldSkillGain * ((options.scale as number) + 2.0)
+	--end
+end)]]
+
 time.runRepeatedly( -- This function runs once every x seconds, where x = DELAY
 	function() 
 		if isFollowing() then
@@ -931,6 +944,11 @@ return {
         ["hurtShies"] = function() -- For testing the "Recall away at low health" feature - this event is sent from the player script
             attributes[1](selfObj).current = 1
         end,
+		["shiesJump"] = function()
+			print(types.NPC.stats.skills.acrobatics(selfObj).progress)
+			(selfObj as self).controls.jump = true
+			print(types.NPC.stats.skills.acrobatics(selfObj).progress)
+		end,
 		["shiesActivated"] = function()
 		end,
 		["playerSneak"] = function(sneaking: boolean)

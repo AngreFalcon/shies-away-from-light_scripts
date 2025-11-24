@@ -1,4 +1,3 @@
-local ui = require('openmw.ui')
 local UI = require('openmw.interfaces').UI
 local input = require('openmw.input')
 local nearby = require('openmw.nearby')
@@ -22,8 +21,9 @@ return {
         	-- Scan nearby actors - if Shies is found in the list, send an event over to him
         	for _, obj in ipairs(nearby.actors) do
             	if obj.recordId == "safl_shies" then
-               		obj:sendEvent("hurtShies", nil)
-               		ui.showMessage('Your callous behaviour has injured the poor lizard... he run away.....', nil)
+					obj:sendEvent("shiesJump", nil)
+               		--obj:sendEvent("hurtShies", nil)
+               		--ui.showMessage('Your callous behaviour has injured the poor lizard... he run away.....', nil)
                		return
             	end
          	end
