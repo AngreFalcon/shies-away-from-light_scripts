@@ -16,17 +16,19 @@ local selfObj = self as core.GameObject
 
 -- Constants
 local SCRIPT_VERSION <const> = 1 -- Increment whenever onSave is changed
-local MOD_SPEED_DISTANCE_THRESHOLD <const> = 300 -- The distance threshold that determines whether follower moves at normal speed or speeds up to catch up with the player
-local CATCHUP_MULT <const> = 2.25 -- The value to multiply the player's speed and athletics value by before applying it as a modifier to follower if they falls behind
-local FOLLOW_MOD <const> = 15 -- The modifier to be applied to follower's speed and athletics when normally following the player
-local WANDER_MOD <const> = 40 -- The modifier to be applies to follower's speed when wandering instead of followings
-local ATTRIBUTE_PANIC_THRESHOLD <const> = 0.75 -- The percentage missing from an attribute before follower should ignore the potion waste threshold and consume a restorative potion anyway. At 0.75, if follower is missing more than 75% health, follower will use a restore health potion whether its effect would be considered wasted or not
+local STAT_MOD = {
+	CATCHUP_MULT = 2.25, -- The value to multiply the player's speed and athletics value by before applying it as a modifier to follower if they falls behind
+	FOLLOW = 15, -- The modifier to be applied to follower's speed and athletics when normally following the player
+	WANDER = 40, -- The modifier to be applies to follower's speed when wandering instead of followings
+}
 local DEFAULT_CD <const> = { -- Default cooldowns in seconds
 	RESTORE = 10, -- The general cooldown to wait before using any other restore effects, regardless of individual method cooldown
 	ENCHANTMENT = 60, -- The default cooldown for a restorative enchantment if the actual duration couldn't be found
 	SPELL = 10, -- The default cooldown for a restorative spell if the actual duration couldn't be found
 	POTION = 60, -- The default cooldown for a restorative potion if the actual duration couldn't be found
 	SCROLL = 60, -- The default cooldown for a restorative scroll if the actual duration couldn't be found
+	WARP = 6, -- Default value for the warp timer
+	SHEATHE = 4.4, -- Default value for the sheathe timer
 }
 local RESTORE_WEIGHTS <const> = { -- Multipliers to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection
 	ENCHANTMENT = 0.75,
@@ -34,25 +36,31 @@ local RESTORE_WEIGHTS <const> = { -- Multipliers to be applied to each restorati
 	POTION = 1.25,
 	SCROLL = 1.5,
 }
+local ATTRIBUTE_PANIC_THRESHOLD <const> = 0.75 -- The percentage missing from an attribute before follower should ignore the potion waste threshold and consume a restorative potion anyway. At 0.75, if follower is missing more than 75% health, follower will use a restore health potion whether its effect would be considered wasted or not
 local WASTE_THRESHOLD <const> = { -- The percentage threshold that determines whether a restorative effect is considered wasted or not
 	POTION = 0.25, -- At 0.25, if follower is only missing 25 health or less, a restorative effect with magnitude greater than 100 would be considered wasted
 	SCROLL = 0.50, -- At 0.50, if follower is only missing 50 health or less, a restorative effect with magnitude greater than 100 would be considered wasted
 }
-local WARP_TIMER <const> = 6 -- Default value for the warp timer
-local SHEATHE_TIMER <const> = 4.4 -- Default value for the sheathe timer
-local MAINTAIN_DISTANCE_LOWER_THRESHOLD <const> = 70 -- The lower distance threshold that forces follower to wander away from the player
-local MAINTAIN_DISTANCE_UPPER_THRESHOLD <const> = 100 -- The upper distance threshold that makes companion follow the player again after moving away
-local WANDER_DISTANCE <const> = 300 -- The distance parameter for follower's wander package when maintaining their distance
+local DISTANCE_THRESHOLD <const> = {
+	MOD_SPEED = 300, -- The distance threshold that determines whether follower moves at normal speed or speeds up to catch up with the player
+	MAINTAIN_LOWER = 70, -- The lower distance threshold that forces follower to wander away from the player
+	MAINTAIN_UPPER = 100, -- The upper distance threshold that makes companion follow the player again after moving away
+	WANDER = 300 -- The distance parameter for follower's wander package when maintaining their distance
+}
+local BOOL <const> = { -- MWScript does not have boolean types, so all MWVars are numbers even if they're being used as boolean flags
+	TRUE = 1,
+	FALSE = 0
+}
 local NUDGE_DELAY <const> = 4 -- The number of seconds follower should wander after being nudged before following the player again
-local MWVAR_TRUE <const> = 1 -- MWScript does not have boolean types, so all MWVars are numbers even if they're being used as boolean flags
-local MWVAR_FALSE <const> = 0 -- MWScript does not have boolean types, so all MWVars are numbers even if they're being used as boolean flags
 local DELAY <const> = 0.5 * time.second -- The number of seconds to wait before executing our delayed, non-priority functions
 
 -- Shies Constants
-local FLEE_THRESHOLD <const> = 0.1 -- The health percentage at which shies should flee from combat via recall
-local SHIES_FLED_FOUND_STAGE <const> = 40 -- The stage at which the player has found and spoken with shies after shies fled from combat for the first time
-local RECALL_TIMEOUT <const> = 2 * time.second -- The number of seconds it will take for shies' recall to complete when initiated
-local INIT_DATA <const>: cmn.SaveData = {recallLoc = {cellId = "Balmora, Council Club", cellPos = util.vector3(-5, -218, -251)}} -- Initial recall point for shies
+local SHIES <const> = {
+	FLEE_THRESHOLD = 0.1, -- The health percentage at which shies should flee from combat via recall
+	SHIES_FLED_FOUND_STAGE = 40, -- The stage at which the player has found and spoken with shies after shies fled from combat for the first time
+	RECALL_TIMEOUT = 2 * time.second, -- The number of seconds it will take for shies' recall to complete when initiated
+	INIT_DATA: cmn.SaveData = {recallLoc = {cellId = "Balmora, Council Club", cellPos = util.vector3(-5, -218, -251)}} -- Initial recall point for shies
+}
 
 -- Variables
 local RecallLoc: cmn.CellLoc
@@ -61,7 +69,7 @@ local checks: {cmn.Flag: boolean} = {}
 local restoreAttr: {cmn.RestoreAttr} = {}
 local timers: {cmn.Timer: number} = {}
 
--- Warp function variables
+-- Warp function variables - Must persist between function calls
 local posA: cmn.CellLoc
 local posB: cmn.CellLoc
 local posC: cmn.CellLoc
@@ -136,7 +144,7 @@ end
 
 local function setSheatheWarpTimers(dt: number) -- Sheathe weapon after combat check
 	if checks["combat"] == true then
-		timers["warp"] = WARP_TIMER
+		timers["warp"] = DEFAULT_CD.WARP
 		timers["sheathe"] = timers["sheathe"] - dt
 		if core.sound.isSoundPlaying("Weapon Swish", selfObj) == true
 			or core.sound.isSoundPlaying("crossbowShoot", selfObj) == true
@@ -146,7 +154,7 @@ local function setSheatheWarpTimers(dt: number) -- Sheathe weapon after combat c
 			or core.sound.isSoundPlaying("destruction cast", selfObj) == true
 			or core.sound.isSoundPlaying("illusion cast", selfObj) == true
 		then
-			timers["sheathe"] = SHEATHE_TIMER
+			timers["sheathe"] = DEFAULT_CD.SHEATHE
 		elseif timers["sheathe"] <= 0 then
 			checks["combat"] = false
 			if types.Actor.getStance(selfObj) == types.Actor.STANCE.Spell then
@@ -159,8 +167,8 @@ local function setSheatheWarpTimers(dt: number) -- Sheathe weapon after combat c
 		or types.Actor.getStance(selfObj) == types.Actor.STANCE.Spell
 	then
 		checks["combat"] = true
-		timers["warp"] = WARP_TIMER
-		timers["sheathe"] = SHEATHE_TIMER
+		timers["warp"] = DEFAULT_CD.WARP
+		timers["sheathe"] = DEFAULT_CD.SHEATHE
 	end
 end
 
@@ -294,9 +302,9 @@ local function castSpell(spell: core.Spell, castSound: string): number -- Applie
 	return duration
 end
 
-local function useEnchantment(itemId: string, itemName:string, enchantName: string, effectName: string, castSound: string): number
-	local item = types.Actor.inventory(selfObj):find(itemId)
-	local enchantment = (core.magic.enchantments.records as {string: core.Enchantment})[enchantName]
+local function useEnchantment(itemRecord: cmn.EnchRecord, effectName: string, castSound: string): number
+	local item = types.Actor.inventory(selfObj):find(itemRecord.id)
+	local enchantment = (core.magic.enchantments.records as {string: core.Enchantment})[itemRecord.enchant]
 	local duration: number = DEFAULT_CD.SCROLL
 	if effectName ~= nil then
 		for _, effect in pairs((enchantment.effects as {any: core.MagicEffectWithParams})) do -- For every effect provided by this spell, play an appropriate vfx and sound
@@ -317,9 +325,9 @@ local function useEnchantment(itemId: string, itemName:string, enchantName: stri
 		end
 	end
 	types.Actor.activeSpells(selfObj):add({
-		id = itemId,
+		id = itemRecord.id,
 		effects = {0},
-		name = itemName,
+		name = itemRecord.name,
 		caster = selfObj,
 	})
 	core.sendGlobalEvent("changeEnchCharge", {item, enchantment.cost}) -- Subtract the cost of the enchantment from the current charge of the enchanted item
@@ -376,10 +384,9 @@ local function useScroll(scrollId: string, effectName: string, castSound: string
 	return duration
 end
 
-local function selectEnch(effectId: string, attrDiff: number, itemType: cmn.EnchType): {string, number, string, string}
+local function selectRestoreEnch(effectId: string, attrDiff: number, itemType: cmn.EnchType): {cmn.EnchRecord, number}
 	local inventory = types.Actor.inventory(selfObj)
 	local selectedItem: cmn.EnchRecord
-	local selectedMagnitude: number
 	local selectedHealQuality: number
 	for _, item in pairs(inventory:getAll(itemType) as {any: cmn.EnchType}) do
 		local itemRecord = (itemType.record(item) as cmn.EnchRecord)
@@ -390,13 +397,8 @@ local function selectEnch(effectId: string, attrDiff: number, itemType: cmn.Ench
 					if effect.id == effectId then
 						local magnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration
 						local healQuality = math.abs(attrDiff - magnitude)
-						if (selectedItem == nil) then
+						if (selectedItem == nil) or healQuality < selectedHealQuality then
 							selectedItem = itemRecord
-							selectedMagnitude = magnitude
-							selectedHealQuality = math.abs(attrDiff - selectedMagnitude)
-						elseif healQuality < selectedHealQuality then
-							selectedItem = itemRecord
-							selectedMagnitude = magnitude
 							selectedHealQuality = healQuality
 						end
 					end
@@ -405,14 +407,15 @@ local function selectEnch(effectId: string, attrDiff: number, itemType: cmn.Ench
 		end
 	end
 	if selectedItem ~= nil and selectedHealQuality ~= nil then
-		return {selectedItem.id, selectedHealQuality, selectedItem.name, selectedItem.enchant}
+		return {selectedItem, selectedHealQuality}
 	else
 		return nil
 	end
 end
 
-local function selectRestoreSpell(effectId: string, attrDiff: number, currentMagicka: number): {core.Spell, number} -- Selects the best restorative spell the NPC currently has (prioritizes magnitude over cost). Prefers the spell that restores closest to the missing amount of whichever attribute is being restored rather than just the spell with the greatest magnitude, currently ignores all side effects of casting the spell. Returns nil if no spell is found
+local function selectRestoreSpell(effectId: string, attrDiff: number): {core.Spell, number} -- Selects the best restorative spell the NPC currently has (prioritizes magnitude over cost). Prefers the spell that restores closest to the missing amount of whichever attribute is being restored rather than just the spell with the greatest magnitude, currently ignores all side effects of casting the spell. Returns nil if no spell is found
 	local spells = types.Actor.spells(selfObj)
+	local currentMagicka = attributes[2](selfObj).current
 	local selectedSpell: core.Spell
 	local selectedMagnitude: number
 	local selectedHealQuality: number
@@ -421,13 +424,10 @@ local function selectRestoreSpell(effectId: string, attrDiff: number, currentMag
 			for _, effect in pairs((spell.effects as {any: core.MagicEffectWithParams})) do
 				if effect.id == (effectId as string) and effect.range == core.magic.RANGE.Self then -- We only care if at least one of the effects of this spell restores our chosen attribute and works on self
 					if spell.cost < currentMagicka then -- Only selects this spell if we can afford to cast it
+						local costRatio = spell.cost / currentMagicka
 						local magnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration -- Find the average magnitude of the given effect for this spell
-						local healQuality = math.abs(attrDiff - magnitude)
-						if (selectedSpell == nil) then
-							selectedSpell = spell
-							selectedMagnitude = magnitude
-							selectedHealQuality = math.abs(attrDiff - selectedMagnitude)
-						elseif healQuality < selectedHealQuality then
+						local healQuality = math.abs(attrDiff - magnitude) * (1 + costRatio)
+						if (selectedSpell == nil) or healQuality < selectedHealQuality then
 							selectedSpell = spell
 							selectedMagnitude = magnitude
 							selectedHealQuality = healQuality
@@ -455,11 +455,7 @@ local function selectRestorePotion(effectId: string, attrDiff: number, attrMax: 
 			if effect.id == effectId then
 				local magnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration -- Find the average magnitude of the given effect for this potion
 				local healQuality = math.abs(attrDiff - magnitude)
-				if (selectedPotion == nil) then -- Choose the potion that would be efficient for the missing amount of whichever attribute this is
-					selectedPotion = potionRecord
-					selectedMagnitude = magnitude
-					selectedHealQuality = math.abs(attrDiff - selectedMagnitude)
-				elseif healQuality < selectedHealQuality then
+				if (selectedPotion == nil) or healQuality < selectedHealQuality then
 					selectedPotion = potionRecord
 					selectedMagnitude = magnitude
 					selectedHealQuality = healQuality
@@ -491,11 +487,7 @@ local function selectRestoreScroll(effectId: string, attrDiff: number, attrMax: 
 					if effect.id == effectId then
 						local magnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration -- Find the average magnitude of the given effect for this scroll
 						local healQuality = math.abs(attrDiff - magnitude)
-						if (selectedScroll == nil) then -- Choose the scroll that would be efficient for the missing amount of whichever attribute this is
-							selectedScroll = scrollRecord
-							selectedMagnitude = magnitude
-							selectedHealQuality = math.abs(attrDiff - selectedMagnitude)
-						elseif healQuality < selectedHealQuality then
+						if (selectedScroll == nil) or healQuality < selectedHealQuality then
 							selectedScroll = scrollRecord
 							selectedMagnitude = magnitude
 							selectedHealQuality = healQuality
@@ -528,14 +520,12 @@ local function chooseRestoreMethod(iter: integer) -- Intelligently selects the m
 	  	name: RESTORE_METHOD
 	  	data: any
 	  	weight: number -- How this particular restore method is weighted against others. The lower, the better. Calculated by finding the difference between the method's restore magnitude and the quantity of missing attribute
-		itemName: string
-		enchantName: string
 	end
 
 	local methodAction: {RESTORE_METHOD: function} = {
-	  	["encharmor"] = function(method: RestoreMethod) restoreAttr[iter].enchantmentTimer = useEnchantment((method.data as string), method.itemName, method.enchantName, restoreAttr[iter].effectName, "restoration cast") end,
-	  	["enchclothing"] = function(method: RestoreMethod) restoreAttr[iter].enchantmentTimer = useEnchantment((method.data as string), method.itemName, method.enchantName, restoreAttr[iter].effectName, "restoration cast") end,
-	  	["enchweapon"] = function(method: RestoreMethod) restoreAttr[iter].enchantmentTimer = useEnchantment((method.data as string), method.itemName, method.enchantName, restoreAttr[iter].effectName, "restoration cast") end,
+	  	["encharmor"] = function(method: RestoreMethod) restoreAttr[iter].enchantmentTimer = useEnchantment((method.data as cmn.EnchRecord), restoreAttr[iter].effectName, "restoration cast") end,
+	  	["enchclothing"] = function(method: RestoreMethod) restoreAttr[iter].enchantmentTimer = useEnchantment((method.data as cmn.EnchRecord), restoreAttr[iter].effectName, "restoration cast") end,
+	  	["enchweapon"] = function(method: RestoreMethod) restoreAttr[iter].enchantmentTimer = useEnchantment((method.data as cmn.EnchRecord), restoreAttr[iter].effectName, "restoration cast") end,
 	  	["spell"] = function(method: RestoreMethod) restoreAttr[iter].spellTimer = castSpell((method.data as core.Spell), "restoration cast") end,
 	  	["potion"] = function(method: RestoreMethod) restoreAttr[iter].potionTimer = consumePotion((method.data as string), restoreAttr[iter].effectName) end,
 	  	["scroll"] = function(method: RestoreMethod) restoreAttr[iter].scrollTimer = useScroll((method.data as string), restoreAttr[iter].effectName, "restoration cast") end,
@@ -543,40 +533,34 @@ local function chooseRestoreMethod(iter: integer) -- Intelligently selects the m
 	local attrDiff = getAttrDiff(attributes[iter](selfObj))
 	local restoreMethods: {RestoreMethod} = {}
 	if restoreAttr[iter].enchantmentTimer <= 0 then
-		local armor = selectEnch(restoreAttr[iter].effectId, attrDiff, types.Armor as cmn.EnchType)
+		local armor = selectRestoreEnch(restoreAttr[iter].effectId, attrDiff, types.Armor as cmn.EnchType)
 		if armor ~= nil then
 	  		table.insert(restoreMethods, {
 	  	  		name = "encharmor",
 				data = armor[1],
 				weight = armor[2] + (getMaxAttr(attributes[iter](selfObj)) * RESTORE_WEIGHTS.ENCHANTMENT),
-				itemName = armor[3],
-				enchantName = armor[4]
 	  		})
 		end
 		--local clothing = selectEnchClothing(restoreAttr[iter].effectId, attrDiff)
-		local clothing = selectEnch(restoreAttr[iter].effectId, attrDiff, types.Clothing as cmn.EnchType)
+		local clothing = selectRestoreEnch(restoreAttr[iter].effectId, attrDiff, types.Clothing as cmn.EnchType)
 		if clothing ~= nil then
 		  	table.insert(restoreMethods, {
 		  	  	name = "enchclothing",
 				data = clothing[1],
 				weight = clothing[2] + (getMaxAttr(attributes[iter](selfObj)) * RESTORE_WEIGHTS.ENCHANTMENT),
-				itemName = clothing[3],
-				enchantName = clothing[4]
 	  		})
 		end
-		local weapon = selectEnch(restoreAttr[iter].effectId, attrDiff, types.Weapon as cmn.EnchType)
+		local weapon = selectRestoreEnch(restoreAttr[iter].effectId, attrDiff, types.Weapon as cmn.EnchType)
 	  	if weapon ~= nil then
 			table.insert(restoreMethods, {
 		  	  	name = "enchweapon",
 				data = weapon[1],
 				weight = weapon[2] + (getMaxAttr(attributes[iter](selfObj)) * RESTORE_WEIGHTS.ENCHANTMENT),
-				itemName = weapon[3],
-				enchantName = weapon[4]
 	  		})
 		end
 	end
 	if restoreAttr[iter].spellTimer <= 0 and attributes[2](selfObj).current > 0 then
-	  	local spell = selectRestoreSpell(restoreAttr[iter].effectId, attrDiff, attributes[2](selfObj).current)
+	  	local spell = selectRestoreSpell(restoreAttr[iter].effectId, attrDiff)
 		if spell ~= nil then
 	  		table.insert(restoreMethods, {
 	  		  	name = "spell",
@@ -609,7 +593,7 @@ local function chooseRestoreMethod(iter: integer) -- Intelligently selects the m
 
 	local method: RestoreMethod = restoreMethods[1]
 	for i = 2, #restoreMethods do
-	 	if method.weight < restoreMethods[i].weight == false then
+	 	if method.weight >= restoreMethods[i].weight then
 	  	  	method = restoreMethods[i]
   	  	end
 	end
@@ -664,7 +648,7 @@ local function flee() -- Triggers if shies' health drops below a certain thresho
         function(actor: core.GameObject)
 			ai.removePackages("Combat")
 			ai.removePackages("Follow")
-			if RecallLoc == INIT_DATA.recallLoc and (types.Player.quests(player) as {string: cmn.PlayerQuest})["SAFL_ShiesFled"].started == false then
+			if RecallLoc == SHIES.INIT_DATA.recallLoc and (types.Player.quests(player) as {string: cmn.PlayerQuest})["SAFL_ShiesFled"].started == false then
 				triggerShiesFledQuest() -- The player has not changed Shies' marked location. This likely means the Shies Fled quest has not been started yet; we can further check by checking the player's journal entries
 			end
             return core.sendGlobalEvent("teleport", {
@@ -675,15 +659,15 @@ local function flee() -- Triggers if shies' health drops below a certain thresho
         end,
         nil
     )
-	if RecallLoc == INIT_DATA.recallLoc and (types.Player.quests(player) as {string: cmn.PlayerQuest})["SAFL_ShiesFled"].stage < SHIES_FLED_FOUND_STAGE then -- The player has not recovered shies yet
+	if RecallLoc == SHIES.INIT_DATA.recallLoc and (types.Player.quests(player) as {string: cmn.PlayerQuest})["SAFL_ShiesFled"].stage < SHIES.SHIES_FLED_FOUND_STAGE then -- The player has not recovered shies yet
 		checks["incapacitated"] = true
 	end
-    time.newSimulationTimer(RECALL_TIMEOUT, cb, self, nil)
+    time.newSimulationTimer(SHIES.RECALL_TIMEOUT, cb, self, nil)
 end
 
 local function shiesCheckAttributes() -- Calls shies-specific functions relating to attributes
-	if attributes[1](selfObj).current > 0 and attributes[1](selfObj).current / getMaxAttr(attributes[1](selfObj)) < FLEE_THRESHOLD then -- Check health ratio
-		updateMWVar("companion", MWVAR_FALSE)
+	if attributes[1](selfObj).current > 0 and attributes[1](selfObj).current / getMaxAttr(attributes[1](selfObj)) < SHIES.FLEE_THRESHOLD then -- Check health ratio
+		updateMWVar("companion", BOOL.FALSE)
 		checks["cMove"] = false
         flee() -- Teleport Shies away from combat to whatever position he has marked
 		fullHeal() -- Heal Shies to avoid the script triggering again, and also to ensure the player doesn't have to restore his health upon recovering him
@@ -711,17 +695,17 @@ local function maintainDistance() -- Toggles follower between wandering and foll
 	if playerPos == nil then
 		return
 	end
-	if isFollowing() and MWVars["compmove"] == MWVAR_TRUE and checks["cMove"] == false
-	and getCoDist(followerPos, playerPos.cellPos) < MAINTAIN_DISTANCE_LOWER_THRESHOLD
+	if isFollowing() and MWVars["compmove"] == BOOL.TRUE and checks["cMove"] == false
+	and getCoDist(followerPos, playerPos.cellPos) < DISTANCE_THRESHOLD.MAINTAIN_LOWER
 	then
 		ai.removePackages("Follow")
 		ai.startPackage({
 			type = "Wander",
-			distance = WANDER_DISTANCE
+			distance = DISTANCE_THRESHOLD.WANDER
 		})
 		checks["cMove"] = true
 	end
-	if checks["cMove"] == true and getCoDist(followerPos, playerPos.cellPos) > MAINTAIN_DISTANCE_UPPER_THRESHOLD then
+	if checks["cMove"] == true and getCoDist(followerPos, playerPos.cellPos) > DISTANCE_THRESHOLD.MAINTAIN_UPPER then
 		ai.removePackages("Wander")
 		makeCompanionFollow()
 		checks["cMove"] = false
@@ -729,12 +713,12 @@ local function maintainDistance() -- Toggles follower between wandering and foll
 end
 
 local function nudge(timePassed: number) -- Waits 4 seconds before making companion follow the player again. onetimemove is set true in dialogue while simultaneously triggering the Wander AI package to make them move
-	if MWVars["onetimemove"] == MWVAR_TRUE then
+	if MWVars["onetimemove"] == BOOL.TRUE then
 		timers["move"] = timers["move"] + timePassed
 		if timers["move"] >= NUDGE_DELAY then
 			timers["move"] = 0
 			makeCompanionFollow()
-			updateMWVar("onetimemove", MWVAR_FALSE)
+			updateMWVar("onetimemove", BOOL.FALSE)
 		end
 	end
 end
@@ -779,21 +763,21 @@ local function warpToPlayer() -- If the player gets too far from follower, telep
 end
 
 local function setDefaultSpeed() -- Sets follower's speed modifier while not following the player
-	types.Actor.stats.attributes.speed(selfObj).modifier = WANDER_MOD
+	types.Actor.stats.attributes.speed(selfObj).modifier = STAT_MOD.WANDER
 end
 
 local function modSpeedAndAthletics() -- Set follower's speed and athletics modifier to a flat value if they're within a certain distance of the player, or add a multiplier based off the player's stats if they're too far
 	local followerSpeed = types.Actor.stats.attributes.speed(selfObj)
 	local followerAthletics = types.NPC.stats.skills.athletics(selfObj)
-	local cSpeed = types.Actor.stats.attributes.speed(player).modified * CATCHUP_MULT
-	local cAthletics = types.NPC.stats.skills.athletics(player).modified * CATCHUP_MULT
-	if (followerSpeed.modifier ~= FOLLOW_MOD or followerAthletics.modifier ~= FOLLOW_MOD)
-		and (getCoDist(selfObj.position, getPlayerCellPos().cellPos) <= MOD_SPEED_DISTANCE_THRESHOLD)
+	local cSpeed = types.Actor.stats.attributes.speed(player).modified * STAT_MOD.CATCHUP_MULT
+	local cAthletics = types.NPC.stats.skills.athletics(player).modified * STAT_MOD.CATCHUP_MULT
+	if (followerSpeed.modifier ~= STAT_MOD.FOLLOW or followerAthletics.modifier ~= STAT_MOD.FOLLOW)
+		and (getCoDist(selfObj.position, getPlayerCellPos().cellPos) <= DISTANCE_THRESHOLD.MOD_SPEED)
 	then
-		followerSpeed.modifier = FOLLOW_MOD
-		followerAthletics.modifier = FOLLOW_MOD
+		followerSpeed.modifier = STAT_MOD.FOLLOW
+		followerAthletics.modifier = STAT_MOD.FOLLOW
 	elseif (followerSpeed.modifier ~= cSpeed or followerAthletics.modifier ~= cAthletics)
-		and (getCoDist(selfObj.position, getPlayerCellPos().cellPos) > MOD_SPEED_DISTANCE_THRESHOLD)
+		and (getCoDist(selfObj.position, getPlayerCellPos().cellPos) > DISTANCE_THRESHOLD.MOD_SPEED)
 	then
 		followerSpeed.modifier = cSpeed
 		followerAthletics.modifier = cAthletics
@@ -824,7 +808,7 @@ local function onUpdate(dt: number) -- Called every frame while the script is lo
 	if checks["incapacitated"] == true then
 		-- Right now there is only one instance of shies being incapacitated, and only one condition under which he gets back up
 		-- However, if this mechanic is extended in the future, passing a boolean parameter as the get up condition makes this trivial
-		shiesIncapacitated((types.Player.quests(player) as {string: cmn.PlayerQuest})["SAFL_ShiesFled"].stage >= SHIES_FLED_FOUND_STAGE)
+		shiesIncapacitated((types.Player.quests(player) as {string: cmn.PlayerQuest})["SAFL_ShiesFled"].stage >= SHIES.SHIES_FLED_FOUND_STAGE)
 	end
 
 	if checks["fly"] == false and types.Actor.isOnGround(selfObj) == false then
@@ -843,7 +827,7 @@ local function onUpdate(dt: number) -- Called every frame while the script is lo
 end
 
 local function onInit() -- Called when the script is created but not loaded
-	RecallLoc = INIT_DATA.recallLoc
+	RecallLoc = SHIES.INIT_DATA.recallLoc
 	checks["cMove"] = false
 	checks["fly"] = false
 	checks["ww"] = false
@@ -905,7 +889,7 @@ end
 local function onLoad(data: cmn.SaveData) -- Called only when the script loads, not the saved game. will not be called if the script was not previously saved
 	if (not data) or (not data.version) or (data.version < SCRIPT_VERSION) then
 		print('Was saved with an old version of the script, initializing to default')
-		RecallLoc = INIT_DATA.recallLoc
+		RecallLoc = SHIES.INIT_DATA.recallLoc
 		return
 	elseif (data.version > SCRIPT_VERSION) then
 		error('Required update to a new version of the script')
