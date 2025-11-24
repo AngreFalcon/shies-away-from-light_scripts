@@ -29,10 +29,10 @@ local DEFAULT_CD <const> = { -- Default cooldowns in seconds
 	SCROLL = 60, -- The default cooldown for a restorative scroll if the actual duration couldn't be found
 }
 local RESTORE_WEIGHTS <const> = { -- Multipliers to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection
-	ENCHANTMENT = 1,
-	SPELL = 0.75,
-	POTION = 1,
-	SCROLL = 1,
+	ENCHANTMENT = 0.75,
+	SPELL = 1,
+	POTION = 1.25,
+	SCROLL = 1.5,
 }
 local WASTE_THRESHOLD <const> = { -- The percentage threshold that determines whether a restorative effect is considered wasted or not
 	POTION = 0.25, -- At 0.25, if follower is only missing 25 health or less, a restorative effect with magnitude greater than 100 would be considered wasted
@@ -109,10 +109,6 @@ end
 
 local function getAttrDiff(attr: types.DynamicStat): number -- Get the missing value of the specified dynamic stat
 	return getMaxAttr(attr) - attr.current
-end
-
-local function preferFirstHealAmount(attrDiff: number, magnitude1: number, magnitude2: number): boolean -- Returns true if the first magnitude is better, false if the second magnitude is preferable
-	return (math.abs(attrDiff - magnitude1) < math.abs(attrDiff - magnitude2))
 end
 
 local function checkAttrDamaged(attr: types.DynamicStat): boolean -- Returns true if the provided attribute is not currently full
@@ -238,151 +234,6 @@ local function toggleEffect(flag: cmn.Flag, effectType: string) -- This function
 	end
 end
 
-local function castSpell(spell: core.Spell, castSound: string): number -- Applies the effect of the specified spell to the follower, including vfx and sound, and then consumes follower's magicka equal to the cost of the spell. 
-	local duration: number = DEFAULT_CD.SPELL
-	types.Actor.activeSpells(selfObj):add({ -- Add the spell's effect to the follower's list of spell effect that are currently applied
-		id = spell.id,
-		effects = {0},
-		name = spell.name,
-		caster = selfObj,
-	})
-	-- This should be the correct way to do this. However, it appears this event does not work properly, possibly a feature that's not present in openmw 0.50?
-	-- selfObj:sendEvent('ModifyStat', {name = 'magicka', amount = -10}) -- Subtract the cost of the spell from the follower's current magicka
-	attributes[2](selfObj).current = attributes[2](selfObj).current - spell.cost -- Subtract the cost of the spell from the follower's current magicka
-	for _, effect in pairs((spell.effects as {any: core.MagicEffectWithParams})) do -- For every effect provided by this spell, play an appropriate vfx and sound
-		local vfx = effect.effect
-		selfObj:sendEvent('AddVfx', {
-        	model = types.Static.record(vfx.castStatic).model,
-        	options = {
-            	vfxId = "followerCast" .. effect.id,
-            	particleTextureOverride = vfx.particle,
-            	loop = false,
-        	}
-    	})
-		--core.sound.playSound3d(vfx.castSound, selfObj, {}) -- Due to what appears to be a bug with the lua API, it's not actually possible to retrieve any sounds for our spell effect. For now the sound must be passed in as a string
-		core.sound.playSound3d(castSound, selfObj, {})
-		if duration < effect.duration then
-			duration = effect.duration -- Get the longest duration of any of the effects supplied by this spell and use that as the duration of the spell itself
-		end
-	end
-	return duration
-end
-
-local function consumePotion(potionID: string, effectName: string): number -- Sends a global event to trigger follower to consume the specified potion. Returns the duration of whatever effect is specified, or 60 if the potion does not have that effect
-	local potion = types.Actor.inventory(selfObj):find(potionID)
-	local potionEffects = types.Potion.record(potion).effects
-	local duration: number = DEFAULT_CD.POTION
-	if effectName ~= nil then
-		for i = 1, #potionEffects do
-			if potionEffects[i].effect.name == effectName then
-				duration = potionEffects[i].duration
-				break
-			end
-		end
-	end
-	core.sendGlobalEvent("UseItem", {object = potion, actor = selfObj})
-	return duration
-end
-
---[[local function useScroll(scrollID: string, effectName: string): number -- Sends a global event to trigger follower to use the specified scroll. Returns the duration of whatever effect is specified, or 60 if the scroll does not have that effect
-	local scroll = types.Actor.inventory(selfObj):find(scrollID)
-	local scrollEffects: {core.MagicEffectWithParams} = (core.magic.enchantments.records as {string: core.Enchantment})[types.Book.record(scroll).enchant].effects
-	local duration: number = DEFAULT_CD.SCROLL
-	if effectName ~= nil then
-		for i = 1, #scrollEffects do
-			if scrollEffects[i].effect.name == effectName then
-				duration = scrollEffects[i].duration
-			end
-		end
-	end
-	core.sendGlobalEvent("UseItem", {object = scroll, actor = selfObj}) -- This doesn't actually cast the scroll's spell or consume the scroll, but it does avoid errors
-	return duration
-end]]
-
---[[local function selectEnchArmor(effectId: string, attrDiff: number): {string, number}
-	local inventory = types.Actor.inventory(selfObj)
-	local selectedItem: types.ArmorRecord
-	local selectedMagnitude: number
-	for _, item in pairs(inventory:getAll(types.Armor) as {any: types.Armor}) do
-		local itemRecord = types.Armor.record(item)
-		if itemRecord.enchant ~= nil then
-			local enchant = (core.magic.enchantments.records as {string: core.Enchantment})[itemRecord.enchant]
-			if enchant.type == core.magic.ENCHANTMENT_TYPE.CastOnUse then
-				for _, effect in pairs(enchant.effects as {any: core.MagicEffectWithParams}) do
-					if effect.id == effectId then
-						local enchantMagnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration
-						if ((selectedItem == nil) or preferFirstHealAmount(attrDiff, enchantMagnitude, selectedMagnitude) == true) then
-							selectedItem = itemRecord
-							selectedMagnitude = enchantMagnitude
-						end
-					end
-				end
-			end
-		end
-	end
-	if selectedItem ~= nil and selectedMagnitude ~= nil then
-		return {selectedItem.id, selectedMagnitude}
-	else
-		return nil
-	end
-end]]
-
---[[local function selectEnchClothing(effectId: string, attrDiff: number): {string, number}
-	local inventory = types.Actor.inventory(selfObj)
-	local selectedItem: types.ClothingRecord
-	local selectedMagnitude: number
-	for _, item in pairs(inventory:getAll(types.Clothing) as {any: types.Clothing}) do
-		local itemRecord = types.Clothing.record(item)
-		if itemRecord.enchant ~= nil then
-			local enchant = core.magic.enchantments.records[itemRecord.enchant as integer]
-			if enchant.type == core.magic.ENCHANTMENT_TYPE.CastOnUse then
-				for _, effect in pairs(enchant.effects as {any: core.MagicEffectWithParams}) do
-					if effect.id == effectId then
-						local enchantMagnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration
-						if ((selectedItem == nil) or preferFirstHealAmount(attrDiff, enchantMagnitude, selectedMagnitude) == true) then
-							selectedItem = itemRecord
-							selectedMagnitude = enchantMagnitude
-						end
-					end
-				end
-			end
-		end
-	end
-	if selectedItem ~= nil and selectedMagnitude ~= nil then
-		return {selectedItem.id, selectedMagnitude}
-	else
-		return nil
-	end
-end]]
-
---[[local function selectEnchWeapon(effectId: string, attrDiff: number): {string, number}
-	local inventory = types.Actor.inventory(selfObj)
-	local selectedItem: types.WeaponRecord
-	local selectedMagnitude: number
-	for _, item in pairs(inventory:getAll(types.Weapon) as {any: types.Weapon}) do
-		local itemRecord = types.Weapon.record(item)
-		if itemRecord.enchant ~= nil then
-			local enchant: core.Enchantment = (core.magic.enchantments.records as {string: core.Enchantment})[itemRecord.enchant]
-			if enchant.type == core.magic.ENCHANTMENT_TYPE.CastOnUse then
-				for _, effect in pairs(enchant.effects as {any: core.MagicEffectWithParams}) do
-					if effect.id == effectId then
-						local enchantMagnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration
-						if ((selectedItem == nil) or preferFirstHealAmount(attrDiff, enchantMagnitude, selectedMagnitude) == true) then
-							selectedItem = itemRecord
-							selectedMagnitude = enchantMagnitude
-						end
-					end
-				end
-			end
-		end
-	end
-	if selectedItem ~= nil and selectedMagnitude ~= nil then
-		return {selectedItem.id, selectedMagnitude}
-	else
-		return nil
-	end
-end]]
-
 --[[ Unable to make the follower cast using self.controls. This, however, would be preferable to adding a spell effect using types.Actor.activeSpells if it can be made to work
 	local function castSpell1(spell: core.Spell, duration: number)
 	local currentStance = types.Actor.getStance(selfObj)
@@ -413,27 +264,286 @@ end]]
 	types.Actor.setStance(selfObj, currentStance)
 end]]
 
+local function castSpell(spell: core.Spell, castSound: string): number -- Applies the effect of the specified spell to the follower, including vfx and sound, and then consumes follower's magicka equal to the cost of the spell. 
+	local duration: number = DEFAULT_CD.SPELL
+	types.Actor.activeSpells(selfObj):add({ -- Add the spell's effect to the follower's list of spell effect that are currently applied
+		id = spell.id,
+		effects = {0},
+		name = spell.name,
+		caster = selfObj,
+	})
+	-- This should be the correct way to do this. However, it appears this event does not work properly, possibly a feature that's not present in openmw 0.50?
+	-- selfObj:sendEvent('ModifyStat', {name = 'magicka', amount = -10}) -- Subtract the cost of the spell from the follower's current magicka
+	attributes[2](selfObj).current = attributes[2](selfObj).current - spell.cost -- Subtract the cost of the spell from the follower's current magicka
+	for _, effect in pairs((spell.effects as {any: core.MagicEffectWithParams})) do -- For every effect provided by this spell, play an appropriate vfx and sound
+		local vfx = effect.effect
+		selfObj:sendEvent('AddVfx', {
+        	model = types.Static.record(vfx.castStatic).model,
+        	options = {
+            	vfxId = "followerCast" .. effect.id,
+            	particleTextureOverride = vfx.particle,
+            	loop = false,
+        	}
+    	})
+		--core.sound.playSound3d(vfx.castSound, selfObj, {}) -- Due to what appears to be a bug with the lua API, it's not actually possible to retrieve any sounds for our spell effect. For now the sound must be passed in as a string
+		core.sound.playSound3d(castSound, selfObj, {})
+		if duration < effect.duration then
+			duration = effect.duration -- Get the longest duration of any of the effects supplied by this spell and use that as the duration of the spell itself
+		end
+	end
+	return duration
+end
+
+local function useEnchantment(itemId: string, itemName:string, enchantName: string, effectName: string, castSound: string): number
+	local item = types.Actor.inventory(selfObj):find(itemId)
+	local enchantment = (core.magic.enchantments.records as {string: core.Enchantment})[enchantName]
+	local duration: number = DEFAULT_CD.SCROLL
+	if effectName ~= nil then
+		for _, effect in pairs((enchantment.effects as {any: core.MagicEffectWithParams})) do -- For every effect provided by this spell, play an appropriate vfx and sound
+			local vfx = effect.effect
+			selfObj:sendEvent('AddVfx', {
+        		model = types.Static.record(vfx.castStatic).model,
+        		options = {
+            		vfxId = "followerCast" .. effect.id,
+            		particleTextureOverride = vfx.particle,
+            		loop = false,
+        		}
+    		})
+			--core.sound.playSound3d(vfx.castSound, selfObj, {}) -- Due to what appears to be a bug with the lua API, it's not actually possible to retrieve any sounds for our spell effect. For now the sound must be passed in as a string
+			core.sound.playSound3d(castSound, selfObj, {})
+			if vfx.name == effectName then
+				duration = effect.duration -- We only use the relevant magic effect's duration as our cooldown. Any side effects the enchantment might have aren't considered when deciding whether we can use another enchantment again or not
+			end
+		end
+	end
+	types.Actor.activeSpells(selfObj):add({
+		id = itemId,
+		effects = {0},
+		name = itemName,
+		caster = selfObj,
+	})
+	core.sendGlobalEvent("changeEnchCharge", {item, enchantment.cost}) -- Subtract the cost of the enchantment from the current charge of the enchanted item
+	return duration
+end
+
+local function consumePotion(potionID: string, effectName: string): number -- Sends a global event to trigger follower to consume the specified potion. Returns the duration of whatever effect is specified, or 60 if the potion does not have that effect
+	local potion = types.Actor.inventory(selfObj):find(potionID)
+	local potionEffects = types.Potion.record(potion).effects
+	local duration: number = DEFAULT_CD.POTION
+	if effectName ~= nil then
+		for i = 1, #potionEffects do
+			if potionEffects[i].effect.name == effectName then
+				duration = potionEffects[i].duration
+				break
+			end
+		end
+	end
+	core.sendGlobalEvent("UseItem", {object = potion, actor = selfObj})
+	return duration
+end
+
+local function useScroll(scrollId: string, effectName: string, castSound: string): number -- Sends a global event to trigger follower to use the specified scroll. Returns the duration of whatever effect is specified, or 60 if the scroll does not have that effect
+	local scroll = types.Actor.inventory(selfObj):find(scrollId)
+	local scrollRecord = types.Book.record(scroll)
+	local scrollEffects: {core.MagicEffectWithParams} = (core.magic.enchantments.records as {string: core.Enchantment})[scrollRecord.enchant].effects
+	local duration: number = DEFAULT_CD.SCROLL
+	if effectName ~= nil then
+		for _, effect in pairs((scrollEffects as {any: core.MagicEffectWithParams})) do -- For every effect provided by this spell, play an appropriate vfx and sound
+			local vfx = effect.effect
+			selfObj:sendEvent('AddVfx', {
+        		model = types.Static.record(vfx.castStatic).model,
+        		options = {
+            		vfxId = "followerCast" .. effect.id,
+            		particleTextureOverride = vfx.particle,
+            		loop = false,
+        		}
+    		})
+			--core.sound.playSound3d(vfx.castSound, selfObj, {}) -- Due to what appears to be a bug with the lua API, it's not actually possible to retrieve any sounds for our spell effect. For now the sound must be passed in as a string
+			core.sound.playSound3d(castSound, selfObj, {})
+			if vfx.name == effectName then
+				duration = effect.duration -- We only use the relevant magic effect's duration as our cooldown. Any side effects the enchantment might have aren't considered when deciding whether we can use another enchantment again or not
+			end
+		end
+	end
+	types.Actor.activeSpells(selfObj):add({
+		id = scrollId,
+		effects = {0},
+		name = scrollRecord.name,
+		caster = selfObj,
+	})
+	core.sendGlobalEvent('ConsumeItem', {item = scroll, amount = 1}) -- Since applying the scroll's effect does not actually consume the scroll, we need to do so by sending a global event
+	--core.sendGlobalEvent("UseItem", {object = scroll, actor = selfObj}) -- This doesn't actually cast the scroll's spell or consume the scroll
+	return duration
+end
+
+local function selectEnchArmor(effectId: string, attrDiff: number): {string, number, string, string}
+	local inventory = types.Actor.inventory(selfObj)
+	local selectedItem: types.ArmorRecord
+	local selectedMagnitude: number
+	local selectedHealQuality: number
+	for _, item in pairs(inventory:getAll(types.Armor) as {any: types.Armor}) do
+		local itemRecord = types.Armor.record(item)
+		if itemRecord.enchant ~= nil then
+			local enchant = (core.magic.enchantments.records as {string: core.Enchantment})[itemRecord.enchant]
+			if enchant.type == core.magic.ENCHANTMENT_TYPE.CastOnUse then
+				for _, effect in pairs(enchant.effects as {any: core.MagicEffectWithParams}) do
+					if effect.id == effectId then
+						local magnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration
+						local healQuality = math.abs(attrDiff - magnitude)
+						if (selectedItem == nil) then
+							selectedItem = itemRecord
+							selectedMagnitude = magnitude
+							selectedHealQuality = math.abs(attrDiff - selectedMagnitude)
+						elseif healQuality < selectedHealQuality then
+							selectedItem = itemRecord
+							selectedMagnitude = magnitude
+							selectedHealQuality = healQuality
+						end
+					end
+				end
+			end
+		end
+	end
+	if selectedItem ~= nil and selectedHealQuality ~= nil then
+		return {selectedItem.id, selectedHealQuality, selectedItem.name, selectedItem.enchant}
+	else
+		return nil
+	end
+end
+
+local function selectEnchClothing(effectId: string, attrDiff: number): {string, number, string, string}
+	local inventory = types.Actor.inventory(selfObj)
+	local selectedItem: types.ClothingRecord
+	local selectedMagnitude: number
+	local selectedHealQuality: number
+	for _, item in pairs(inventory:getAll(types.Clothing) as {any: types.Clothing}) do
+		local itemRecord = types.Clothing.record(item)
+		if itemRecord.enchant ~= nil then
+			local enchant = (core.magic.enchantments.records as {string: core.Enchantment})[itemRecord.enchant]
+			if enchant.type == core.magic.ENCHANTMENT_TYPE.CastOnUse then
+				for _, effect in pairs(enchant.effects as {any: core.MagicEffectWithParams}) do
+					if effect.id == effectId then
+						local magnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration
+						local healQuality = math.abs(attrDiff - magnitude)
+						if (selectedItem == nil) then
+							selectedItem = itemRecord
+							selectedMagnitude = magnitude
+							selectedHealQuality = math.abs(attrDiff - selectedMagnitude)
+						elseif healQuality < selectedHealQuality then
+							selectedItem = itemRecord
+							selectedMagnitude = magnitude
+							selectedHealQuality = healQuality
+						end
+					end
+				end
+			end
+		end
+	end
+	if selectedItem ~= nil and selectedHealQuality ~= nil then
+		return {selectedItem.id, selectedHealQuality, selectedItem.name, selectedItem.enchant}
+	else
+		return nil
+	end
+end
+
+local function selectEnchWeapon(effectId: string, attrDiff: number): {string, number, string, string}
+	local inventory = types.Actor.inventory(selfObj)
+	local selectedItem: types.WeaponRecord
+	local selectedMagnitude: number
+	local selectedHealQuality: number
+	for _, item in pairs(inventory:getAll(types.Weapon) as {any: types.Weapon}) do
+		local itemRecord = types.Weapon.record(item)
+		if itemRecord.enchant ~= nil then
+			local enchant = (core.magic.enchantments.records as {string: core.Enchantment})[itemRecord.enchant]
+			if enchant.type == core.magic.ENCHANTMENT_TYPE.CastOnUse then
+				for _, effect in pairs(enchant.effects as {any: core.MagicEffectWithParams}) do
+					if effect.id == effectId then
+						local magnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration
+						local healQuality = math.abs(attrDiff - magnitude)
+						if (selectedItem == nil) then
+							selectedItem = itemRecord
+							selectedMagnitude = magnitude
+							selectedHealQuality = math.abs(attrDiff - selectedMagnitude)
+						elseif healQuality < selectedHealQuality then
+							selectedItem = itemRecord
+							selectedMagnitude = magnitude
+							selectedHealQuality = healQuality
+						end
+					end
+				end
+			end
+		end
+	end
+	if selectedItem ~= nil and selectedHealQuality ~= nil then
+		return {selectedItem.id, selectedHealQuality, selectedItem.name, selectedItem.enchant}
+	else
+		return nil
+	end
+end
+
+local function selectEnch(effectId: string, attrDiff: number, itemType: cmn.EnchType): {string, number, string, string}
+	local inventory = types.Actor.inventory(selfObj)
+	local selectedItem: cmn.EnchRecord
+	local selectedMagnitude: number
+	local selectedHealQuality: number
+	for _, item in pairs(inventory:getAll(itemType) as {any: cmn.EnchType}) do
+		local itemRecord = (itemType.record(item) as cmn.EnchRecord)
+		if itemRecord.enchant ~= nil then
+			local enchant = (core.magic.enchantments.records as {string: core.Enchantment})[itemRecord.enchant]
+			if enchant.type == core.magic.ENCHANTMENT_TYPE.CastOnUse then
+				for _, effect in pairs(enchant.effects as {any: core.MagicEffectWithParams}) do
+					if effect.id == effectId then
+						local magnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration
+						local healQuality = math.abs(attrDiff - magnitude)
+						if (selectedItem == nil) then
+							selectedItem = itemRecord
+							selectedMagnitude = magnitude
+							selectedHealQuality = math.abs(attrDiff - selectedMagnitude)
+						elseif healQuality < selectedHealQuality then
+							selectedItem = itemRecord
+							selectedMagnitude = magnitude
+							selectedHealQuality = healQuality
+						end
+					end
+				end
+			end
+		end
+	end
+	if selectedItem ~= nil and selectedHealQuality ~= nil then
+		return {selectedItem.id, selectedHealQuality, selectedItem.name, selectedItem.enchant}
+	else
+		return nil
+	end
+end
+
 local function selectRestoreSpell(effectId: string, attrDiff: number, currentMagicka: number): {core.Spell, number} -- Selects the best restorative spell the NPC currently has (prioritizes magnitude over cost). Prefers the spell that restores closest to the missing amount of whichever attribute is being restored rather than just the spell with the greatest magnitude, currently ignores all side effects of casting the spell. Returns nil if no spell is found
 	local spells = types.Actor.spells(selfObj)
 	local selectedSpell: core.Spell
 	local selectedMagnitude: number
+	local selectedHealQuality: number
 	for _, spell in pairs((spells as {any: core.Spell})) do
 		if spell.type == core.magic.SPELL_TYPE.Spell or (spell.type == core.magic.SPELL_TYPE.Power and types.Actor.activeSpells(selfObj):canUsePower(spell.id) == true) then -- Only use a spell or power, no abilities. Powers will only be cast if they are not currently on cooldown
 			for _, effect in pairs((spell.effects as {any: core.MagicEffectWithParams})) do
 				if effect.id == (effectId as string) and effect.range == core.magic.RANGE.Self then -- We only care if at least one of the effects of this spell restores our chosen attribute and works on self
-					local spellMagnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration -- Find the average magnitude of the given effect for this spell
-					if ((selectedSpell == nil) or preferFirstHealAmount(attrDiff, spellMagnitude, selectedMagnitude) == true) -- Choose the spell that would be efficient for the missing amount of whichever attribute this is
-					and (spell.cost < currentMagicka) -- Only selects this spell if we can afford to cast it
-					then
-						selectedSpell = spell
-						selectedMagnitude = spellMagnitude
+					if spell.cost < currentMagicka then -- Only selects this spell if we can afford to cast it
+						local magnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration -- Find the average magnitude of the given effect for this spell
+						local healQuality = math.abs(attrDiff - magnitude)
+						if (selectedSpell == nil) then
+							selectedSpell = spell
+							selectedMagnitude = magnitude
+							selectedHealQuality = math.abs(attrDiff - selectedMagnitude)
+						elseif healQuality < selectedHealQuality then
+							selectedSpell = spell
+							selectedMagnitude = magnitude
+							selectedHealQuality = healQuality
+						end
 					end
 				end
 			end
 		end
 	end
 	if selectedSpell ~= nil and selectedMagnitude ~= nil then
-		return {selectedSpell, selectedMagnitude}
+		return {selectedSpell, selectedHealQuality}
 	else
 		return nil
 	end
@@ -443,32 +553,40 @@ local function selectRestorePotion(effectId: string, attrDiff: number, attrMax: 
 	local inventory = types.Actor.inventory(selfObj)
 	local selectedPotion: types.PotionRecord
 	local selectedMagnitude: number
+	local selectedHealQuality: number
 	for _, potion in pairs(inventory:getAll(types.Potion) as {any: types.Potion}) do
 		local potionRecord = types.Potion.record(potion)
 		for _, effect in pairs(potionRecord.effects as {any: core.MagicEffectWithParams}) do
 			if effect.id == effectId then
-				local potionMagnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration -- Find the average magnitude of the given effect for this potion
-				if ((selectedPotion == nil) or preferFirstHealAmount(attrDiff, potionMagnitude, selectedMagnitude) == true) then -- Choose the potion that would be efficient for the missing amount of whichever attribute this is
+				local magnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration -- Find the average magnitude of the given effect for this potion
+				local healQuality = math.abs(attrDiff - magnitude)
+				if (selectedPotion == nil) then -- Choose the potion that would be efficient for the missing amount of whichever attribute this is
 					selectedPotion = potionRecord
-					selectedMagnitude = potionMagnitude
+					selectedMagnitude = magnitude
+					selectedHealQuality = math.abs(attrDiff - selectedMagnitude)
+				elseif healQuality < selectedHealQuality then
+					selectedPotion = potionRecord
+					selectedMagnitude = magnitude
+					selectedHealQuality = healQuality
 				end
 			end
 		end
 	end
-	if selectedPotion ~= nil and selectedMagnitude ~= nil
+	if selectedPotion ~= nil and selectedMagnitude ~= nil and selectedHealQuality ~= nil
 	and (((selectedMagnitude * WASTE_THRESHOLD.POTION) < attrDiff) -- Only select potion if less than 25% of its effect will be wasted
 	or (attrDiff > (attrMax * ATTRIBUTE_PANIC_THRESHOLD))) -- However, if follower is missing more than 75% of their attribute, ignore the waste threshold
 	then
-		return {selectedPotion.id, selectedMagnitude}
+		return {selectedPotion.id, selectedHealQuality}
 	else
 		return nil
 	end
 end
 
---[[local function selectRestoreScroll(effectId: string, attrDiff: number, attrMax: number): {string, number} -- Find whichever scroll is enchanted with an effect that has the most suitable restore health/magicka/fatigue amount out of all scrolls in the follower's inventory
+local function selectRestoreScroll(effectId: string, attrDiff: number, attrMax: number): {string, number} -- Find whichever scroll is enchanted with an effect that has the most suitable restore health/magicka/fatigue amount out of all scrolls in the follower's inventory
 	local inventory = types.Actor.inventory(selfObj)
 	local selectedScroll: types.BookRecord
 	local selectedMagnitude: number
+	local selectedHealQuality: number
 	for _, scroll in pairs(inventory:getAll(types.Book) as {any: types.Book}) do
 		local scrollRecord = types.Book.record(scroll)
 		if scrollRecord.isScroll == true then
@@ -476,26 +594,31 @@ end
 			if enchant.type == core.magic.ENCHANTMENT_TYPE.CastOnce then -- As far as we're concerned here, scrolls should be one time use only. Ignore any that aren't.
 				for _, effect in pairs(enchant.effects as {any: core.MagicEffectWithParams}) do
 					if effect.id == effectId then
-						local scrollMagnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration -- Find the average magnitude of the given effect for this scroll
-						if ((selectedScroll == nil) or preferFirstHealAmount(attrDiff, scrollMagnitude, selectedMagnitude) == true) then -- Choose the scroll that would be efficient for the missing amount of whichever attribute this is
+						local magnitude = (effect.magnitudeMax + effect.magnitudeMin) / 2 * effect.duration -- Find the average magnitude of the given effect for this scroll
+						local healQuality = math.abs(attrDiff - magnitude)
+						if (selectedScroll == nil) then -- Choose the scroll that would be efficient for the missing amount of whichever attribute this is
 							selectedScroll = scrollRecord
-							selectedMagnitude = scrollMagnitude
+							selectedMagnitude = magnitude
+							selectedHealQuality = math.abs(attrDiff - selectedMagnitude)
+						elseif healQuality < selectedHealQuality then
+							selectedScroll = scrollRecord
+							selectedMagnitude = magnitude
+							selectedHealQuality = healQuality
 						end
 					end
 				end
 			end
 		end
 	end
-	if selectedScroll ~= nil and selectedMagnitude ~= nil
+	if selectedScroll ~= nil and selectedMagnitude ~= nil and selectedHealQuality ~= nil
 	and (((selectedMagnitude * WASTE_THRESHOLD.SCROLL) < attrDiff) -- Only select potion if less than 25% of its effect will be wasted
 	or (attrDiff > (attrMax * ATTRIBUTE_PANIC_THRESHOLD))) -- However, if follower is missing more than 75% of their attribute, ignore the waste threshold
 	then
-		print(selectedScroll.id)
-		return {selectedScroll.id, selectedMagnitude}
+		return {selectedScroll.id, selectedHealQuality}
 	else
 		return nil
 	end
-end]]
+end
 
 local function chooseRestoreMethod(iter: integer) -- Intelligently selects the most appropriate healing method to use when health is low based on what spells, potions, scrolls, and enchantments are available. As of OpenMW 0.50, scrolls and enchantments are not available due to API limitations
 	local enum RESTORE_METHOD
@@ -509,52 +632,61 @@ local function chooseRestoreMethod(iter: integer) -- Intelligently selects the m
 	local interface RestoreMethod
 	  	name: RESTORE_METHOD
 	  	data: any
-	  	magnitude: number
+	  	weight: number -- How this particular restore method is weighted against others. The lower, the better. Calculated by finding the difference between the method's restore magnitude and the quantity of missing attribute
+		itemName: string
+		enchantName: string
 	end
 
 	local methodAction: {RESTORE_METHOD: function} = {
-	  	--["encharmor"] = function(method: RestoreMethod) restoreAttr[iter].enchantmentTimer = 0 end,
-	  	--["enchclothing"] = function(method: RestoreMethod) restoreAttr[iter].enchantmentTimer = 0 end,
-	  	--["enchweapon"] = function(method: RestoreMethod) restoreAttr[iter].enchantmentTimer = 0 end,
+	  	["encharmor"] = function(method: RestoreMethod) restoreAttr[iter].enchantmentTimer = useEnchantment((method.data as string), method.itemName, method.enchantName, restoreAttr[iter].effectName, "restoration cast") end,
+	  	["enchclothing"] = function(method: RestoreMethod) restoreAttr[iter].enchantmentTimer = useEnchantment((method.data as string), method.itemName, method.enchantName, restoreAttr[iter].effectName, "restoration cast") end,
+	  	["enchweapon"] = function(method: RestoreMethod) restoreAttr[iter].enchantmentTimer = useEnchantment((method.data as string), method.itemName, method.enchantName, restoreAttr[iter].effectName, "restoration cast") end,
 	  	["spell"] = function(method: RestoreMethod) restoreAttr[iter].spellTimer = castSpell((method.data as core.Spell), "restoration cast") end,
 	  	["potion"] = function(method: RestoreMethod) restoreAttr[iter].potionTimer = consumePotion((method.data as string), restoreAttr[iter].effectName) end,
-	  	--["scroll"] = function(method: RestoreMethod) restoreAttr[iter].scrollTimer = useScroll((method.data as string), restoreAttr[iter].effectName) end,
+	  	["scroll"] = function(method: RestoreMethod) restoreAttr[iter].scrollTimer = useScroll((method.data as string), restoreAttr[iter].effectName, "restoration cast") end,
 	}
 	local attrDiff = getAttrDiff(attributes[iter](selfObj))
 	local restoreMethods: {RestoreMethod} = {}
-	--[[if restoreAttr[iter].enchantmentTimer <= 0 then
-		local armor = selectEnchArmor(restoreAttr[iter].effectId, attrDiff)
+	if restoreAttr[iter].enchantmentTimer <= 0 then
+		local armor = selectEnch(restoreAttr[iter].effectId, attrDiff, types.Armor as cmn.EnchType)
 		if armor ~= nil then
 	  		table.insert(restoreMethods, {
 	  	  		name = "encharmor",
 				data = armor[1],
-				magnitude = armor[2] * RESTORE_WEIGHTS.ENCHANTMENT
+				weight = armor[2] + (getMaxAttr(attributes[iter](selfObj)) * RESTORE_WEIGHTS.ENCHANTMENT),
+				itemName = armor[3],
+				enchantName = armor[4]
 	  		})
 		end
-		local clothing = selectEnchClothing(restoreAttr[iter].effectId, attrDiff)
+		--local clothing = selectEnchClothing(restoreAttr[iter].effectId, attrDiff)
+		local clothing = selectEnch(restoreAttr[iter].effectId, attrDiff, types.Clothing as cmn.EnchType)
 		if clothing ~= nil then
 		  	table.insert(restoreMethods, {
 		  	  	name = "enchclothing",
 				data = clothing[1],
-				magnitude = clothing[2] * RESTORE_WEIGHTS.ENCHANTMENT
+				weight = clothing[2] + (getMaxAttr(attributes[iter](selfObj)) * RESTORE_WEIGHTS.ENCHANTMENT),
+				itemName = clothing[3],
+				enchantName = clothing[4]
 	  		})
 		end
-		local weapon = selectEnchWeapon(restoreAttr[iter].effectId, attrDiff)
+		local weapon = selectEnch(restoreAttr[iter].effectId, attrDiff, types.Weapon as cmn.EnchType)
 	  	if weapon ~= nil then
 			table.insert(restoreMethods, {
 		  	  	name = "enchweapon",
 				data = weapon[1],
-				magnitude = weapon[2] * RESTORE_WEIGHTS.ENCHANTMENT
+				weight = weapon[2] + (getMaxAttr(attributes[iter](selfObj)) * RESTORE_WEIGHTS.ENCHANTMENT),
+				itemName = weapon[3],
+				enchantName = weapon[4]
 	  		})
 		end
-	end]]
+	end
 	if restoreAttr[iter].spellTimer <= 0 and attributes[2](selfObj).current > 0 then
 	  	local spell = selectRestoreSpell(restoreAttr[iter].effectId, attrDiff, attributes[2](selfObj).current)
 		if spell ~= nil then
 	  		table.insert(restoreMethods, {
 	  		  	name = "spell",
 	  		  	data = spell[1],
-	  		  	magnitude = spell[2] * RESTORE_WEIGHTS.SPELL
+	  		  	weight = spell[2] + (getMaxAttr(attributes[iter](selfObj)) * RESTORE_WEIGHTS.SPELL),
 	  		})
 		end
 	end
@@ -564,25 +696,25 @@ local function chooseRestoreMethod(iter: integer) -- Intelligently selects the m
 		  	table.insert(restoreMethods, {
 		  	  	name = "potion",
 	  		  	data = potion[1],
-	  	  		magnitude = potion[2] * RESTORE_WEIGHTS.POTION
+	  	  		weight = potion[2] + (getMaxAttr(attributes[iter](selfObj)) * RESTORE_WEIGHTS.POTION),
 	  		})
 		end
 	end
-	--[[if restoreAttr[iter].scrollTimer <= 0 then
+	if restoreAttr[iter].scrollTimer <= 0 then
 	  	local scroll = selectRestoreScroll(restoreAttr[iter].effectId, attrDiff, getMaxAttr(attributes[iter](selfObj)))
 		if scroll ~= nil then
 		  	table.insert(restoreMethods, {
 		  	  	name = "scroll",
 	  		  	data = scroll[1],
-	  	  		magnitude = scroll[2] * RESTORE_WEIGHTS.SCROLL
+	  	  		weight = scroll[2] + (getMaxAttr(attributes[iter](selfObj)) * RESTORE_WEIGHTS.SCROLL),
 	  		})
 		end
-	end]]
+	end
 	if #restoreMethods == 0 then return end
 
 	local method: RestoreMethod = restoreMethods[1]
 	for i = 2, #restoreMethods do
-	 	if preferFirstHealAmount(attrDiff, method.magnitude, restoreMethods[i].magnitude) == false then
+	 	if method.weight < restoreMethods[i].weight == false then
 	  	  	method = restoreMethods[i]
   	  	end
 	end

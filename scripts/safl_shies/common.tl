@@ -49,11 +49,25 @@ local interface SaveData
 	doOnce2: boolean
 end
 
+local interface EnchType is types.Item
+	record: function(
+		id: any
+	): EnchRecord
+end
+
+local interface EnchRecord
+	id: string
+	name: string
+	enchant: string
+end
+
 return {
 	PlayerQuest = PlayerQuest,
 	Flag = Flag,
 	Timer = Timer,
     SaveData = SaveData,
 	RestoreAttr = RestoreAttr,
-	CellLoc = CellLoc
+	CellLoc = CellLoc,
+	EnchType = EnchType,
+	EnchRecord = EnchRecord
 }

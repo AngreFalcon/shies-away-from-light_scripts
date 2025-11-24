@@ -1,6 +1,7 @@
 local core = require('openmw.core')
 local util = require('openmw.util')
 local world = require('openmw.world')
+local types = require('openmw.types')
 
 local shies = "safl_shies"
 
@@ -40,6 +41,11 @@ local function syncMWVars(actor: core.GameObject)
 	end
 end
 
+local function changeEnchCharge(data: {core.GameObject, number})
+	local itemData = types.Item.itemData(data[1])
+	itemData.enchantmentCharge = itemData.enchantmentCharge - data[2]
+end
+
 return {
    	engineHandlers = {
       	onActorActive = function(actor: core.GameObject)
@@ -64,5 +70,6 @@ return {
       	["teleport"] = teleport,
       	["disable"] = disable,
 	  	["updateMWVar"] = updateMWVar,
+		["changeEnchCharge"] = changeEnchCharge,
    	}
 }
