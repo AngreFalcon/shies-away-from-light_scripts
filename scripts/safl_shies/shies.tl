@@ -302,7 +302,7 @@ local function castSpell(spell: core.Spell, castSound: string): number -- Applie
 	return duration
 end
 
-local function useEnchantment(itemRecord: cmn.EnchRecord, effectName: string, castSound: string): number
+local function useEnchantment(itemRecord: cmn.EnchRecord, effectName: string, castSound: string): number -- Makes follower use the specified enchanted item, applying its magic effect and consuming some of the item's charge
 	local item = types.Actor.inventory(selfObj):find(itemRecord.id)
 	local enchantment = (core.magic.enchantments.records as {string: core.Enchantment})[itemRecord.enchant]
 	local duration: number = DEFAULT_CD.SCROLL
@@ -384,7 +384,7 @@ local function useScroll(scrollId: string, effectName: string, castSound: string
 	return duration
 end
 
-local function selectRestoreEnch(effectId: string, attrDiff: number, itemType: cmn.EnchType): {cmn.EnchRecord, number}
+local function selectRestoreEnch(effectId: string, attrDiff: number, itemType: cmn.EnchType): {cmn.EnchRecord, number} -- Scans through the follower's inventory, finding the enchanted item that has the most applicable restorative effect
 	local inventory = types.Actor.inventory(selfObj)
 	local selectedItem: cmn.EnchRecord
 	local selectedHealQuality: number
@@ -786,7 +786,7 @@ end
 --
 
 -- Handler functions - Functions that will be called directly by OpenMW
-time.runRepeatedly(
+time.runRepeatedly( -- This function runs once every x seconds, where x = DELAY
 	function() 
 		if isFollowing() then
 			modSpeedAndAthletics()
