@@ -17,6 +17,8 @@ for file in lfs.dir(src) do
 	if file ~= nil and file ~= "." and file ~= ".." then
 		if string.sub(file, -3) == ".tl" then
 			table.insert(fileNames, file)
+		elseif string.sub(file, -4) == ".lua" then
+			os.remove(src .. "/" .. file)
 		end
 	end
 end
