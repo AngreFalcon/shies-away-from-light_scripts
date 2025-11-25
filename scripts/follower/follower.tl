@@ -123,13 +123,16 @@ end
 -- Handler functions - Functions that will be called directly by OpenMW
 local function delayUpdate1(self: Follower) -- This function runs once every x seconds, where x = DELAY1
 	if self:isFollowing() then
+		self:toggleEffect("fly", (core.magic.EFFECT_TYPE.Levitate as string))
+		self:toggleEffect("ww", (core.magic.EFFECT_TYPE.WaterWalking as string))
+		self:forceZLevel()
 		self:modSpeedAndAthletics()
 	elseif self.player ~= nil then
 		self:setDefaultSpeed()
 	end
 end
 
-local function delayUpdate2(self: Follower) -- This function runs once every x seconds, where x = DELAY2
+local function delayUpdate2(_: Follower) -- This function runs once every x seconds, where x = DELAY2
 
 end
 
@@ -142,9 +145,6 @@ local function onUpdate(self: Follower, dt: number)
 	end
 	if self:isFollowing() then
 		self:setSneak()
-		self:toggleEffect("fly", (core.magic.EFFECT_TYPE.Levitate as string))
-		self:toggleEffect("ww", (core.magic.EFFECT_TYPE.WaterWalking as string))
-		self:forceZLevel()
 		self:warpToPlayer()
 	elseif self.player ~= nil then -- This condition should be reserved for function calls that take place when the follower is temporarily not following the player e.g., the follower has not been dismissed. Behaviors that occur when the follower has been dismissed should be placed outside of this condition block
 		self:maintainDistance()
