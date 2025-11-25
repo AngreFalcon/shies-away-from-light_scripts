@@ -6,28 +6,8 @@ local cmn = require('scripts.follower.common')
 
 -- Credit to Grumpy and Kateri for their companion mwscripts, which were used as the foundation from which this script was built
 
-local interface OMW_SELF_CONTROLS
-	sneak: boolean
-end
-
-local interface OMW_SELF_PACKAGE
-    controls: OMW_SELF_CONTROLS
-end
-
-local interface OMW_AI_PACKAGE
-    type: string
-    target: core.GameObject
-    distance: number
-end
-
-local interface OMW_AI
-	getActiveTarget: function(string): core.GameObject
-	getActivePackage: function(): OMW_AI_PACKAGE
-    removePackages: function(string)
-	startPackage: function(OMW_AI_PACKAGE)
-end
-
-global interface Follower
+local interface Follower is Follower.OMW_SELF
+	metamethod __call: function(Follower, ...: DerivedFollower): DerivedFollower
     type Attributes = { function(core.GameObject): types.DynamicStat }
     interface STAT_MOD
         CATCHUP_MULT: number
@@ -63,9 +43,28 @@ global interface Follower
 		TRUE: integer
 		FALSE: integer
 	end
+	interface OMW_SELF_CONTROLS
+		sneak: boolean
+		jump: boolean
+	end
+	interface OMW_SELF
+		controls: OMW_SELF_CONTROLS
+	end
+	interface OMW_AI_PACKAGE
+		type: string
+		target: core.GameObject
+		distance: number
+	end
+	interface OMW_AI
+		getActiveTarget: function(string): core.GameObject
+		getActivePackage: function(): OMW_AI_PACKAGE
+		removePackages: function(string)
+		startPackage: function(OMW_AI_PACKAGE)
+	end
 
     selfObj: core.GameObject
     ai: OMW_AI
+	controls: OMW_SELF_CONTROLS
 	attributes: Attributes
 	statMod: STAT_MOD
 	defaultCd: DEFAULT_CD
@@ -88,12 +87,12 @@ global interface Follower
     doOnce2: boolean
 	MWVars: {string: number}
 	
+	onUpdate: function(self: Follower, dt: number)
+	onSave: function(self: Follower, payload: {string: any}): cmn.SaveData
+	onLoad: function(self: Follower, data: cmn.SaveData)
 	updateMWVar: function(self: Follower, varName: string, varData: number)
 	isFollowing: function(self: Follower): boolean
 	getPlayerLeader: function(self: Follower)
-	getMaxAttr: function(self: Follower, attr: types.DynamicStat): number
-	getAttrDiff: function(self: Follower, attr: types.DynamicStat): number
-	checkAttrDamaged: function(self: Follower, attr: types.DynamicStat): boolean
 	fullHeal: function(self: Follower)
 	checkForPotion: function(self: Follower, potionName: string): boolean
 	getPlayerCellPos: function(self: Follower): cmn.CellLoc
@@ -121,6 +120,56 @@ global interface Follower
 	modSpeedAndAthletics: function(self: Follower)
 end
 
+-- Handler functions - Functions that will be called directly by OpenMW
+local function onUpdate(self: Follower, dt: number)
+	self:getPlayerLeader()
+    self:checkAttributes()
+	self:updateTimers(dt)
+	if self.checks["fly"] == false and types.Actor.isOnGround(self.selfObj) == false then
+		self:freeFall()
+	end
+	if self:isFollowing() then
+		self:setSneak()
+		self:toggleEffect("fly", (core.magic.EFFECT_TYPE.Levitate as string))
+		self:toggleEffect("ww", (core.magic.EFFECT_TYPE.WaterWalking as string))
+		self:forceZLevel()
+		self:warpToPlayer()
+	elseif self.player ~= nil then -- This condition should be reserved for only function calls that take place when the follower is temporarily not following the player e.g., the follower has not been dismissed. Behaviors that occur when the follower has been dismissed should be placed outside of this condition block
+		self:maintainDistance()
+		self:nudge(dt)
+	end
+end
+local function onSave(self: Follower, payload: {string: any}): cmn.SaveData
+	for k, v in pairs(self.MWVars) do
+		self:updateMWVar(k, v)
+	end
+	return cmn.merge(
+		{
+			player = self.player,
+			doOnce = self.doOnce,
+			doOnce2 = self.doOnce2,
+			checks = self.checks,
+			timers = self.timers,
+			restoreAttr = self.restoreAttr,
+			posA = self.posA,
+			posB = self.posB,
+			posC = self.posC,
+		},
+		payload
+	)
+end
+local function onLoad(self: Follower, data: cmn.SaveData)
+		self.player = data.player
+		self.doOnce = data.doOnce
+		self.doOnce2 = data.doOnce2
+		self.checks = data.checks
+		self.timers = data.timers
+		self.restoreAttr = data.restoreAttr
+		self.posA = data.posA
+		self.posB = data.posB
+		self.posC = data.posC
+end
+
 -- Utility functions -- Functions that may return game values or that other functions may depend on for calculations or checks
 local function updateMWVar(self: Follower, varName: string, varData: number) -- Send an event to the global script to update a single mwscript variable with the provided value
 	core.sendGlobalEvent("updateMWVar", {varName, varData, self.selfObj})
@@ -137,20 +186,8 @@ local function getPlayerLeader(self: Follower) -- Gets the player object that co
 	end
 end
 
-local function getMaxAttr(attr: types.DynamicStat): number -- Get the maximum value of the specified dynamic stat
-	return attr.base + attr.modifier
-end
-
-local function getAttrDiff(self: Follower, attr: types.DynamicStat): number -- Get the missing value of the specified dynamic stat
-	return self:getMaxAttr(attr) - attr.current
-end
-
-local function checkAttrDamaged(self: Follower, attr: types.DynamicStat): boolean -- Returns true if the provided attribute is not currently full
-	return attr.current < self:getMaxAttr(attr)
-end
-
 local function fullHeal(self: Follower) -- Fully restore follower's health
-	self.attributes[1](self.selfObj).current = self:getMaxAttr(self.attributes[1](self.selfObj))
+	self.attributes[1](self.selfObj).current = cmn.getMaxAttr(self.attributes[1](self.selfObj))
 end
 
 local function checkForPotion(self: Follower, potionName: string): boolean -- Returns true if follower has any of the specified potions in their inventory
@@ -227,8 +264,8 @@ local function setSneak(self: Follower) -- Make sure if the player is sneaking, 
 	if self.player ~= nil then
 		self.player:sendEvent("getSneakVal", self.selfObj)
 	end
-	if (self.selfObj as OMW_SELF_PACKAGE).controls.sneak ~= self.checks["playerSneak"] then
-		(self.selfObj as OMW_SELF_PACKAGE).controls.sneak = self.checks["playerSneak"]
+	if self.controls.sneak ~= self.checks["playerSneak"] then
+		self.controls.sneak = self.checks["playerSneak"]
 	end
 end
 
@@ -511,7 +548,7 @@ local function chooseRestoreMethod(self: Follower, iter: integer) -- Intelligent
 		["potion"] = function(method: RestoreMethod) self.restoreAttr[iter].potionTimer = self:consumePotion((method.data as string), self.restoreAttr[iter].effectName) end,
 		["scroll"] = function(method: RestoreMethod) self.restoreAttr[iter].scrollTimer = self:useScroll((method.data as string), self.restoreAttr[iter].effectName, "restoration cast") end,
 	}
-	local attrDiff = self:getAttrDiff(self.attributes[iter](self.selfObj))
+	local attrDiff = cmn.getAttrDiff(self.attributes[iter](self.selfObj))
 	local restoreMethods: {RestoreMethod} = {}
 	if self.restoreAttr[iter].enchantmentTimer <= 0 then
 		local armor = self:selectRestoreEnch(self.restoreAttr[iter].effectId, attrDiff, types.Armor as cmn.EnchType)
@@ -519,7 +556,7 @@ local function chooseRestoreMethod(self: Follower, iter: integer) -- Intelligent
 			table.insert(restoreMethods, {
 				name = "encharmor",
 				data = armor[1],
-				weight = armor[2] + (self:getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.ENCHANTMENT),
+				weight = armor[2] + (cmn.getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.ENCHANTMENT),
 			})
 		end
 		local clothing = self:selectRestoreEnch(self.restoreAttr[iter].effectId, attrDiff, types.Clothing as cmn.EnchType)
@@ -527,7 +564,7 @@ local function chooseRestoreMethod(self: Follower, iter: integer) -- Intelligent
 			table.insert(restoreMethods, {
 				name = "enchclothing",
 				data = clothing[1],
-				weight = clothing[2] + (self:getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.ENCHANTMENT),
+				weight = clothing[2] + (cmn.getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.ENCHANTMENT),
 			})
 		end
 		local weapon = self:selectRestoreEnch(self.restoreAttr[iter].effectId, attrDiff, types.Weapon as cmn.EnchType)
@@ -535,7 +572,7 @@ local function chooseRestoreMethod(self: Follower, iter: integer) -- Intelligent
 			table.insert(restoreMethods, {
 				name = "enchweapon",
 				data = weapon[1],
-				weight = weapon[2] + (self:getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.ENCHANTMENT),
+				weight = weapon[2] + (cmn.getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.ENCHANTMENT),
 			})
 		end
 	end
@@ -545,27 +582,27 @@ local function chooseRestoreMethod(self: Follower, iter: integer) -- Intelligent
 			table.insert(restoreMethods, {
 				name = "spell",
 				data = spell[1],
-				weight = spell[2] + (self:getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.SPELL),
+				weight = spell[2] + (cmn.getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.SPELL),
 			})
 		end
 	end
 	if self.restoreAttr[iter].potionTimer <= 0 then
-		local potion = self:selectRestorePotion(self.restoreAttr[iter].effectId, attrDiff, self:getMaxAttr(self.attributes[iter](self.selfObj)))
+		local potion = self:selectRestorePotion(self.restoreAttr[iter].effectId, attrDiff, cmn.getMaxAttr(self.attributes[iter](self.selfObj)))
 		if potion ~= nil then
 			table.insert(restoreMethods, {
 				name = "potion",
 				data = potion[1],
-				weight = potion[2] + (self:getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.POTION),
+				weight = potion[2] + (cmn.getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.POTION),
 			})
 		end
 	end
 	if self.restoreAttr[iter].scrollTimer <= 0 then
-		local scroll = self:selectRestoreScroll(self.restoreAttr[iter].effectId, attrDiff, self:getMaxAttr(self.attributes[iter](self.selfObj)))
+		local scroll = self:selectRestoreScroll(self.restoreAttr[iter].effectId, attrDiff, cmn.getMaxAttr(self.attributes[iter](self.selfObj)))
 		if scroll ~= nil then
 			table.insert(restoreMethods, {
 				name = "scroll",
 				data = scroll[1],
-				weight = scroll[2] + (self:getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.SCROLL),
+				weight = scroll[2] + (cmn.getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.SCROLL),
 			})
 		end
 	end
@@ -582,7 +619,7 @@ end
 
 local function checkAttributes(self: Follower) -- Used to call various functions that affect follower's dynamic attributes like health, fatigue, and magicka
 	for i = 1, #self.attributes do
-		if self:checkAttrDamaged(self.attributes[i](self.selfObj)) == true and self.timers["restorecooldown"] <= 0 then
+		if cmn.checkAttrDamaged(self.attributes[i](self.selfObj)) == true and self.timers["restorecooldown"] <= 0 then
 			self:chooseRestoreMethod(i)
 		end
 	end
@@ -700,11 +737,11 @@ end
 --
 
 local function defaultFollower(): Follower
-	local follower = {
+	return {
 		-- Aliases
-	    selfObj: core.GameObject = nil,
+	    selfObj = nil,
 	    attributes = {types.Actor.stats.dynamic.health, types.Actor.stats.dynamic.magicka, types.Actor.stats.dynamic.fatigue},
-	    ai: OMW_AI = nil,
+	    ai = nil,
 		
 	    -- Constants
 	    --SKILL_LEVEL_MULT <const> = 1.5 -- The multiplier to apply to all skill increases
@@ -713,7 +750,7 @@ local function defaultFollower(): Follower
 	        FOLLOW = 15, -- Flat modifier to be applied to follower's speed and athletics when normally following the player
 	        WANDER = 40, -- Flat modifier to be applies to follower's speed when wandering instead of followings
 	    },
-		defaultCD = { -- Default cooldowns in seconds
+		defaultCd = { -- Default cooldowns in seconds
 			RESTORE = 10, -- The general cooldown to wait before using any other restore effects, regardless of individual method cooldown
 			ENCHANTMENT = 10, -- The default cooldown for a restorative enchantment if the actual duration couldn't be found
 			SPELL = 10, -- The default cooldown for a restorative spell if the actual duration couldn't be found
@@ -748,22 +785,60 @@ local function defaultFollower(): Follower
 		DELAY2 = 5 * time.second, -- The number of seconds to wait before executing our delayed, non-priority functions
 	
 		-- Variables
-	    player: core.GameObject = nil,
-	    checks: {cmn.Flag: boolean} = {},
-	    restoreAttr: {cmn.RestoreAttr} = {},
-	    timers: {cmn.Timer: number} = {},
+	    player = nil,
+	    checks = {
+			["cMove"] = false,
+			["fly"] = false,
+			["ww"] = false,
+			["combat"] = false,
+			["incapacitated"] = false,
+			["playerSneak"] = false,
+		},
+	    restoreAttr = {
+			[1] = {
+				potionTimer = 0,
+				spellTimer = 0,
+				scrollTimer = 0,
+				enchantmentTimer = 0,
+				effectName = "Restore Health",
+				effectId = "restorehealth",
+			},
+			[2] = {
+				potionTimer = 0,
+				spellTimer = 0,
+				scrollTimer = 0,
+				enchantmentTimer = 0,
+				effectName = "Restore Magicka",
+				effectId = "restoremagicka",
+			},
+			[3] = {
+				potionTimer = 0,
+				spellTimer = 0,
+				scrollTimer = 0,
+				enchantmentTimer = 0,
+				effectName = "Restore Fatigue",
+				effectId = "restorefatigue",
+			}
+		},
+	    timers = {
+			["move"] = 0,
+			["sheathe"] = 0,
+			["warp"] = 0,
+			["freefall"] = 0,
+			["restorecooldown"] = 0,
+		},
 	
 		-- Warp function variables - Must persist between function calls
-	    posA: cmn.CellLoc = nil,
-	    posB: cmn.CellLoc = nil,
-	    posC: cmn.CellLoc = nil,
-	    doOnce: boolean = nil,
-	    doOnce2: boolean = nil,
+	    posA = nil,
+	    posB = nil,
+	    posC = nil,
+	    doOnce = false,
+	    doOnce2 = false,
 	
 		-- MWScript variables
 		-- Important to note: all MWScript variables are automatically cast to all lowercase
 		-- If making a follower that uses this script, the follower must have the following variables declared in MWScript within their .esp plugin file
-		MWVars: {string: number} = {},
+		MWVars = {},
 		--[[ MWVars:
 			short companion -- Engine variable -- True if follower is currently following the player. If 0, companion dialogue topics don't appear
 			short nohello -- Engine variable -- 
@@ -774,13 +849,14 @@ local function defaultFollower(): Follower
 			short addonce -- True after the mwscript has executed once, is used to initialize companion to 0
 		]]
 		
+		-- Handler functions - Functions that will be called directly by OpenMW
+		onUpdate = onUpdate,
+		onSave = onSave,
+		onLoad = onLoad,
 		-- Utility functions -- Functions that may return game values or that other functions may depend on for calculations or checks
 		updateMWVar = updateMWVar, -- Send an event to the global script to update a single mwscript variable with the provided value
 		isFollowing = isFollowing, -- Simply return true or false if companion is currently following any player
 		getPlayerLeader = getPlayerLeader, -- Gets the player object that companion is currently following		
-		getMaxAttr = getMaxAttr, -- Get the maximum value of the specified dynamic stat		
-		getAttrDiff = getAttrDiff, -- Get the missing value of the specified dynamic stat		
-		checkAttrDamaged = checkAttrDamaged, -- Returns true if the provided attribute is not currently full		
 		fullHeal = fullHeal, -- Fully restore follower's health		
 		checkForPotion = checkForPotion, -- Returns true if follower has any of the specified potions in their inventory
 		getPlayerCellPos = getPlayerCellPos, -- Get the cell location of the player that companion is currently following
@@ -809,10 +885,22 @@ local function defaultFollower(): Follower
 		setDefaultSpeed = setDefaultSpeed, -- Sets follower's speed modifier while not following the player
 		modSpeedAndAthletics = modSpeedAndAthletics, -- Set follower's speed and athletics modifier to a flat value if they're within a certain distance of the player, or add a multiplier based off the player's stats if they're too far
 	}
-	return follower as Follower
 end
 
-return function(child: {string: any}): Follower
-	child.base = defaultFollower();
-	return setmetatable(child as Follower, { __index = child.base })
+local interface DerivedFollower is Follower
+	base: Follower
+	self: Follower.OMW_SELF
 end
+
+local function constructor(_: Follower, child: DerivedFollower): DerivedFollower
+	child.base = defaultFollower()
+	return setmetatable(child,
+		{ __index = setmetatable(child.base,
+			{ __index = {
+				selfObj = child.self,
+				controls = child.self.controls
+			}})
+		})
+end
+
+return setmetatable({} as Follower, { __call = constructor })
