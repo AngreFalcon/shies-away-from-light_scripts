@@ -10,8 +10,8 @@ local cmn = require('scripts.follower.common')
 local follower = require('scripts.follower.follower')
 
 local Shies = follower({
-	selfObj = self,
-	ai = ai,
+	self = self as follower.OMW_SELF,
+	ai = ai as follower.OMW_AI
 })
 
 -- Shies Constants
@@ -264,7 +264,7 @@ return {
         end,
 		["shiesJump"] = function()
 			print(types.NPC.stats.skills.acrobatics(Shies.selfObj).progress)
-			(Shies.selfObj as self).controls.jump = true
+			Shies.controls.jump = true
 			print(types.NPC.stats.skills.acrobatics(Shies.selfObj).progress)
 		end,
 		["shiesActivated"] = function()

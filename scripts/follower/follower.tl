@@ -6,28 +6,8 @@ local cmn = require('scripts.follower.common')
 
 -- Credit to Grumpy and Kateri for their companion mwscripts, which were used as the foundation from which this script was built
 
-local interface OMW_SELF_CONTROLS
-	sneak: boolean
-end
-
-local interface OMW_SELF_PACKAGE
-    controls: OMW_SELF_CONTROLS
-end
-
-local interface OMW_AI_PACKAGE
-    type: string
-    target: core.GameObject
-    distance: number
-end
-
-local interface OMW_AI
-	getActiveTarget: function(string): core.GameObject
-	getActivePackage: function(): OMW_AI_PACKAGE
-    removePackages: function(string)
-	startPackage: function(OMW_AI_PACKAGE)
-end
-
-global interface Follower
+local interface Follower is Follower.OMW_SELF
+	metamethod __call: function(Follower, ...: DerivedFollower): DerivedFollower
     type Attributes = { function(core.GameObject): types.DynamicStat }
     interface STAT_MOD
         CATCHUP_MULT: number
@@ -62,6 +42,24 @@ global interface Follower
 	interface BOOL
 		TRUE: integer
 		FALSE: integer
+	end
+	interface OMW_SELF_CONTROLS
+		sneak: boolean
+		jump: boolean
+	end
+	interface OMW_SELF
+		controls: OMW_SELF_CONTROLS
+	end
+	interface OMW_AI_PACKAGE
+		type: string
+		target: core.GameObject
+		distance: number
+	end
+	interface OMW_AI
+		getActiveTarget: function(string): core.GameObject
+		getActivePackage: function(): OMW_AI_PACKAGE
+		removePackages: function(string)
+		startPackage: function(OMW_AI_PACKAGE)
 	end
 
     selfObj: core.GameObject
@@ -212,8 +210,8 @@ local function setSneak(self: Follower) -- Make sure if the player is sneaking, 
 	if self.player ~= nil then
 		self.player:sendEvent("getSneakVal", self.selfObj)
 	end
-	if (self.selfObj as OMW_SELF_PACKAGE).controls.sneak ~= self.checks["playerSneak"] then
-		(self.selfObj as OMW_SELF_PACKAGE).controls.sneak = self.checks["playerSneak"]
+	if self.controls.sneak ~= self.checks["playerSneak"] then
+		self.controls.sneak = self.checks["playerSneak"]
 	end
 end
 
@@ -689,7 +687,7 @@ local function defaultFollower(): Follower
 		-- Aliases
 	    selfObj: core.GameObject = nil,
 	    attributes = {types.Actor.stats.dynamic.health, types.Actor.stats.dynamic.magicka, types.Actor.stats.dynamic.fatigue},
-	    ai: OMW_AI = nil,
+	    ai: Follower.OMW_AI = nil,
 		
 	    -- Constants
 	    --SKILL_LEVEL_MULT <const> = 1.5 -- The multiplier to apply to all skill increases
@@ -793,7 +791,20 @@ local function defaultFollower(): Follower
 	}
 end
 
-return function(child: {string: any}): Follower
-	child.base = defaultFollower();
-	return setmetatable(child as Follower, { __index = child.base })
+local interface DerivedFollower is Follower
+	base: Follower
+	self: Follower.OMW_SELF
 end
+
+local function constructor(_: Follower, child: DerivedFollower): DerivedFollower
+	child.base = defaultFollower();
+	return setmetatable(child,
+		{ __index = setmetatable(child.base,
+			{ __index = {
+				selfObj = child.self,
+				controls = child.self.controls
+			}})
+		})
+end
+
+return setmetatable({} as Follower, { __call = constructor })
