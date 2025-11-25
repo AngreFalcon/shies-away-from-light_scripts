@@ -89,7 +89,7 @@ local function flee() -- Triggers if shies' health drops below a certain thresho
 end
 
 local function shiesCheckAttributes() -- Calls shies-specific functions relating to attributes
-	if Shies.attributes[1](Shies.selfObj).current > 0 and Shies.attributes[1](Shies.selfObj).current / cmn.getMaxAttr(Shies.attributes[1](Shies.selfObj)) < SHIES.FLEE_THRESHOLD then -- Check health ratio
+	if Shies.dynamicStats[1](Shies.selfObj).current > 0 and Shies.dynamicStats[1](Shies.selfObj).current / cmn.getMaxDynStat(Shies.dynamicStats[1](Shies.selfObj)) < SHIES.FLEE_THRESHOLD then -- Check health ratio
 		Shies:updateMWVar("companion", Shies.mwBool.FALSE)
 		Shies.checks["cMove"] = false
         flee() -- Teleport Shies away from combat to whatever position he has marked
@@ -177,7 +177,7 @@ return {
             attackerObj:sendEvent("shiesAttacked", "Why did you do that :(\nincremdibly rude...")
         end,
         ["hurtShies"] = function() -- For testing the "Recall away at low health" feature - this event is sent from the player script
-            Shies.attributes[1](Shies.selfObj).current = 1
+            Shies.dynamicStats[1](Shies.selfObj).current = 1
         end,
 		["shiesJump"] = function()
 			print(types.NPC.stats.skills.acrobatics(Shies.selfObj).progress)

@@ -8,7 +8,7 @@ local cmn = require('scripts.follower.common')
 
 local interface Follower is Follower.OMW_SELF
 	metamethod __call: function(Follower, ...: DerivedFollower): DerivedFollower
-    type Attributes = { function(core.GameObject): types.DynamicStat }
+    type DynamicStats = { function(core.GameObject): types.DynamicStat }
     interface STAT_MOD
         CATCHUP_MULT: number
         FOLLOW: number
@@ -23,15 +23,15 @@ local interface Follower is Follower.OMW_SELF
 		WARP: number
 		SHEATHE: number
 	end
-	interface RESTORE_WEIGHTS
-		ENCHANTMENT: number
-		SPELL: number
-		POTION: number
-		SCROLL: number
-	end
-	interface WASTE_THRESHOLD
-		POTION: number
-		SCROLL: number
+	interface RESTORE_CONSTS
+		TRIGGER_PERC: number
+		PANIC_THRESHOLD: number
+		ENCHANTMENT_WEIGHT: number
+		SPELL_WEIGHT: number
+		POTION_WEIGHT: number
+		POTION_WASTE: number
+		SCROLL_WEIGHT: number
+		SCROLL_WASTE: number
 	end
 	interface DISTANCE_THRESHOLD
 		MOD_SPEED: number
@@ -65,20 +65,18 @@ local interface Follower is Follower.OMW_SELF
     selfObj: core.GameObject
     ai: OMW_AI
 	controls: OMW_SELF_CONTROLS
-	attributes: Attributes
+	dynamicStats: DynamicStats
 	statMod: STAT_MOD
 	defaultCd: DEFAULT_CD
-	restoreWeights: RESTORE_WEIGHTS
-	wasteThreshold: WASTE_THRESHOLD
+	restoreConsts: RESTORE_CONSTS
 	distanceThreshold: DISTANCE_THRESHOLD
 	mwBool: BOOL
-    ATTRIBUTE_PANIC_THRESHOLD: number
 	NUDGE_DELAY: number
 	DELAY1: number
 	DELAY2: number
 	player: core.GameObject
     checks: {cmn.Flag: boolean}
-    restoreAttr: {cmn.RestoreAttr}
+    restoreDynStat: {cmn.RestoreDynStat}
 	timers: {cmn.Timer: number}
     posA: cmn.CellLoc
     posB: cmn.CellLoc
@@ -150,7 +148,7 @@ local function onSave(self: Follower, payload: {string: any}): cmn.SaveData
 			doOnce2 = self.doOnce2,
 			checks = self.checks,
 			timers = self.timers,
-			restoreAttr = self.restoreAttr,
+			restoreAttr = self.restoreDynStat,
 			posA = self.posA,
 			posB = self.posB,
 			posC = self.posC,
@@ -164,7 +162,7 @@ local function onLoad(self: Follower, data: cmn.SaveData)
 		self.doOnce2 = data.doOnce2
 		self.checks = data.checks
 		self.timers = data.timers
-		self.restoreAttr = data.restoreAttr
+		self.restoreDynStat = data.restoreDynStat
 		self.posA = data.posA
 		self.posB = data.posB
 		self.posC = data.posC
@@ -187,7 +185,7 @@ local function getPlayerLeader(self: Follower) -- Gets the player object that co
 end
 
 local function fullHeal(self: Follower) -- Fully restore follower's health
-	self.attributes[1](self.selfObj).current = cmn.getMaxAttr(self.attributes[1](self.selfObj))
+	self.dynamicStats[1](self.selfObj).current = cmn.getMaxDynStat(self.dynamicStats[1](self.selfObj))
 end
 
 local function checkForPotion(self: Follower, potionName: string): boolean -- Returns true if follower has any of the specified potions in their inventory
@@ -230,18 +228,18 @@ local function setSheatheWarpTimers(self: Follower, dt: number) -- Sheathe weapo
 end
 
 local function updateTimers(self: Follower, dt: number) -- This function updates our various timers by dt, the time passed since this script's last executions
-	for i = 1, #self.restoreAttr do
-		if self.restoreAttr[i].spellTimer > 0 then
-			self.restoreAttr[i].spellTimer = self.restoreAttr[i].spellTimer - dt
+	for i = 1, #self.restoreDynStat do
+		if self.restoreDynStat[i].spellTimer > 0 then
+			self.restoreDynStat[i].spellTimer = self.restoreDynStat[i].spellTimer - dt
 		end
-		if self.restoreAttr[i].enchantmentTimer > 0 then
-			self.restoreAttr[i].enchantmentTimer = self.restoreAttr[i].enchantmentTimer - dt
+		if self.restoreDynStat[i].enchantmentTimer > 0 then
+			self.restoreDynStat[i].enchantmentTimer = self.restoreDynStat[i].enchantmentTimer - dt
 		end
-		if self.restoreAttr[i].potionTimer > 0 then
-			self.restoreAttr[i].potionTimer = self.restoreAttr[i].potionTimer - dt
+		if self.restoreDynStat[i].potionTimer > 0 then
+			self.restoreDynStat[i].potionTimer = self.restoreDynStat[i].potionTimer - dt
 		end
-		if self.restoreAttr[i].scrollTimer > 0 then
-			self.restoreAttr[i].scrollTimer = self.restoreAttr[i].scrollTimer - dt
+		if self.restoreDynStat[i].scrollTimer > 0 then
+			self.restoreDynStat[i].scrollTimer = self.restoreDynStat[i].scrollTimer - dt
 		end
 	end
 	if self.timers["restorecooldown"] > 0 then
@@ -292,7 +290,7 @@ local function castSpell(self: Follower, spell: core.Spell, castSound: string): 
 	local duration: number = self.defaultCd.SPELL
 	-- This should be the correct way to do this. However, it appears this event does not work properly, possibly a feature that's not present in openmw 0.50?
 	-- selfObj:sendEvent('ModifyStat', {name = 'magicka', amount = -10}) -- Subtract the cost of the spell from the follower's current magicka
-	self.attributes[2](self.selfObj).current = self.attributes[2](self.selfObj).current - spell.cost -- Subtract the cost of the spell from the follower's current magicka
+	self.dynamicStats[2](self.selfObj).current = self.dynamicStats[2](self.selfObj).current - spell.cost -- Subtract the cost of the spell from the follower's current magicka
 	if false then
 		return 0
 	end
@@ -434,7 +432,7 @@ end
 
 local function selectRestoreSpell(self: Follower, effectId: string, attrDiff: number): {core.Spell, number} -- Selects the best restorative spell the NPC currently has (prioritizes magnitude over cost). Prefers the spell that restores closest to the missing amount of whichever attribute is being restored rather than just the spell with the greatest magnitude, currently ignores all side effects of casting the spell. Returns nil if no spell is found
 	local spells = types.Actor.spells(self.selfObj)
-	local currentMagicka = self.attributes[2](self.selfObj).current
+	local currentMagicka = self.dynamicStats[2](self.selfObj).current
 	local selectedSpell: core.Spell
 	local selectedMagnitude: number
 	local selectedHealQuality: number
@@ -483,8 +481,8 @@ local function selectRestorePotion(self: Follower, effectId: string, attrDiff: n
 		end
 	end
 	if selectedPotion ~= nil and selectedMagnitude ~= nil and selectedHealQuality ~= nil
-	and (((selectedMagnitude * self.wasteThreshold.POTION) < attrDiff) -- Only select potion if less than 25% of its effect will be wasted
-	or (attrDiff > (attrMax * self.ATTRIBUTE_PANIC_THRESHOLD))) -- However, if follower is missing more than 75% of their attribute, ignore the waste threshold
+	and (((selectedMagnitude * self.restoreConsts.POTION_WASTE) < attrDiff) -- Only select potion if less than 25% of its effect will be wasted
+	or (attrDiff > (attrMax * self.restoreConsts.PANIC_THRESHOLD))) -- However, if follower is missing more than 75% of their attribute, ignore the waste threshold
 	then
 		return {selectedPotion.id, selectedHealQuality}
 	else
@@ -517,8 +515,8 @@ local function selectRestoreScroll(self: Follower, effectId: string, attrDiff: n
 		end
 	end
 	if selectedScroll ~= nil and selectedMagnitude ~= nil and selectedHealQuality ~= nil
-	and (((selectedMagnitude * self.wasteThreshold.SCROLL) < attrDiff) -- Only select potion if less than 25% of its effect will be wasted
-	or (attrDiff > (attrMax * self.ATTRIBUTE_PANIC_THRESHOLD))) -- However, if follower is missing more than 75% of their attribute, ignore the waste threshold
+	and (((selectedMagnitude * self.restoreConsts.SCROLL_WASTE) < attrDiff) -- Only select potion if less than 25% of its effect will be wasted
+	or (attrDiff > (attrMax * self.restoreConsts.PANIC_THRESHOLD))) -- However, if follower is missing more than 75% of their attribute, ignore the waste threshold
 	then
 		return {selectedScroll.id, selectedHealQuality}
 	else
@@ -541,68 +539,68 @@ local function chooseRestoreMethod(self: Follower, iter: integer) -- Intelligent
 		weight: number -- How this particular restore method is weighted against others. The lower, the better. Calculated by finding the difference between the method's restore magnitude and the quantity of missing attribute
 	end
 	local methodAction: {RESTORE_METHOD: function} = {
-		["encharmor"] = function(method: RestoreMethod) self.restoreAttr[iter].enchantmentTimer = self:useEnchantment((method.data as cmn.EnchRecord), self.restoreAttr[iter].effectName, "restoration cast") end,
-		["enchclothing"] = function(method: RestoreMethod) self.restoreAttr[iter].enchantmentTimer = self:useEnchantment((method.data as cmn.EnchRecord), self.restoreAttr[iter].effectName, "restoration cast") end,
-		["enchweapon"] = function(method: RestoreMethod) self.restoreAttr[iter].enchantmentTimer = self:useEnchantment((method.data as cmn.EnchRecord), self.restoreAttr[iter].effectName, "restoration cast") end,
-		["spell"] = function(method: RestoreMethod) self.restoreAttr[iter].spellTimer = self:castSpell((method.data as core.Spell), "restoration cast") end,
-		["potion"] = function(method: RestoreMethod) self.restoreAttr[iter].potionTimer = self:consumePotion((method.data as string), self.restoreAttr[iter].effectName) end,
-		["scroll"] = function(method: RestoreMethod) self.restoreAttr[iter].scrollTimer = self:useScroll((method.data as string), self.restoreAttr[iter].effectName, "restoration cast") end,
+		["encharmor"] = function(method: RestoreMethod) self.restoreDynStat[iter].enchantmentTimer = self:useEnchantment((method.data as cmn.EnchRecord), self.restoreDynStat[iter].effectName, "restoration cast") end,
+		["enchclothing"] = function(method: RestoreMethod) self.restoreDynStat[iter].enchantmentTimer = self:useEnchantment((method.data as cmn.EnchRecord), self.restoreDynStat[iter].effectName, "restoration cast") end,
+		["enchweapon"] = function(method: RestoreMethod) self.restoreDynStat[iter].enchantmentTimer = self:useEnchantment((method.data as cmn.EnchRecord), self.restoreDynStat[iter].effectName, "restoration cast") end,
+		["spell"] = function(method: RestoreMethod) self.restoreDynStat[iter].spellTimer = self:castSpell((method.data as core.Spell), "restoration cast") end,
+		["potion"] = function(method: RestoreMethod) self.restoreDynStat[iter].potionTimer = self:consumePotion((method.data as string), self.restoreDynStat[iter].effectName) end,
+		["scroll"] = function(method: RestoreMethod) self.restoreDynStat[iter].scrollTimer = self:useScroll((method.data as string), self.restoreDynStat[iter].effectName, "restoration cast") end,
 	}
-	local attrDiff = cmn.getAttrDiff(self.attributes[iter](self.selfObj))
+	local attrDiff = cmn.getDynStatDiff(self.dynamicStats[iter](self.selfObj))
 	local restoreMethods: {RestoreMethod} = {}
-	if self.restoreAttr[iter].enchantmentTimer <= 0 then
-		local armor = self:selectRestoreEnch(self.restoreAttr[iter].effectId, attrDiff, types.Armor as cmn.EnchType)
+	if self.restoreDynStat[iter].enchantmentTimer <= 0 then
+		local armor = self:selectRestoreEnch(self.restoreDynStat[iter].effectId, attrDiff, types.Armor as cmn.EnchType)
 		if armor ~= nil then
 			table.insert(restoreMethods, {
 				name = "encharmor",
 				data = armor[1],
-				weight = armor[2] + (cmn.getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.ENCHANTMENT),
+				weight = armor[2] + (cmn.getMaxDynStat(self.dynamicStats[iter](self.selfObj)) * self.restoreConsts.ENCHANTMENT_WEIGHT),
 			})
 		end
-		local clothing = self:selectRestoreEnch(self.restoreAttr[iter].effectId, attrDiff, types.Clothing as cmn.EnchType)
+		local clothing = self:selectRestoreEnch(self.restoreDynStat[iter].effectId, attrDiff, types.Clothing as cmn.EnchType)
 		if clothing ~= nil then
 			table.insert(restoreMethods, {
 				name = "enchclothing",
 				data = clothing[1],
-				weight = clothing[2] + (cmn.getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.ENCHANTMENT),
+				weight = clothing[2] + (cmn.getMaxDynStat(self.dynamicStats[iter](self.selfObj)) * self.restoreConsts.ENCHANTMENT_WEIGHT),
 			})
 		end
-		local weapon = self:selectRestoreEnch(self.restoreAttr[iter].effectId, attrDiff, types.Weapon as cmn.EnchType)
+		local weapon = self:selectRestoreEnch(self.restoreDynStat[iter].effectId, attrDiff, types.Weapon as cmn.EnchType)
 		if weapon ~= nil then
 			table.insert(restoreMethods, {
 				name = "enchweapon",
 				data = weapon[1],
-				weight = weapon[2] + (cmn.getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.ENCHANTMENT),
+				weight = weapon[2] + (cmn.getMaxDynStat(self.dynamicStats[iter](self.selfObj)) * self.restoreConsts.ENCHANTMENT_WEIGHT),
 			})
 		end
 	end
-	if self.restoreAttr[iter].spellTimer <= 0 and self.attributes[2](self.selfObj).current > 0 then
-		local spell = self:selectRestoreSpell(self.restoreAttr[iter].effectId, attrDiff)
+	if self.restoreDynStat[iter].spellTimer <= 0 and self.dynamicStats[2](self.selfObj).current > 0 then
+		local spell = self:selectRestoreSpell(self.restoreDynStat[iter].effectId, attrDiff)
 		if spell ~= nil then
 			table.insert(restoreMethods, {
 				name = "spell",
 				data = spell[1],
-				weight = spell[2] + (cmn.getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.SPELL),
+				weight = spell[2] + (cmn.getMaxDynStat(self.dynamicStats[iter](self.selfObj)) * self.restoreConsts.SPELL_WEIGHT),
 			})
 		end
 	end
-	if self.restoreAttr[iter].potionTimer <= 0 then
-		local potion = self:selectRestorePotion(self.restoreAttr[iter].effectId, attrDiff, cmn.getMaxAttr(self.attributes[iter](self.selfObj)))
+	if self.restoreDynStat[iter].potionTimer <= 0 then
+		local potion = self:selectRestorePotion(self.restoreDynStat[iter].effectId, attrDiff, cmn.getMaxDynStat(self.dynamicStats[iter](self.selfObj)))
 		if potion ~= nil then
 			table.insert(restoreMethods, {
 				name = "potion",
 				data = potion[1],
-				weight = potion[2] + (cmn.getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.POTION),
+				weight = potion[2] + (cmn.getMaxDynStat(self.dynamicStats[iter](self.selfObj)) * self.restoreConsts.POTION_WEIGHT),
 			})
 		end
 	end
-	if self.restoreAttr[iter].scrollTimer <= 0 then
-		local scroll = self:selectRestoreScroll(self.restoreAttr[iter].effectId, attrDiff, cmn.getMaxAttr(self.attributes[iter](self.selfObj)))
+	if self.restoreDynStat[iter].scrollTimer <= 0 then
+		local scroll = self:selectRestoreScroll(self.restoreDynStat[iter].effectId, attrDiff, cmn.getMaxDynStat(self.dynamicStats[iter](self.selfObj)))
 		if scroll ~= nil then
 			table.insert(restoreMethods, {
 				name = "scroll",
 				data = scroll[1],
-				weight = scroll[2] + (cmn.getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.SCROLL),
+				weight = scroll[2] + (cmn.getMaxDynStat(self.dynamicStats[iter](self.selfObj)) * self.restoreConsts.SCROLL_WEIGHT),
 			})
 		end
 	end
@@ -618,8 +616,8 @@ local function chooseRestoreMethod(self: Follower, iter: integer) -- Intelligent
 end
 
 local function checkAttributes(self: Follower) -- Used to call various functions that affect follower's dynamic attributes like health, fatigue, and magicka
-	for i = 1, #self.attributes do
-		if cmn.checkAttrDamaged(self.attributes[i](self.selfObj)) == true and self.timers["restorecooldown"] <= 0 then
+	for i = 1, #self.dynamicStats do
+		if cmn.getDynStatMissingPerc(self.dynamicStats[i](self.selfObj)) >= self.restoreConsts.TRIGGER_PERC and self.timers["restorecooldown"] <= 0 then
 			self:chooseRestoreMethod(i)
 		end
 	end
@@ -740,7 +738,7 @@ local function defaultFollower(): Follower
 	return {
 		-- Aliases
 	    selfObj = nil,
-	    attributes = {types.Actor.stats.dynamic.health, types.Actor.stats.dynamic.magicka, types.Actor.stats.dynamic.fatigue},
+	    dynamicStats = {types.Actor.stats.dynamic.health, types.Actor.stats.dynamic.magicka, types.Actor.stats.dynamic.fatigue},
 	    ai = nil,
 		
 	    -- Constants
@@ -759,15 +757,15 @@ local function defaultFollower(): Follower
 			WARP = 6, -- Default value for the warp timer
 			SHEATHE = 4.4, -- Default value for the sheathe timer
 		},
-		restoreWeights = { -- Multipliers to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection. The smaller, the better
-			ENCHANTMENT = 0.75,
-			SPELL = 1,
-			POTION = 1.25,
-			SCROLL = 1.5,
-		},
-	    wasteThreshold = { -- The percentage threshold that determines whether a restorative effect is considered wasted or not
-			POTION = 0.25, -- At 0.25, if follower is only missing 25 health or less, a restorative effect with magnitude greater than 100 would be considered wasted
-			SCROLL = 0.50, -- At 0.50, if follower is only missing 50 health or less, a restorative effect with magnitude greater than 100 would be considered wasted
+		restoreConsts = {
+			TRIGGER_PERC = 0.15, -- What percentage of the dynamic stat that must be missing before a restore method is triggered
+			PANIC_THRESHOLD = 0.75, -- The percentage missing from an attribute before follower should ignore the waste threshold and consume a restorative consumable anyway. At 0.75, if follower is missing more than 75% health, follower will use a restore health consumable whether its effect would be considered wasted or not
+			ENCHANTMENT_WEIGHT = 0.75, -- Multiplier to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection. The smaller, the better
+			SPELL_WEIGHT = 1, -- Multiplier to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection. The smaller, the better
+			POTION_WEIGHT = 1.25, -- Multiplier to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection. The smaller, the better
+			POTION_WASTE = 0.25, -- At 0.25, if follower is only missing 25 health or less, a restorative effect with magnitude greater than 100 would be considered wasted
+			SCROLL_WEIGHT = 1.5, -- Multiplier to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection. The smaller, the better
+			SCROLL_WASTE = 0.50, -- At 0.50, if follower is only missing 50 health or less, a restorative effect with magnitude greater than 100 would be considered wasted
 		},
 		distanceThreshold = {
 			MOD_SPEED = 300, -- The distance threshold that determines whether follower moves at normal speed or speeds up to catch up with the player
@@ -779,7 +777,6 @@ local function defaultFollower(): Follower
 			TRUE = 1,
 			FALSE = 0,
 		},
-		ATTRIBUTE_PANIC_THRESHOLD = 0.75, -- The percentage missing from an attribute before follower should ignore the waste threshold and consume a restorative consumable anyway. At 0.75, if follower is missing more than 75% health, follower will use a restore health consumable whether its effect would be considered wasted or not
 		NUDGE_DELAY = 4, -- The number of seconds follower should wander after being nudged before following the player again
 		DELAY1 = 0.5 * time.second, -- The number of seconds to wait before executing our delayed, non-priority functions
 		DELAY2 = 5 * time.second, -- The number of seconds to wait before executing our delayed, non-priority functions
@@ -794,7 +791,7 @@ local function defaultFollower(): Follower
 			["incapacitated"] = false,
 			["playerSneak"] = false,
 		},
-	    restoreAttr = {
+	    restoreDynStat = {
 			[1] = {
 				potionTimer = 0,
 				spellTimer = 0,
