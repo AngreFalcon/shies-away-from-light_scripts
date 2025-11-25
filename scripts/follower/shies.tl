@@ -9,10 +9,8 @@ local anim = require('openmw.animation')
 local cmn = require('scripts.follower.common')
 local follower = require('scripts.follower.follower')
 
-
 local Shies = {}
 setmetatable(Shies, { __index = Shies.parent })
-
 
 -- Shies Constants
 local SHIES <const> = {
