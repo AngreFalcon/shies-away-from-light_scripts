@@ -120,9 +120,6 @@ local function onUpdate(dt: number) -- Called every frame while the script is lo
 	if core.isWorldPaused() == true then
 		return
 	end
-	Shies:getPlayerLeader()
-    Shies:checkAttributes()
-	Shies:updateTimers(dt)
 	
 	shiesCheckAttributes()
 	if Shies.checks["incapacitated"] == true then
@@ -131,90 +128,18 @@ local function onUpdate(dt: number) -- Called every frame while the script is lo
 		shiesIncapacitated((types.Player.quests(Shies.player) as {string: cmn.PlayerQuest})["SAFL_ShiesFled"].stage >= SHIES.SHIES_FLED_FOUND_STAGE)
 	end
 
-	if Shies.checks["fly"] == false and types.Actor.isOnGround(Shies.selfObj) == false then
-		Shies:freeFall()
-	end
-	if Shies:isFollowing() then
-		Shies:setSneak()
-		Shies:toggleEffect("fly", (core.magic.EFFECT_TYPE.Levitate as string))
-		Shies:toggleEffect("ww", (core.magic.EFFECT_TYPE.WaterWalking as string))
-		Shies:forceZLevel()
-		Shies:warpToPlayer()
-	elseif Shies.player ~= nil then -- This condition should be reserved for only function calls that take place when the follower is temporarily not following the player e.g., the follower has not been dismissed. Behaviors that occur when the follower has been dismissed should be placed outside of this condition block
-		Shies:maintainDistance()
-		Shies:nudge(dt)
-	end
+	Shies:onUpdate(dt)
 end
 
 local function onInit() -- Called when the script is created but not loaded
 	RecallLoc = SHIES.INIT_DATA.recallLoc
-	for i,v in pairs({
-		selfObj = self,
-		doOnce = false,
-		doOnce2 = false,
-		checks = {
-			["cMove"] = false,
-			["fly"] = false,
-			["ww"] = false,
-			["combat"] = false,
-			["incapacitated"] = false,
-			["playerSneak"] = false,
-		},
-		timers = {
-			["move"] = 0,
-			["sheathe"] = 0,
-			["warp"] = 0,
-			["freefall"] = 0,
-			["restorecooldown"] = 0,
-		},
-		restoreAttr = {
-			[1] = {
-				potionTimer = 0,
-				spellTimer = 0,
-				scrollTimer = 0,
-				enchantmentTimer = 0,
-				effectName = "Restore Health",
-				effectId = "restorehealth",
-			},
-			[2] = {
-				potionTimer = 0,
-				spellTimer = 0,
-				scrollTimer = 0,
-				enchantmentTimer = 0,
-				effectName = "Restore Magicka",
-				effectId = "restoremagicka",
-			},
-			[3] = {
-				potionTimer = 0,
-				spellTimer = 0,
-				scrollTimer = 0,
-				enchantmentTimer = 0,
-				effectName = "Restore Fatigue",
-				effectId = "restorefatigue",
-			}
-		},
-	} as {string: any}) do
-		(Shies as {string: any})[i] = v
-	end
 end
 
 local function onSave(): cmn.SaveData -- Called when the game saves, even if currently in an inactive state
-	for k, v in pairs(Shies.MWVars) do
-		Shies:updateMWVar(k, v)
-	end
-	return {
+	return Shies:onSave({
 		version = SCRIPT_VERSION,
 		recallLoc = RecallLoc,
-		player = Shies.player,
-		doOnce = Shies.doOnce,
-		doOnce2 = Shies.doOnce2,
-		checks = Shies.checks,
-		timers = Shies.timers,
-		restoreAttr = Shies.restoreAttr,
-		posA = Shies.posA,
-		posB = Shies.posB,
-		posC = Shies.posC,
-	}
+	})
 end
 
 local function onLoad(data: cmn.SaveData) -- Called only when the script loads, not the saved game. Will not be called if the script was not previously saved
@@ -226,15 +151,7 @@ local function onLoad(data: cmn.SaveData) -- Called only when the script loads, 
 		error('Required update to a new version of the script')
 	elseif (data.version == SCRIPT_VERSION) then
 		RecallLoc = data.recallLoc
-		Shies.player = data.player
-		Shies.doOnce = data.doOnce
-		Shies.doOnce2 = data.doOnce2
-		Shies.checks = data.checks
-		Shies.timers = data.timers
-		Shies.restoreAttr = data.restoreAttr
-		Shies.posA = data.posA
-		Shies.posB = data.posB
-		Shies.posC = data.posC
+		Shies:onLoad(data)
 	end
 end
 --
@@ -264,7 +181,7 @@ return {
         end,
 		["shiesJump"] = function()
 			print(types.NPC.stats.skills.acrobatics(Shies.selfObj).progress)
-			Shies.controls.jump = true
+			Shies.controls.sneak = true
 			print(types.NPC.stats.skills.acrobatics(Shies.selfObj).progress)
 		end,
 		["shiesActivated"] = function()

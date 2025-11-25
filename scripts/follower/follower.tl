@@ -64,6 +64,7 @@ local interface Follower is Follower.OMW_SELF
 
     selfObj: core.GameObject
     ai: OMW_AI
+	controls: OMW_SELF_CONTROLS
 	attributes: Attributes
 	statMod: STAT_MOD
 	defaultCd: DEFAULT_CD
@@ -86,6 +87,9 @@ local interface Follower is Follower.OMW_SELF
     doOnce2: boolean
 	MWVars: {string: number}
 	
+	onUpdate: function(self: Follower, dt: number)
+	onSave: function(self: Follower, payload: {string: any}): cmn.SaveData
+	onLoad: function(self: Follower, data: cmn.SaveData)
 	updateMWVar: function(self: Follower, varName: string, varData: number)
 	isFollowing: function(self: Follower): boolean
 	getPlayerLeader: function(self: Follower)
@@ -114,6 +118,56 @@ local interface Follower is Follower.OMW_SELF
 	warpToPlayer: function(self: Follower)
 	setDefaultSpeed: function(self: Follower)
 	modSpeedAndAthletics: function(self: Follower)
+end
+
+-- Handler functions - Functions that will be called directly by OpenMW
+local function onUpdate(self: Follower, dt: number)
+	self:getPlayerLeader()
+    self:checkAttributes()
+	self:updateTimers(dt)
+	if self.checks["fly"] == false and types.Actor.isOnGround(self.selfObj) == false then
+		self:freeFall()
+	end
+	if self:isFollowing() then
+		self:setSneak()
+		self:toggleEffect("fly", (core.magic.EFFECT_TYPE.Levitate as string))
+		self:toggleEffect("ww", (core.magic.EFFECT_TYPE.WaterWalking as string))
+		self:forceZLevel()
+		self:warpToPlayer()
+	elseif self.player ~= nil then -- This condition should be reserved for only function calls that take place when the follower is temporarily not following the player e.g., the follower has not been dismissed. Behaviors that occur when the follower has been dismissed should be placed outside of this condition block
+		self:maintainDistance()
+		self:nudge(dt)
+	end
+end
+local function onSave(self: Follower, payload: {string: any}): cmn.SaveData
+	for k, v in pairs(self.MWVars) do
+		self:updateMWVar(k, v)
+	end
+	return cmn.merge(
+		{
+			player = self.player,
+			doOnce = self.doOnce,
+			doOnce2 = self.doOnce2,
+			checks = self.checks,
+			timers = self.timers,
+			restoreAttr = self.restoreAttr,
+			posA = self.posA,
+			posB = self.posB,
+			posC = self.posC,
+		},
+		payload
+	)
+end
+local function onLoad(self: Follower, data: cmn.SaveData)
+		self.player = data.player
+		self.doOnce = data.doOnce
+		self.doOnce2 = data.doOnce2
+		self.checks = data.checks
+		self.timers = data.timers
+		self.restoreAttr = data.restoreAttr
+		self.posA = data.posA
+		self.posB = data.posB
+		self.posC = data.posC
 end
 
 -- Utility functions -- Functions that may return game values or that other functions may depend on for calculations or checks
@@ -685,9 +739,9 @@ end
 local function defaultFollower(): Follower
 	return {
 		-- Aliases
-	    selfObj: core.GameObject = nil,
+	    selfObj = nil,
 	    attributes = {types.Actor.stats.dynamic.health, types.Actor.stats.dynamic.magicka, types.Actor.stats.dynamic.fatigue},
-	    ai: Follower.OMW_AI = nil,
+	    ai = nil,
 		
 	    -- Constants
 	    --SKILL_LEVEL_MULT <const> = 1.5 -- The multiplier to apply to all skill increases
@@ -731,22 +785,60 @@ local function defaultFollower(): Follower
 		DELAY2 = 5 * time.second, -- The number of seconds to wait before executing our delayed, non-priority functions
 	
 		-- Variables
-	    player: core.GameObject = nil,
-	    checks: {cmn.Flag: boolean} = {},
-	    restoreAttr: {cmn.RestoreAttr} = {},
-	    timers: {cmn.Timer: number} = {},
+	    player = nil,
+	    checks = {
+			["cMove"] = false,
+			["fly"] = false,
+			["ww"] = false,
+			["combat"] = false,
+			["incapacitated"] = false,
+			["playerSneak"] = false,
+		},
+	    restoreAttr = {
+			[1] = {
+				potionTimer = 0,
+				spellTimer = 0,
+				scrollTimer = 0,
+				enchantmentTimer = 0,
+				effectName = "Restore Health",
+				effectId = "restorehealth",
+			},
+			[2] = {
+				potionTimer = 0,
+				spellTimer = 0,
+				scrollTimer = 0,
+				enchantmentTimer = 0,
+				effectName = "Restore Magicka",
+				effectId = "restoremagicka",
+			},
+			[3] = {
+				potionTimer = 0,
+				spellTimer = 0,
+				scrollTimer = 0,
+				enchantmentTimer = 0,
+				effectName = "Restore Fatigue",
+				effectId = "restorefatigue",
+			}
+		},
+	    timers = {
+			["move"] = 0,
+			["sheathe"] = 0,
+			["warp"] = 0,
+			["freefall"] = 0,
+			["restorecooldown"] = 0,
+		},
 	
 		-- Warp function variables - Must persist between function calls
-	    posA: cmn.CellLoc = nil,
-	    posB: cmn.CellLoc = nil,
-	    posC: cmn.CellLoc = nil,
-	    doOnce: boolean = nil,
-	    doOnce2: boolean = nil,
+	    posA = nil,
+	    posB = nil,
+	    posC = nil,
+	    doOnce = false,
+	    doOnce2 = false,
 	
 		-- MWScript variables
 		-- Important to note: all MWScript variables are automatically cast to all lowercase
 		-- If making a follower that uses this script, the follower must have the following variables declared in MWScript within their .esp plugin file
-		MWVars: {string: number} = {},
+		MWVars = {},
 		--[[ MWVars:
 			short companion -- Engine variable -- True if follower is currently following the player. If 0, companion dialogue topics don't appear
 			short nohello -- Engine variable -- 
@@ -757,6 +849,10 @@ local function defaultFollower(): Follower
 			short addonce -- True after the mwscript has executed once, is used to initialize companion to 0
 		]]
 		
+		-- Handler functions - Functions that will be called directly by OpenMW
+		onUpdate = onUpdate,
+		onSave = onSave,
+		onLoad = onLoad,
 		-- Utility functions -- Functions that may return game values or that other functions may depend on for calculations or checks
 		updateMWVar = updateMWVar, -- Send an event to the global script to update a single mwscript variable with the provided value
 		isFollowing = isFollowing, -- Simply return true or false if companion is currently following any player
@@ -797,7 +893,7 @@ local interface DerivedFollower is Follower
 end
 
 local function constructor(_: Follower, child: DerivedFollower): DerivedFollower
-	child.base = defaultFollower();
+	child.base = defaultFollower()
 	return setmetatable(child,
 		{ __index = setmetatable(child.base,
 			{ __index = {
