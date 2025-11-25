@@ -76,7 +76,7 @@ end
 
 local function getDynStatMissingPerc(attr: types.DynamicStat): number -- Returns the percentage missing from the provided dynamic stat
 	local maxStat = getMaxDynStat(attr)
-	return (attr.current / maxStat)
+	return (maxStat - attr.current / maxStat)
 end
 
 -- Utility functions

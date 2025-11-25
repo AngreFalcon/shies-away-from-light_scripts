@@ -181,7 +181,7 @@ return {
         end,
 		["shiesJump"] = function()
 			print(types.NPC.stats.skills.acrobatics(Shies.selfObj).progress)
-			Shies.controls.sneak = true
+			Shies.controls.jump = true
 			print(types.NPC.stats.skills.acrobatics(Shies.selfObj).progress)
 		end,
 		["shiesActivated"] = function()

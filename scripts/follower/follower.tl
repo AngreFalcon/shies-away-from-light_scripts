@@ -137,6 +137,7 @@ local function onUpdate(self: Follower, dt: number)
 		self:nudge(dt)
 	end
 end
+
 local function onSave(self: Follower, payload: {string: any}): cmn.SaveData
 	for k, v in pairs(self.MWVars) do
 		self:updateMWVar(k, v)
@@ -156,6 +157,7 @@ local function onSave(self: Follower, payload: {string: any}): cmn.SaveData
 		payload
 	)
 end
+
 local function onLoad(self: Follower, data: cmn.SaveData)
 		self.player = data.player
 		self.doOnce = data.doOnce
@@ -285,6 +287,13 @@ local function toggleEffect(self: Follower, flag: cmn.Flag, effectType: string) 
 		self.checks[flag] = false
 	end
 end
+
+local function freeFall(self: Follower) -- Used to call various functions that should trigger while follower is in freefall
+	if self.timers["freefall"] > 1 and self:checkForPotion("p_slowfall_s") then
+		self.timers["freefall"] = -(self:consumePotion("p_slowfall_s", "SlowFall"))
+	end
+end
+	-- Restore dynamic stat logic
 
 local function castSpell(self: Follower, spell: core.Spell, castSound: string): number -- Applies the effect of the specified spell to the follower, including vfx and sound, and then consumes follower's magicka equal to the cost of the spell. 
 	local duration: number = self.defaultCd.SPELL
@@ -617,15 +626,9 @@ end
 
 local function checkAttributes(self: Follower) -- Used to call various functions that affect follower's dynamic attributes like health, fatigue, and magicka
 	for i = 1, #self.dynamicStats do
-		if cmn.getDynStatMissingPerc(self.dynamicStats[i](self.selfObj)) >= self.restoreConsts.TRIGGER_PERC and self.timers["restorecooldown"] <= 0 then
+		if cmn.getDynStatMissingPerc(self.dynamicStats[i](self.selfObj)) <= self.restoreConsts.TRIGGER_PERC and self.timers["restorecooldown"] <= 0 then
 			self:chooseRestoreMethod(i)
 		end
-	end
-end
-
-local function freeFall(self: Follower) -- Used to call various functions that should trigger while follower is in freefall
-	if self.timers["freefall"] > 1 and self:checkForPotion("p_slowfall_s") then
-		self.timers["freefall"] = -(self:consumePotion("p_slowfall_s", "SlowFall"))
 	end
 end
 --
@@ -734,6 +737,7 @@ local function modSpeedAndAthletics(self: Follower) -- Set follower's speed and 
 end
 --
 
+-- 
 local function defaultFollower(): Follower
 	return {
 		-- Aliases
@@ -758,7 +762,7 @@ local function defaultFollower(): Follower
 			SHEATHE = 4.4, -- Default value for the sheathe timer
 		},
 		restoreConsts = {
-			TRIGGER_PERC = 0.15, -- What percentage of the dynamic stat that must be missing before a restore method is triggered
+			TRIGGER_PERC = 0.15, -- What percentage of the dynamic stat must be missing before a restore method is triggered
 			PANIC_THRESHOLD = 0.75, -- The percentage missing from an attribute before follower should ignore the waste threshold and consume a restorative consumable anyway. At 0.75, if follower is missing more than 75% health, follower will use a restore health consumable whether its effect would be considered wasted or not
 			ENCHANTMENT_WEIGHT = 0.75, -- Multiplier to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection. The smaller, the better
 			SPELL_WEIGHT = 1, -- Multiplier to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection. The smaller, the better
