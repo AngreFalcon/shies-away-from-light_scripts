@@ -27,7 +27,7 @@ local interface OMW_AI
 	startPackage: function(OMW_AI_PACKAGE)
 end
 
-local interface Follower
+global interface Follower
     type Attributes = { function(core.GameObject): types.DynamicStat }
     interface STAT_MOD
         CATCHUP_MULT: number
