@@ -5,7 +5,6 @@ local util = require('openmw.util')
 local cmn = require('scripts.follower.common')
 
 -- Credit to Grumpy and Kateri for their companion mwscripts, which were used as the foundation from which this script was built
-local SCRIPT_VERSION <const> = 1 -- Increment whenever onSave is changed
 
 local interface OMW_SELF_CONTROLS
 	sneak: boolean

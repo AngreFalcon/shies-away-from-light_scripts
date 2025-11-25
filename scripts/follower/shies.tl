@@ -9,10 +9,10 @@ local anim = require('openmw.animation')
 local cmn = require('scripts.follower.common')
 local follower = require('scripts.follower.follower')
 
-local Shies = {}
-setmetatable(Shies, { __index = Shies.parent })
+local Shies: Follower
 
 -- Shies Constants
+local SCRIPT_VERSION <const> = 1 -- Increment whenever onSave is changed
 local SHIES <const> = {
 	FLEE_THRESHOLD = 0.1, -- The health percentage at which shies should flee from combat via recall
 	SHIES_FLED_FOUND_STAGE = 40, -- The stage at which the player has found and spoken with shies after shies fled from combat for the first time
@@ -29,8 +29,8 @@ local RecallLoc: cmn.CellLoc
 
 -- Shies-specific utility functions
 local function triggerShiesFledQuest() -- Used to trigger the shies fled quest. Should only be triggered once
-	if player ~= nil then
-		player:sendEvent("shiesFled", nil)
+	if Shies.player ~= nil then
+		Shies.player:sendEvent("shiesFled", nil)
 	end
 end
 --
@@ -38,23 +38,23 @@ end
 -- Shies-specific gameplay functions
 local function shiesIncapacitated(getBackUp: boolean) -- This function applies and ends the knockout animation for shies. The boolean parameter must be true for the animation to end
 	local animName = "knockout"
-	if anim.isPlaying(selfObj, animName) == false then
-		anim.clearAnimationQueue(selfObj, false) -- Empties anim queue to immediately play the knockout animation
-		anim.playQueued(selfObj, animName, {})
+	if anim.isPlaying(Shies.selfObj, animName) == false then
+		anim.clearAnimationQueue(Shies.selfObj, false) -- Empties anim queue to immediately play the knockout animation
+		anim.playQueued(Shies.selfObj, animName, {})
 	elseif getBackUp == true then
 		I.AnimationController.addTextKeyHandler(animName, function(animGroup: string, key: string)
-			anim.playQueued(selfObj, animGroup, {startkey = 'stop', stopkey = 'stop', loops = 0})
+			anim.playQueued(Shies.selfObj, animGroup, {startkey = 'stop', stopkey = 'stop', loops = 0})
 			if key.sub(key, #key - #'stop') == 'stop' then
-				anim.clearAnimationQueue(selfObj, true) -- Only clear the anim queue once the knockout anim has finished its current loop
+				anim.clearAnimationQueue(Shies.selfObj, true) -- Only clear the anim queue once the knockout anim has finished its current loop
 			end
 		end)
-		checks["incapacitated"] = false
+		Shies.checks["incapacitated"] = false
 	end
 end
 
 local function flee() -- Triggers if shies' health drops below a certain threshold. Plays the magic cast VFX and then teleports shies to a preset location while canceling shies' follow AI package
     local vfx = core.magic.effects.records["recall"] -- Trigger the Recall vfx
-    selfObj:sendEvent('AddVfx', {
+    Shies.selfObj:sendEvent('AddVfx', {
         model = types.Static.record(vfx.hitStatic).model,
         options = {
             vfxId = "vfxShiesFlee",
@@ -64,11 +64,11 @@ local function flee() -- Triggers if shies' health drops below a certain thresho
     })
 
     local cb = time.registerTimerCallback( -- Teleport away after RECALL_TIMEOUT seconds
-        selfObj.id .. "_FleeCallback",
+        Shies.selfObj.id .. "_FleeCallback",
         function(actor: core.GameObject)
 			ai.removePackages("Combat")
 			ai.removePackages("Follow")
-			if RecallLoc == SHIES.INIT_DATA.recallLoc and (types.Player.quests(player) as {string: cmn.PlayerQuest})["SAFL_ShiesFled"].started == false then
+			if RecallLoc == SHIES.INIT_DATA.recallLoc and (types.Player.quests(Shies.player) as {string: cmn.PlayerQuest})["SAFL_ShiesFled"].started == false then
 				triggerShiesFledQuest() -- The player has not changed Shies' marked location. This likely means the Shies Fled quest has not been started yet; we can further check by checking the player's journal entries
 			end
             return core.sendGlobalEvent("teleport", {
@@ -79,18 +79,18 @@ local function flee() -- Triggers if shies' health drops below a certain thresho
         end,
         nil
     )
-	if RecallLoc == SHIES.INIT_DATA.recallLoc and (types.Player.quests(player) as {string: cmn.PlayerQuest})["SAFL_ShiesFled"].stage < SHIES.SHIES_FLED_FOUND_STAGE then -- The player has not recovered shies yet
-		checks["incapacitated"] = true
+	if RecallLoc == SHIES.INIT_DATA.recallLoc and (types.Player.quests(Shies.player) as {string: cmn.PlayerQuest})["SAFL_ShiesFled"].stage < SHIES.SHIES_FLED_FOUND_STAGE then -- The player has not recovered shies yet
+		Shies.checks["incapacitated"] = true
 	end
     time.newSimulationTimer(SHIES.RECALL_TIMEOUT, cb, self, nil)
 end
 
 local function shiesCheckAttributes() -- Calls shies-specific functions relating to attributes
-	if attributes[1](selfObj).current > 0 and attributes[1](selfObj).current / getMaxAttr(attributes[1](selfObj)) < SHIES.FLEE_THRESHOLD then -- Check health ratio
-		updateMWVar("companion", BOOL.FALSE)
-		checks["cMove"] = false
+	if Shies.attributes[1](Shies.selfObj).current > 0 and Shies.attributes[1](Shies.selfObj).current / Shies:getMaxAttr(Shies.attributes[1](Shies.selfObj)) < SHIES.FLEE_THRESHOLD then -- Check health ratio
+		Shies:updateMWVar("companion", Shies.mwBool.FALSE)
+		Shies.checks["cMove"] = false
         flee() -- Teleport Shies away from combat to whatever position he has marked
-		fullHeal() -- Heal Shies to avoid the script triggering again, and also to ensure the player doesn't have to restore his health upon recovering him
+		Shies:fullHeal() -- Heal Shies to avoid the script triggering again, and also to ensure the player doesn't have to restore his health upon recovering him
 		return
 	end
 end
@@ -99,111 +99,120 @@ end
 -- Handler functions - Functions that will be called directly by OpenMW
 time.runRepeatedly( -- This function runs once every x seconds, where x = DELAY1
 	function() 
-		if isFollowing() then
-			modSpeedAndAthletics()
-		elseif player ~= nil then
-			setDefaultSpeed()
+		if Shies:isFollowing() then
+			Shies:modSpeedAndAthletics()
+		elseif Shies.player ~= nil then
+			Shies:setDefaultSpeed()
 		end
-	end, DELAY1, {}
+	end, Shies.DELAY1, {}
 )
 
 time.runRepeatedly( -- This function runs once every x seconds, where x = DELAY2
 	function()
 
-	end, DELAY2, {}
+	end, Shies.DELAY2, {}
 )
 
 local function onUpdate(dt: number) -- Called every frame while the script is loaded
 	if core.isWorldPaused() == true then
 		return
 	end
-	getPlayerLeader()
-    checkAttributes()
-	updateTimers(dt)
+	Shies:getPlayerLeader()
+    Shies:checkAttributes()
+	Shies:updateTimers(dt)
 	
 	shiesCheckAttributes()
-	if checks["incapacitated"] == true then
+	if Shies.checks["incapacitated"] == true then
 		-- Right now there is only one instance of shies being incapacitated, and only one condition under which he gets back up
 		-- However, if this mechanic is extended in the future, passing a boolean parameter as the get up condition makes this trivial
-		shiesIncapacitated((types.Player.quests(player) as {string: cmn.PlayerQuest})["SAFL_ShiesFled"].stage >= SHIES.SHIES_FLED_FOUND_STAGE)
+		shiesIncapacitated((types.Player.quests(Shies.player) as {string: cmn.PlayerQuest})["SAFL_ShiesFled"].stage >= SHIES.SHIES_FLED_FOUND_STAGE)
 	end
 
-	if checks["fly"] == false and types.Actor.isOnGround(selfObj) == false then
-		freeFall()
+	if Shies.checks["fly"] == false and types.Actor.isOnGround(Shies.selfObj) == false then
+		Shies:freeFall()
 	end
-	if isFollowing() then
-		setSneak()
-		toggleEffect("fly", (core.magic.EFFECT_TYPE.Levitate as string))
-		toggleEffect("ww", (core.magic.EFFECT_TYPE.WaterWalking as string))
-		forceZLevel()
-		warpToPlayer()
-	elseif player ~= nil then -- This condition should be reserved for only function calls that take place when the follower is temporarily not following the player e.g., the follower has not been dismissed. Behaviors that occur when the follower has been dismissed should be placed outside of this condition block
-		maintainDistance()
-		nudge(dt)
+	if Shies:isFollowing() then
+		Shies:setSneak()
+		Shies:toggleEffect("fly", (core.magic.EFFECT_TYPE.Levitate as string))
+		Shies:toggleEffect("ww", (core.magic.EFFECT_TYPE.WaterWalking as string))
+		Shies:forceZLevel()
+		Shies:warpToPlayer()
+	elseif Shies.player ~= nil then -- This condition should be reserved for only function calls that take place when the follower is temporarily not following the player e.g., the follower has not been dismissed. Behaviors that occur when the follower has been dismissed should be placed outside of this condition block
+		Shies:maintainDistance()
+		Shies:nudge(dt)
 	end
 end
 
 local function onInit() -- Called when the script is created but not loaded
 	RecallLoc = SHIES.INIT_DATA.recallLoc
-	checks["cMove"] = false
-	checks["fly"] = false
-	checks["ww"] = false
-	checks["combat"] = false
-	checks["incapacitated"] = false
-	checks["playerSneak"] = false
-	doOnce = false
-	doOnce2 = false
-	timers["move"] = 0
-	timers["sheathe"] = 0
-	timers["warp"] = 0
-	timers["freefall"] = 0
-	timers["restorecooldown"] = 0
-	restoreAttr[1] = {
-		potionTimer = 0,
-		spellTimer = 0,
-		scrollTimer = 0,
-		enchantmentTimer = 0,
-		effectName = "Restore Health",
-		effectId = "restorehealth",
-	}
-	restoreAttr[2] = {
-		potionTimer = 0,
-		spellTimer = 0,
-		scrollTimer = 0,
-		enchantmentTimer = 0,
-		effectName = "Restore Magicka",
-		effectId = "restoremagicka",
-	}
-	restoreAttr[3] = {
-		potionTimer = 0,
-		spellTimer = 0,
-		scrollTimer = 0,
-		enchantmentTimer = 0,
-		effectName = "Restore Fatigue",
-		effectId = "restorefatigue",
-	}
+	Shies = follower({
+		selfObj = self,
+		doOnce = false,
+		doOnce2 = false,
+		checks = {
+			["cMove"] = false,
+			["fly"] = false,
+			["ww"] = false,
+			["combat"] = false,
+			["incapacitated"] = false,
+			["playerSneak"] = false,
+		},
+		timers = {
+			["move"] = 0,
+			["sheathe"] = 0,
+			["warp"] = 0,
+			["freefall"] = 0,
+			["restorecooldown"] = 0,
+		},
+		restoreAttr = {
+			[1] = {
+				potionTimer = 0,
+				spellTimer = 0,
+				scrollTimer = 0,
+				enchantmentTimer = 0,
+				effectName = "Restore Health",
+				effectId = "restorehealth",
+			},
+			[2] = {
+				potionTimer = 0,
+				spellTimer = 0,
+				scrollTimer = 0,
+				enchantmentTimer = 0,
+				effectName = "Restore Magicka",
+				effectId = "restoremagicka",
+			},
+			[3] = {
+				potionTimer = 0,
+				spellTimer = 0,
+				scrollTimer = 0,
+				enchantmentTimer = 0,
+				effectName = "Restore Fatigue",
+				effectId = "restorefatigue",
+			}
+		},
+	})
 end
 
 local function onSave(): cmn.SaveData -- Called when the game saves, even if currently in an inactive state
-	for k, v in pairs(MWVars) do
-		updateMWVar(k, v)
+	for k, v in pairs(Shies.MWVars) do
+		Shies:updateMWVar(k, v)
 	end
 	return {
 		version = SCRIPT_VERSION,
 		recallLoc = RecallLoc,
-		player = player,
-		checks = checks,
-		timers = timers,
-		restoreAttr = restoreAttr,
-		posA = posA,
-		posB = posB,
-		posC = posC,
-		doOnce = doOnce,
-		doOnce2 = doOnce2,
+		player = Shies.player,
+		doOnce = Shies.doOnce,
+		doOnce2 = Shies.doOnce2,
+		checks = Shies.checks,
+		timers = Shies.timers,
+		restoreAttr = Shies.restoreAttr,
+		posA = Shies.posA,
+		posB = Shies.posB,
+		posC = Shies.posC,
 	}
 end
 
-local function onLoad(data: cmn.SaveData) -- Called only when the script loads, not the saved game. will not be called if the script was not previously saved
+local function onLoad(data: cmn.SaveData) -- Called only when the script loads, not the saved game. Will not be called if the script was not previously saved
 	if (not data) or (not data.version) or (data.version < SCRIPT_VERSION) then
 		print('Was saved with an old version of the script, initializing to default')
 		RecallLoc = SHIES.INIT_DATA.recallLoc
@@ -212,15 +221,15 @@ local function onLoad(data: cmn.SaveData) -- Called only when the script loads, 
 		error('Required update to a new version of the script')
 	elseif (data.version == SCRIPT_VERSION) then
 		RecallLoc = data.recallLoc
-		player = data.player
-		checks = data.checks
-		timers = data.timers
-		restoreAttr = data.restoreAttr
-		posA = data.posA
-		posB = data.posB
-		posC = data.posC
-		doOnce = data.doOnce
-		doOnce2 = data.doOnce2
+		Shies.player = data.player
+		Shies.doOnce = data.doOnce
+		Shies.doOnce2 = data.doOnce2
+		Shies.checks = data.checks
+		Shies.timers = data.timers
+		Shies.restoreAttr = data.restoreAttr
+		Shies.posA = data.posA
+		Shies.posB = data.posB
+		Shies.posC = data.posC
 	end
 end
 --
@@ -234,10 +243,10 @@ return {
     },
     eventHandlers = {
 		["fetchMWVars"] = function(data: {string: number})
-			MWVars = data
+			Shies.MWVars = data
 			for k, v in pairs(data) do
-				if MWVars[k] ~= v then
-					MWVars[k] = v
+				if Shies.MWVars[k] ~= v then
+					Shies.MWVars[k] = v
 				end
 			end
 		end,
@@ -246,18 +255,18 @@ return {
             attackerObj:sendEvent("shiesAttacked", "Why did you do that :(\nincremdibly rude...")
         end,
         ["hurtShies"] = function() -- For testing the "Recall away at low health" feature - this event is sent from the player script
-            attributes[1](selfObj).current = 1
+            Shies.attributes[1](Shies.selfObj).current = 1
         end,
 		["shiesJump"] = function()
-			print(types.NPC.stats.skills.acrobatics(selfObj).progress)
-			(selfObj as self).controls.jump = true
-			print(types.NPC.stats.skills.acrobatics(selfObj).progress)
+			print(types.NPC.stats.skills.acrobatics(Shies.selfObj).progress)
+			(Shies.selfObj as self).controls.jump = true
+			print(types.NPC.stats.skills.acrobatics(Shies.selfObj).progress)
 		end,
 		["shiesActivated"] = function()
 		end,
 		["playerSneak"] = function(sneaking: boolean)
 			if sneaking ~= nil then
-				checks["playerSneak"] = sneaking
+				Shies.checks["playerSneak"] = sneaking
 			end
 		end,
     }
