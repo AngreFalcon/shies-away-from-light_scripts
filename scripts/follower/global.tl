@@ -52,7 +52,7 @@ return {
          	if actor.recordId == shies then
 				shiesObj = actor
 				syncMWVars(shiesObj)
-            	actor:addScript('scripts/safl_shies/shies.lua', nil)
+            	actor:addScript('scripts/follower/shies.lua', nil)
          	end
       	end,
 	  	onActivate = function(object: core.GameObject)
