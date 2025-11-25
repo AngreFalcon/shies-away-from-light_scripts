@@ -16,28 +16,28 @@ local selfObj = self as core.GameObject
 
 -- Constants
 local SCRIPT_VERSION <const> = 1 -- Increment whenever onSave is changed
-local SKILL_LEVEL_MULT <const> = 1.5 -- The multiplier to apply to all skill increases
+--local SKILL_LEVEL_MULT <const> = 1.5 -- The multiplier to apply to all skill increases
 local STAT_MOD = {
-	CATCHUP_MULT = 2.25, -- The value to multiply the player's speed and athletics value by before applying it as a modifier to follower if they falls behind
-	FOLLOW = 15, -- The modifier to be applied to follower's speed and athletics when normally following the player
-	WANDER = 40, -- The modifier to be applies to follower's speed when wandering instead of followings
+	CATCHUP_MULT = 2.25, -- Multiplier that is applied to the player's athletics and speed, the product of which is then added to the follower's athletics and speed as a modifier
+	FOLLOW = 15, -- Flat modifier to be applied to follower's speed and athletics when normally following the player
+	WANDER = 40, -- Flat modifier to be applies to follower's speed when wandering instead of followings
 }
 local DEFAULT_CD <const> = { -- Default cooldowns in seconds
 	RESTORE = 10, -- The general cooldown to wait before using any other restore effects, regardless of individual method cooldown
-	ENCHANTMENT = 60, -- The default cooldown for a restorative enchantment if the actual duration couldn't be found
+	ENCHANTMENT = 10, -- The default cooldown for a restorative enchantment if the actual duration couldn't be found
 	SPELL = 10, -- The default cooldown for a restorative spell if the actual duration couldn't be found
 	POTION = 60, -- The default cooldown for a restorative potion if the actual duration couldn't be found
 	SCROLL = 60, -- The default cooldown for a restorative scroll if the actual duration couldn't be found
 	WARP = 6, -- Default value for the warp timer
 	SHEATHE = 4.4, -- Default value for the sheathe timer
 }
-local RESTORE_WEIGHTS <const> = { -- Multipliers to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection
+local RESTORE_WEIGHTS <const> = { -- Multipliers to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection. The smaller, the better
 	ENCHANTMENT = 0.75,
 	SPELL = 1,
 	POTION = 1.25,
 	SCROLL = 1.5,
 }
-local ATTRIBUTE_PANIC_THRESHOLD <const> = 0.75 -- The percentage missing from an attribute before follower should ignore the potion waste threshold and consume a restorative potion anyway. At 0.75, if follower is missing more than 75% health, follower will use a restore health potion whether its effect would be considered wasted or not
+local ATTRIBUTE_PANIC_THRESHOLD <const> = 0.75 -- The percentage missing from an attribute before follower should ignore the waste threshold and consume a restorative consumable anyway. At 0.75, if follower is missing more than 75% health, follower will use a restore health consumable whether its effect would be considered wasted or not
 local WASTE_THRESHOLD <const> = { -- The percentage threshold that determines whether a restorative effect is considered wasted or not
 	POTION = 0.25, -- At 0.25, if follower is only missing 25 health or less, a restorative effect with magnitude greater than 100 would be considered wasted
 	SCROLL = 0.50, -- At 0.50, if follower is only missing 50 health or less, a restorative effect with magnitude greater than 100 would be considered wasted
@@ -273,7 +273,6 @@ local function castSpell(spell: core.Spell, castSound: string): number -- Applie
 		if duration < effect.duration then
 			duration = effect.duration -- Get the longest duration of any of the effects supplied by this spell and use that as the duration of the spell itself
 		end
-		--types.NPC.stats.skills.restoration(selfObj).progress = types.NPC.stats.skills.restoration(selfObj).progress + 0.01
 	end
 	return duration
 end
