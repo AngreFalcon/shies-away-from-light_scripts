@@ -1,8 +1,8 @@
 local lfs = require"lfs"
 
 local projDir = lfs.currentdir()
-local src = projDir .. "/scripts/scripts/safl_shies/common.tl"
-local dest = projDir .. "/scripts/safl_shies"
+local src = projDir .. "/scripts/scripts/follower/common.tl"
+local dest = projDir .. "/scripts/follower"
 
 for file in lfs.dir(dest) do
 	if file ~= nil and file ~= "." and file ~= ".." then

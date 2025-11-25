@@ -6,7 +6,7 @@ local ai = require('openmw.interfaces').AI
 local time = require('openmw_aux.time')
 local util = require('openmw.util')
 local anim = require('openmw.animation')
-local cmn = require('scripts.safl_shies.common')
+local cmn = require('scripts.follower.common')
 
 -- Credit to Grumpy and Kateri for their companion mwscripts, which were used as the foundation from which this script was built
 
