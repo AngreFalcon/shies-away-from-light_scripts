@@ -102,17 +102,13 @@ end
 -- Handler functions - Functions that will be called directly by OpenMW
 time.runRepeatedly( -- This function runs once every x seconds, where x = DELAY1
 	function() 
-		if Shies:isFollowing() then
-			Shies:modSpeedAndAthletics()
-		elseif Shies.player ~= nil then
-			Shies:setDefaultSpeed()
-		end
+		Shies:delayUpdate1()
 	end, Shies.DELAY1, {}
 )
 
 time.runRepeatedly( -- This function runs once every x seconds, where x = DELAY2
 	function()
-
+		Shies:delayUpdate2()
 	end, Shies.DELAY2, {}
 )
 

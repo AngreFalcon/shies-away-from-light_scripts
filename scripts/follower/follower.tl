@@ -85,6 +85,8 @@ local interface Follower is Follower.OMW_SELF
     doOnce2: boolean
 	MWVars: {string: number}
 	
+	delayUpdate1: function(self: Follower)
+	delayUpdate2: function(self: Follower)
 	onUpdate: function(self: Follower, dt: number)
 	onSave: function(self: Follower, payload: {string: any}): cmn.SaveData
 	onLoad: function(self: Follower, data: cmn.SaveData)
@@ -119,11 +121,23 @@ local interface Follower is Follower.OMW_SELF
 end
 
 -- Handler functions - Functions that will be called directly by OpenMW
+local function delayUpdate1(self: Follower) -- This function runs once every x seconds, where x = DELAY1
+	if self:isFollowing() then
+		self:modSpeedAndAthletics()
+	elseif self.player ~= nil then
+		self:setDefaultSpeed()
+	end
+end
+
+local function delayUpdate2(self: Follower) -- This function runs once every x seconds, where x = DELAY2
+
+end
+
 local function onUpdate(self: Follower, dt: number)
 	self:getPlayerLeader()
     self:checkAttributes()
 	self:updateTimers(dt)
-	if self.checks["fly"] == false and types.Actor.isOnGround(self.selfObj) == false then
+	if types.Actor.isOnGround(self.selfObj) == false and self.checks["fly"] == false then
 		self:freeFall()
 	end
 	if self:isFollowing() then
@@ -132,7 +146,7 @@ local function onUpdate(self: Follower, dt: number)
 		self:toggleEffect("ww", (core.magic.EFFECT_TYPE.WaterWalking as string))
 		self:forceZLevel()
 		self:warpToPlayer()
-	elseif self.player ~= nil then -- This condition should be reserved for only function calls that take place when the follower is temporarily not following the player e.g., the follower has not been dismissed. Behaviors that occur when the follower has been dismissed should be placed outside of this condition block
+	elseif self.player ~= nil then -- This condition should be reserved for function calls that take place when the follower is temporarily not following the player e.g., the follower has not been dismissed. Behaviors that occur when the follower has been dismissed should be placed outside of this condition block
 		self:maintainDistance()
 		self:nudge(dt)
 	end
@@ -851,6 +865,8 @@ local function defaultFollower(): Follower
 		]]
 		
 		-- Handler functions - Functions that will be called directly by OpenMW
+		delayUpdate1 = delayUpdate1,
+		delayUpdate2 = delayUpdate2,
 		onUpdate = onUpdate,
 		onSave = onSave,
 		onLoad = onLoad,
