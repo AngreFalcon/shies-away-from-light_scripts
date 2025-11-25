@@ -91,9 +91,6 @@ global interface Follower
 	updateMWVar: function(self: Follower, varName: string, varData: number)
 	isFollowing: function(self: Follower): boolean
 	getPlayerLeader: function(self: Follower)
-	getMaxAttr: function(self: Follower, attr: types.DynamicStat): number
-	getAttrDiff: function(self: Follower, attr: types.DynamicStat): number
-	checkAttrDamaged: function(self: Follower, attr: types.DynamicStat): boolean
 	fullHeal: function(self: Follower)
 	checkForPotion: function(self: Follower, potionName: string): boolean
 	getPlayerCellPos: function(self: Follower): cmn.CellLoc
@@ -137,20 +134,8 @@ local function getPlayerLeader(self: Follower) -- Gets the player object that co
 	end
 end
 
-local function getMaxAttr(attr: types.DynamicStat): number -- Get the maximum value of the specified dynamic stat
-	return attr.base + attr.modifier
-end
-
-local function getAttrDiff(self: Follower, attr: types.DynamicStat): number -- Get the missing value of the specified dynamic stat
-	return self:getMaxAttr(attr) - attr.current
-end
-
-local function checkAttrDamaged(self: Follower, attr: types.DynamicStat): boolean -- Returns true if the provided attribute is not currently full
-	return attr.current < self:getMaxAttr(attr)
-end
-
 local function fullHeal(self: Follower) -- Fully restore follower's health
-	self.attributes[1](self.selfObj).current = self:getMaxAttr(self.attributes[1](self.selfObj))
+	self.attributes[1](self.selfObj).current = cmn.getMaxAttr(self.attributes[1](self.selfObj))
 end
 
 local function checkForPotion(self: Follower, potionName: string): boolean -- Returns true if follower has any of the specified potions in their inventory
@@ -511,7 +496,7 @@ local function chooseRestoreMethod(self: Follower, iter: integer) -- Intelligent
 		["potion"] = function(method: RestoreMethod) self.restoreAttr[iter].potionTimer = self:consumePotion((method.data as string), self.restoreAttr[iter].effectName) end,
 		["scroll"] = function(method: RestoreMethod) self.restoreAttr[iter].scrollTimer = self:useScroll((method.data as string), self.restoreAttr[iter].effectName, "restoration cast") end,
 	}
-	local attrDiff = self:getAttrDiff(self.attributes[iter](self.selfObj))
+	local attrDiff = cmn.getAttrDiff(self.attributes[iter](self.selfObj))
 	local restoreMethods: {RestoreMethod} = {}
 	if self.restoreAttr[iter].enchantmentTimer <= 0 then
 		local armor = self:selectRestoreEnch(self.restoreAttr[iter].effectId, attrDiff, types.Armor as cmn.EnchType)
@@ -519,7 +504,7 @@ local function chooseRestoreMethod(self: Follower, iter: integer) -- Intelligent
 			table.insert(restoreMethods, {
 				name = "encharmor",
 				data = armor[1],
-				weight = armor[2] + (self:getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.ENCHANTMENT),
+				weight = armor[2] + (cmn.getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.ENCHANTMENT),
 			})
 		end
 		local clothing = self:selectRestoreEnch(self.restoreAttr[iter].effectId, attrDiff, types.Clothing as cmn.EnchType)
@@ -527,7 +512,7 @@ local function chooseRestoreMethod(self: Follower, iter: integer) -- Intelligent
 			table.insert(restoreMethods, {
 				name = "enchclothing",
 				data = clothing[1],
-				weight = clothing[2] + (self:getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.ENCHANTMENT),
+				weight = clothing[2] + (cmn.getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.ENCHANTMENT),
 			})
 		end
 		local weapon = self:selectRestoreEnch(self.restoreAttr[iter].effectId, attrDiff, types.Weapon as cmn.EnchType)
@@ -535,7 +520,7 @@ local function chooseRestoreMethod(self: Follower, iter: integer) -- Intelligent
 			table.insert(restoreMethods, {
 				name = "enchweapon",
 				data = weapon[1],
-				weight = weapon[2] + (self:getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.ENCHANTMENT),
+				weight = weapon[2] + (cmn.getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.ENCHANTMENT),
 			})
 		end
 	end
@@ -545,27 +530,27 @@ local function chooseRestoreMethod(self: Follower, iter: integer) -- Intelligent
 			table.insert(restoreMethods, {
 				name = "spell",
 				data = spell[1],
-				weight = spell[2] + (self:getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.SPELL),
+				weight = spell[2] + (cmn.getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.SPELL),
 			})
 		end
 	end
 	if self.restoreAttr[iter].potionTimer <= 0 then
-		local potion = self:selectRestorePotion(self.restoreAttr[iter].effectId, attrDiff, self:getMaxAttr(self.attributes[iter](self.selfObj)))
+		local potion = self:selectRestorePotion(self.restoreAttr[iter].effectId, attrDiff, cmn.getMaxAttr(self.attributes[iter](self.selfObj)))
 		if potion ~= nil then
 			table.insert(restoreMethods, {
 				name = "potion",
 				data = potion[1],
-				weight = potion[2] + (self:getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.POTION),
+				weight = potion[2] + (cmn.getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.POTION),
 			})
 		end
 	end
 	if self.restoreAttr[iter].scrollTimer <= 0 then
-		local scroll = self:selectRestoreScroll(self.restoreAttr[iter].effectId, attrDiff, self:getMaxAttr(self.attributes[iter](self.selfObj)))
+		local scroll = self:selectRestoreScroll(self.restoreAttr[iter].effectId, attrDiff, cmn.getMaxAttr(self.attributes[iter](self.selfObj)))
 		if scroll ~= nil then
 			table.insert(restoreMethods, {
 				name = "scroll",
 				data = scroll[1],
-				weight = scroll[2] + (self:getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.SCROLL),
+				weight = scroll[2] + (cmn.getMaxAttr(self.attributes[iter](self.selfObj)) * self.restoreWeights.SCROLL),
 			})
 		end
 	end
@@ -582,7 +567,7 @@ end
 
 local function checkAttributes(self: Follower) -- Used to call various functions that affect follower's dynamic attributes like health, fatigue, and magicka
 	for i = 1, #self.attributes do
-		if self:checkAttrDamaged(self.attributes[i](self.selfObj)) == true and self.timers["restorecooldown"] <= 0 then
+		if cmn.checkAttrDamaged(self.attributes[i](self.selfObj)) == true and self.timers["restorecooldown"] <= 0 then
 			self:chooseRestoreMethod(i)
 		end
 	end
@@ -700,7 +685,7 @@ end
 --
 
 local function defaultFollower(): Follower
-	local follower = {
+	return {
 		-- Aliases
 	    selfObj: core.GameObject = nil,
 	    attributes = {types.Actor.stats.dynamic.health, types.Actor.stats.dynamic.magicka, types.Actor.stats.dynamic.fatigue},
@@ -713,7 +698,7 @@ local function defaultFollower(): Follower
 	        FOLLOW = 15, -- Flat modifier to be applied to follower's speed and athletics when normally following the player
 	        WANDER = 40, -- Flat modifier to be applies to follower's speed when wandering instead of followings
 	    },
-		defaultCD = { -- Default cooldowns in seconds
+		defaultCd = { -- Default cooldowns in seconds
 			RESTORE = 10, -- The general cooldown to wait before using any other restore effects, regardless of individual method cooldown
 			ENCHANTMENT = 10, -- The default cooldown for a restorative enchantment if the actual duration couldn't be found
 			SPELL = 10, -- The default cooldown for a restorative spell if the actual duration couldn't be found
@@ -778,9 +763,6 @@ local function defaultFollower(): Follower
 		updateMWVar = updateMWVar, -- Send an event to the global script to update a single mwscript variable with the provided value
 		isFollowing = isFollowing, -- Simply return true or false if companion is currently following any player
 		getPlayerLeader = getPlayerLeader, -- Gets the player object that companion is currently following		
-		getMaxAttr = getMaxAttr, -- Get the maximum value of the specified dynamic stat		
-		getAttrDiff = getAttrDiff, -- Get the missing value of the specified dynamic stat		
-		checkAttrDamaged = checkAttrDamaged, -- Returns true if the provided attribute is not currently full		
 		fullHeal = fullHeal, -- Fully restore follower's health		
 		checkForPotion = checkForPotion, -- Returns true if follower has any of the specified potions in their inventory
 		getPlayerCellPos = getPlayerCellPos, -- Get the cell location of the player that companion is currently following
@@ -809,7 +791,6 @@ local function defaultFollower(): Follower
 		setDefaultSpeed = setDefaultSpeed, -- Sets follower's speed modifier while not following the player
 		modSpeedAndAthletics = modSpeedAndAthletics, -- Set follower's speed and athletics modifier to a flat value if they're within a certain distance of the player, or add a multiplier based off the player's stats if they're too far
 	}
-	return follower as Follower
 end
 
 return function(child: {string: any}): Follower

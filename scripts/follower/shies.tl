@@ -9,7 +9,10 @@ local anim = require('openmw.animation')
 local cmn = require('scripts.follower.common')
 local follower = require('scripts.follower.follower')
 
-local Shies: Follower
+local Shies = follower({
+	selfObj = self,
+	ai = ai,
+})
 
 -- Shies Constants
 local SCRIPT_VERSION <const> = 1 -- Increment whenever onSave is changed
@@ -86,7 +89,7 @@ local function flee() -- Triggers if shies' health drops below a certain thresho
 end
 
 local function shiesCheckAttributes() -- Calls shies-specific functions relating to attributes
-	if Shies.attributes[1](Shies.selfObj).current > 0 and Shies.attributes[1](Shies.selfObj).current / Shies:getMaxAttr(Shies.attributes[1](Shies.selfObj)) < SHIES.FLEE_THRESHOLD then -- Check health ratio
+	if Shies.attributes[1](Shies.selfObj).current > 0 and Shies.attributes[1](Shies.selfObj).current / cmn.getMaxAttr(Shies.attributes[1](Shies.selfObj)) < SHIES.FLEE_THRESHOLD then -- Check health ratio
 		Shies:updateMWVar("companion", Shies.mwBool.FALSE)
 		Shies.checks["cMove"] = false
         flee() -- Teleport Shies away from combat to whatever position he has marked
@@ -145,7 +148,7 @@ end
 
 local function onInit() -- Called when the script is created but not loaded
 	RecallLoc = SHIES.INIT_DATA.recallLoc
-	Shies = follower({
+	for i,v in pairs({
 		selfObj = self,
 		doOnce = false,
 		doOnce2 = false,
@@ -190,7 +193,9 @@ local function onInit() -- Called when the script is created but not loaded
 				effectId = "restorefatigue",
 			}
 		},
-	})
+	} as {string: any}) do
+		(Shies as {string: any})[i] = v
+	end
 end
 
 local function onSave(): cmn.SaveData -- Called when the game saves, even if currently in an inactive state

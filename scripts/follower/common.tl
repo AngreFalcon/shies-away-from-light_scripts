@@ -68,6 +68,16 @@ local function getCoDist(vector1: util.Vector3, vector2: util.Vector3): number -
 	return math.sqrt((tempVar1 * tempVar1) + (tempVar2 * tempVar2))
 end
 
+local function getMaxAttr(attr: types.DynamicStat): number -- Get the maximum value of the specified dynamic stat
+	return attr.base + attr.modifier
+end
+local function getAttrDiff(attr: types.DynamicStat): number -- Get the missing value of the specified dynamic stat
+	return getMaxAttr(attr) - attr.current
+end
+local function checkAttrDamaged(attr: types.DynamicStat): boolean -- Returns true if the provided attribute is not currently full
+	return attr.current < getMaxAttr(attr)
+end
+
 return {
 	PlayerQuest = PlayerQuest,
 	Flag = Flag,
@@ -78,4 +88,7 @@ return {
 	EnchType = EnchType,
 	EnchRecord = EnchRecord,
 	getCoDist = getCoDist,
+	getMaxAttr = getMaxAttr,
+	getAttrDiff = getAttrDiff,
+	checkAttrDamaged = checkAttrDamaged,
 }
