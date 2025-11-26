@@ -33,20 +33,20 @@ return {
 		["shiesAttacked"] = function(message: string)
          	UI.showInteractiveMessage(message, nil)
       	end,
-	  	["shiesFled"] = function()
+	  	["shiesFled"] = function() -- Trigger the start of the Shies Fled quest
 			local quest = getQuest("SAFL_ShiesFled")
 			if not quest.started then
 				quest:addJournalEntry(10, selfObj)
 			end
 	  	end,
-		["getPos"] = function(): util.Vector3 | nil
+		["getPos"] = function(): util.Vector3 | nil -- Get the player's location as a Vector3 (x, y, z coordinates)
 			if self then
 				return self.object.position
 			else
 				return nil
 			end
 		end,
-		["getSneakVal"] = function(actor: core.GameObject)
+		["getSneakVal"] = function(actor: core.GameObject) -- Get the player's current sneak state (true or false)
 			actor:sendEvent("playerSneak", (selfObj as self).controls.sneak)
 		end
    	},

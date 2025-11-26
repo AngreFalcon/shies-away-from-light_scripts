@@ -21,14 +21,14 @@ local function disable(actor: core.GameObject)
    	actor.enabled = false
 end
 
-local function updateMWVar(data: {string, number, core.GameObject})
+local function updateMWVar(data: {string, number, core.GameObject}) -- Updates the value of the specified mwscript variable
 	local localScript = world.mwscript.getLocalScript(data[3], nil)
 	if localScript ~= nil then
 		(localScript as world.MWScript).variables[data[1]] = data[2]
 	end
 end
 
-local function syncMWVars(actor: core.GameObject)
+local function syncMWVars(actor: core.GameObject) -- Get the current state of all local mwscript variables associated with the provided actor
 	if actor ~= nil then
 		local localScript: world.MWScript = world.mwscript.getLocalScript(actor, nil)
 		if localScript ~= nil then
@@ -41,7 +41,7 @@ local function syncMWVars(actor: core.GameObject)
 	end
 end
 
-local function changeEnchCharge(data: {core.GameObject, number})
+local function changeEnchCharge(data: {core.GameObject, number}) -- Modify the current charge of the specified enchanted item
 	local itemData = types.Item.itemData(data[1])
 	itemData.enchantmentCharge = itemData.enchantmentCharge - data[2]
 end
