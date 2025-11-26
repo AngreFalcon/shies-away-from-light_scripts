@@ -111,7 +111,7 @@ local interface Follower is Follower.OMW_SELF
 	selectRestorePotion: function(self: Follower, effectId: string, attrDiff: number, attrMax: number): {string, number}
 	selectRestoreScroll: function(self: Follower, effectId: string, attrDiff: number, attrMax: number): {string, number}
 	chooseRestoreMethod: function(self: Follower, iter: integer)
-	checkAttributes: function(self: Follower)
+	checkDynStats: function(self: Follower)
 	freeFall: function(self: Follower)
 	forceZLevel: function(self: Follower)
 	maintainDistance: function(self: Follower)
@@ -121,6 +121,35 @@ local interface Follower is Follower.OMW_SELF
 	modSpeedAndAthletics: function(self: Follower)
 end
 
+-- Constant Definitions
+--local SkillLevelGainMultiplier <const> = 1.5 -- The multiplier to apply to all skill increases
+local NudgeDelay <const> = 4 -- The number of seconds follower should wander after being nudged before following the player again
+local Delay1 <const> = 0.5 * time.second -- The number of seconds to wait before executing our delayed, non-priority functions
+local Delay2 <const> = 5 * time.second -- The number of seconds to wait before executing our delayed, non-priority functions
+local FollowerCatchupMultiplier <const> = 2.25 -- Multiplier that is applied to the player's athletics and speed, the product of which is then added to the follower's athletics and speed as a modifier
+local FollowerDefaultSpeedMod <const> = 15 -- Flat modifier to be applied to follower's speed and athletics when normally following the player
+local FollowerDefaultWanderSpeedMod <const> = 40 -- Flat modifier to be applies to follower's speed when wandering instead of followings
+local RestoreDefaultCooldown <const> = 10 -- The general cooldown to wait before using any other restore effects, regardless of individual method cooldown
+local RestoreDefaultEnchantmentCooldown <const> = 10 -- The default cooldown for a restorative enchantment if the actual duration couldn't be found
+local RestoreDefaultSpellCooldown <const> = 10 -- The default cooldown for a restorative spell if the actual duration couldn't be found
+local RestoreDefaultPotionCooldown <const> = 60 -- The default cooldown for a restorative potion if the actual duration couldn't be found
+local RestoreDefaultScrollCooldown <const> = 60 -- The default cooldown for a restorative scroll if the actual duration couldn't be found
+local DefaultWarpCooldown <const> = 6 -- Default value for the warp timer
+local DefaultSheatheCooldown <const> = 4.4 -- Default value for the sheathe timer
+local RestoreTriggerThreshold <const> = 0.15 -- What percentage of the dynamic stat must be missing before a restore method is triggered
+local RestorePanicThreshold <const> = 0.75 -- The percentage missing from an attribute before follower should ignore the waste threshold and consume a restorative consumable anyway. At 0.75, if follower is missing more than 75% health, follower will use a restore health consumable whether its effect would be considered wasted or not
+local RestoreEnchantmentWeight <const> = 0.75 -- Multiplier to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection. The smaller, the better
+local RestoreSpellWeight <const> = 1 -- Multiplier to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection. The smaller, the better
+local RestorePotionWeight <const> = 1.25 -- Multiplier to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection. The smaller, the better
+local RestorePotionWasteThreshold <const> = 0.25 -- At 0.25, if follower is only missing 25 health or less, a restorative effect with magnitude greater than 100 would be considered wasted
+local RestoreScrollWeight <const> = 1.5 -- Multiplier to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection. The smaller, the better
+local RestoreScrollWasteThreshold <const> = 0.50 -- At 0.50, if follower is only missing 50 health or less, a restorative effect with magnitude greater than 100 would be considered wasted
+local FollowerModifySpeedThreshold <const> = 300 -- The distance threshold that determines whether follower moves at normal speed or speeds up to catch up with the player
+local FollowerMaintainLowerThreshold <const> = 70 -- The lower distance threshold that forces follower to wander away from the player
+local FollowerMaintainUpperThreshold <const> = 100 -- The upper distance threshold that makes companion follow the player again after moving away
+local FollowerWanderThreshold <const> = 300 -- The distance parameter for follower's wander package when maintaining their distance
+
+-- Function Definitions
 -- Handler functions - Functions that will be called directly by OpenMW
 local function delayUpdate1(self: Follower) -- This function runs once every x seconds, where x = DELAY1
 	if self:isFollowing() then
@@ -138,7 +167,7 @@ end
 
 local function onUpdate(self: Follower, dt: number) -- This function executes every frame and, as such, should be used as sparingly as possible
 	self:getPlayerLeader()
-    self:checkAttributes()
+    self:checkDynStats()
 	self:updateTimers(dt)
 	if types.Actor.isOnGround(self.selfObj) == false and self.checks["fly"] == false then
 		self:freeFall()
@@ -644,7 +673,7 @@ local function chooseRestoreMethod(self: Follower, iter: integer) -- Intelligent
 	self.timers["restorecooldown"] = self.defaultCd.RESTORE
 end
 
-local function checkAttributes(self: Follower) -- Used to call various functions that affect follower's dynamic attributes like health, fatigue, and magicka
+local function checkDynStats(self: Follower) -- Used to call various functions that affect follower's dynamic attributes like health, fatigue, and magicka
 	for i = 1, #self.dynamicStats do
 		if cmn.getDynStatMissingPerc(self.dynamicStats[i](self.selfObj)) <= self.restoreConsts.TRIGGER_PERC and self.timers["restorecooldown"] <= 0 then
 			self:chooseRestoreMethod(i)
@@ -764,46 +793,46 @@ local function defaultFollower(): Follower
 	    selfObj = nil,
 	    dynamicStats = {types.Actor.stats.dynamic.health, types.Actor.stats.dynamic.magicka, types.Actor.stats.dynamic.fatigue},
 	    ai = nil,
-		
-	    -- Constants
-	    statMod = {
-	        CATCHUP_MULT = 2.25, -- Multiplier that is applied to the player's athletics and speed, the product of which is then added to the follower's athletics and speed as a modifier
-	        FOLLOW = 15, -- Flat modifier to be applied to follower's speed and athletics when normally following the player
-	        WANDER = 40, -- Flat modifier to be applies to follower's speed when wandering instead of followings
-	    },
-		defaultCd = { -- Default cooldowns in seconds
-			RESTORE = 10, -- The general cooldown to wait before using any other restore effects, regardless of individual method cooldown
-			ENCHANTMENT = 10, -- The default cooldown for a restorative enchantment if the actual duration couldn't be found
-			SPELL = 10, -- The default cooldown for a restorative spell if the actual duration couldn't be found
-			POTION = 60, -- The default cooldown for a restorative potion if the actual duration couldn't be found
-			SCROLL = 60, -- The default cooldown for a restorative scroll if the actual duration couldn't be found
-			WARP = 6, -- Default value for the warp timer
-			SHEATHE = 4.4, -- Default value for the sheathe timer
-		},
-		restoreConsts = {
-			TRIGGER_PERC = 0.15, -- What percentage of the dynamic stat must be missing before a restore method is triggered
-			PANIC_THRESHOLD = 0.75, -- The percentage missing from an attribute before follower should ignore the waste threshold and consume a restorative consumable anyway. At 0.75, if follower is missing more than 75% health, follower will use a restore health consumable whether its effect would be considered wasted or not
-			ENCHANTMENT_WEIGHT = 0.75, -- Multiplier to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection. The smaller, the better
-			SPELL_WEIGHT = 1, -- Multiplier to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection. The smaller, the better
-			POTION_WEIGHT = 1.25, -- Multiplier to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection. The smaller, the better
-			POTION_WASTE = 0.25, -- At 0.25, if follower is only missing 25 health or less, a restorative effect with magnitude greater than 100 would be considered wasted
-			SCROLL_WEIGHT = 1.5, -- Multiplier to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection. The smaller, the better
-			SCROLL_WASTE = 0.50, -- At 0.50, if follower is only missing 50 health or less, a restorative effect with magnitude greater than 100 would be considered wasted
-		},
-		distanceThreshold = {
-			MOD_SPEED = 300, -- The distance threshold that determines whether follower moves at normal speed or speeds up to catch up with the player
-			MAINTAIN_LOWER = 70, -- The lower distance threshold that forces follower to wander away from the player
-			MAINTAIN_UPPER = 100, -- The upper distance threshold that makes companion follow the player again after moving away
-			WANDER = 300, -- The distance parameter for follower's wander package when maintaining their distance
-		},
 		mwBool = { -- MWScript does not have boolean types, so all MWVars are numbers even if they're being used as boolean flags
 			TRUE = 1,
 			FALSE = 0,
 		},
-	    --SKILL_LEVEL_MULT <const> = 1.5 -- The multiplier to apply to all skill increases
-		NUDGE_DELAY = 4, -- The number of seconds follower should wander after being nudged before following the player again
-		DELAY1 = 0.5 * time.second, -- The number of seconds to wait before executing our delayed, non-priority functions
-		DELAY2 = 5 * time.second, -- The number of seconds to wait before executing our delayed, non-priority functions
+		
+	    -- Constants
+	    --SKILL_LEVEL_MULT = SkillLevelGainMultiplier
+		NUDGE_DELAY = NudgeDelay,
+		DELAY1 = Delay1,
+		DELAY2 = Delay2,
+	    statMod = {
+	        CATCHUP_MULT = FollowerCatchupMultiplier,
+	        FOLLOW = FollowerDefaultSpeedMod,
+	        WANDER = FollowerDefaultWanderSpeedMod,
+	    },
+		defaultCd = {
+			RESTORE = RestoreDefaultCooldown,
+			ENCHANTMENT = RestoreDefaultEnchantmentCooldown,
+			SPELL = RestoreDefaultSpellCooldown,
+			POTION = RestoreDefaultPotionCooldown,
+			SCROLL = RestoreDefaultScrollCooldown,
+			WARP = DefaultWarpCooldown,
+			SHEATHE = DefaultSheatheCooldown,
+		},
+		restoreConsts = {
+			TRIGGER_PERC = RestoreTriggerThreshold,
+			PANIC_THRESHOLD = RestorePanicThreshold,
+			ENCHANTMENT_WEIGHT = RestoreEnchantmentWeight,
+			SPELL_WEIGHT = RestoreSpellWeight,
+			POTION_WEIGHT = RestorePotionWeight,
+			POTION_WASTE = RestorePotionWasteThreshold,
+			SCROLL_WEIGHT = RestoreScrollWeight,
+			SCROLL_WASTE = RestoreScrollWasteThreshold,
+		},
+		distanceThreshold = {
+			MOD_SPEED = FollowerModifySpeedThreshold,
+			MAINTAIN_LOWER = FollowerMaintainLowerThreshold,
+			MAINTAIN_UPPER = FollowerMaintainUpperThreshold,
+			WANDER = FollowerWanderThreshold,
+		},
 	
 		-- Variables
 	    player = nil,
@@ -901,7 +930,7 @@ local function defaultFollower(): Follower
 		selectRestorePotion = selectRestorePotion, -- Find the potion whose restore amount is closest to the amount missing from the specified attribute
 		selectRestoreScroll = selectRestoreScroll, -- Find whichever scroll is enchanted with an effect that has the most suitable restore health/magicka/fatigue amount out of all scrolls in the follower's inventory
 		chooseRestoreMethod = chooseRestoreMethod, -- Intelligently selects the most appropriate healing method to use when health is low based on what spells, potions, scrolls, and enchantments are available. As of OpenMW 0.50, scrolls and enchantments are not available due to API limitations
-		checkAttributes = checkAttributes, -- Used to call various functions that affect follower's dynamic attributes like health, fatigue, and magicka
+		checkDynStats = checkDynStats, -- Used to call various functions that affect follower's dynamic stats like health, fatigue, and magicka
 		freeFall = freeFall, -- Used to call various functions that should trigger while follower is in freefall
 		-- Movement functions - Functions that modify follower's movement behavior
 		forceZLevel = forceZLevel, -- If in combat, levitating and the player Z level is different from follower's, force follower's Z level to the player's
