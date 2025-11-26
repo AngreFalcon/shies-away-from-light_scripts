@@ -27,7 +27,7 @@ local SHIES <const> = {
 local RecallLoc: cmn.CellLoc
 
 --[[ Shies-specific MWVars
-	short fled -- True if shies has teleported away during combat
+	short fled -- 1 if shies has teleported away during combat
 ]]
 
 -- Shies-specific utility functions
@@ -150,6 +150,10 @@ local function onLoad(data: cmn.SaveData) -- Called only when the script loads, 
 		Shies:onLoad(data)
 	end
 end
+
+local function onActivated(actor: types.Actor) -- Called whenever a player activates shies, initiating dialogue
+	Shies:onActivated(actor)
+end
 --
 
 return {
@@ -158,6 +162,7 @@ return {
 		onInit = onInit,
 		onSave = onSave,
 		onLoad = onLoad,
+		onActivated = onActivated,
     },
     eventHandlers = {
 		["fetchMWVars"] = function(data: {string: number})

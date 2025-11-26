@@ -90,6 +90,7 @@ local interface Follower is Follower.OMW_SELF
 	onUpdate: function(self: Follower, dt: number)
 	onSave: function(self: Follower, payload: {string: any}): cmn.SaveData
 	onLoad: function(self: Follower, data: cmn.SaveData)
+	onActivated: function(self: Follower, actor: types.Actor)
 	updateMWVar: function(self: Follower, varName: string, varData: number)
 	isFollowing: function(self: Follower): boolean
 	getPlayerLeader: function(self: Follower)
@@ -133,7 +134,6 @@ local function delayUpdate1(self: Follower) -- This function runs once every x s
 end
 
 local function delayUpdate2(_: Follower) -- This function runs once every x seconds, where x = DELAY2
-
 end
 
 local function onUpdate(self: Follower, dt: number)
@@ -182,6 +182,12 @@ local function onLoad(self: Follower, data: cmn.SaveData)
 		self.posA = data.posA
 		self.posB = data.posB
 		self.posC = data.posC
+end
+
+local function onActivated(self: Follower, _: types.Actor)
+	self:updateMWVar("questThoughts", 0)
+	self:updateMWVar("locationThoughts", 0)
+	self:updateMWVar("npcThoughts", 0)
 end
 
 -- Utility functions -- Functions that may return game values or that other functions may depend on for calculations or checks
@@ -307,8 +313,8 @@ local function freeFall(self: Follower) -- Used to call various functions that s
 		self.timers["freefall"] = -(self:consumePotion("p_slowfall_s", "SlowFall"))
 	end
 end
-	-- Restore dynamic stat logic
 
+	-- Restore dynamic stat logic
 local function castSpell(self: Follower, spell: core.Spell, castSound: string): number -- Applies the effect of the specified spell to the follower, including vfx and sound, and then consumes follower's magicka equal to the cost of the spell. 
 	local duration: number = self.defaultCd.SPELL
 	-- This should be the correct way to do this. However, it appears this event does not work properly, possibly a feature that's not present in openmw 0.50?
@@ -760,7 +766,6 @@ local function defaultFollower(): Follower
 	    ai = nil,
 		
 	    -- Constants
-	    --SKILL_LEVEL_MULT <const> = 1.5 -- The multiplier to apply to all skill increases
 	    statMod = {
 	        CATCHUP_MULT = 2.25, -- Multiplier that is applied to the player's athletics and speed, the product of which is then added to the follower's athletics and speed as a modifier
 	        FOLLOW = 15, -- Flat modifier to be applied to follower's speed and athletics when normally following the player
@@ -795,6 +800,7 @@ local function defaultFollower(): Follower
 			TRUE = 1,
 			FALSE = 0,
 		},
+	    --SKILL_LEVEL_MULT <const> = 1.5 -- The multiplier to apply to all skill increases
 		NUDGE_DELAY = 4, -- The number of seconds follower should wander after being nudged before following the player again
 		DELAY1 = 0.5 * time.second, -- The number of seconds to wait before executing our delayed, non-priority functions
 		DELAY2 = 5 * time.second, -- The number of seconds to wait before executing our delayed, non-priority functions
@@ -855,13 +861,15 @@ local function defaultFollower(): Follower
 		-- If making a follower that uses this script, the follower must have the following variables declared in MWScript within their .esp plugin file
 		MWVars = {},
 		--[[ MWVars:
-			short companion -- Engine variable -- True if follower is currently following the player. If 0, companion dialogue topics don't appear
-			short nohello -- Engine variable -- 
-			short nolore -- Engine variable --
-			short compmove -- True if the player has asked follower to maintain their distance
-			short onetimemove -- True if the player has asked follower to move out of the way
-			short weapuse -- True if the player has asked follower to use the same weapons as the player
-			short addonce -- True after the mwscript has executed once, is used to initialize companion to 0
+			short companion -- 1 enables companion share, 0 disables it
+			short nohello -- Not entirely sure
+			short nolore -- Not entirely sure
+			short compmove -- 1 if the player has asked follower to maintain their distance
+			short onetimemove -- 1 if the player has asked follower to move out of the way
+			short weapuse -- 1 if the player has asked follower to use the same weapons as the player
+			short questThoughts -- 1 if the player has asked follower for their opinion about ongoing quests. Enables dialogue topics for in-progress quests
+			short locationThoughts -- 1 if the player has asked follower for their opinion about locations. Enables dialogue topics for visited locations
+			short npcThoughts -- 1 if the player has asked follower for their opinion about individuals. Enables dialogue topics for various NPCs that have been met
 		]]
 		
 		-- Handler functions - Functions that will be called directly by OpenMW
@@ -870,6 +878,7 @@ local function defaultFollower(): Follower
 		onUpdate = onUpdate,
 		onSave = onSave,
 		onLoad = onLoad,
+		onActivated = onActivated,
 		-- Utility functions -- Functions that may return game values or that other functions may depend on for calculations or checks
 		updateMWVar = updateMWVar, -- Send an event to the global script to update a single mwscript variable with the provided value
 		isFollowing = isFollowing, -- Simply return true or false if companion is currently following any player

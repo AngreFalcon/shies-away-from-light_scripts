@@ -3,11 +3,15 @@ begin safl_compscript ;this script has been modified but credit for the original
 short companion
 short nohello
 short nolore
-short fled
-short compmove
-short onetimemove
-short weapuse
-short addonce
+; Follower variables
+short compmove ; 1 if the player has asked follower to maintain their distance
+short onetimemove ; 1 if the player has asked follower to move out of the way 
+short weapuse ; 1 if the player has asked follower to use the same weapons as the player
+short questThoughts ; 1 if the player has asked follower for their opinion about ongoing quests. Enables dialogue topics for in-progress quests
+short locationThoughts ; 1 if the player has asked follower for their opinion about locations. Enables dialogue topics for visited locations
+short npcThoughts ; 1 if the player has asked follower for their opinion about individuals. Enables dialogue topics for various NPCs that have been met
+; Shies-specific variables
+short fled ; 1 if shies has teleported away during combat
 
 ; if the player has a menu open and the player is not sleeping, don't execute the rest of the script
 if ( MenuMode == 1 )
@@ -37,9 +41,9 @@ endif
 ;ADD ADDITIONAL TOPICS IN THIS SECTION IF REQUIRED.
 
 ; once leveling is implemented 
-if ( addOnce == 0 )
-  ;StartScript, safl_compLevel ; Will discard once skill leveling is implemented in lua
-  Set addOnce to 1
-endif
+;if ( addOnce == 0 )
+;  StartScript, safl_compLevel ; Will discard once skill leveling is implemented in lua
+;  Set addOnce to 1
+;endif
 
 end
