@@ -136,7 +136,7 @@ end
 local function delayUpdate2(_: Follower) -- This function runs once every x seconds, where x = DELAY2
 end
 
-local function onUpdate(self: Follower, dt: number)
+local function onUpdate(self: Follower, dt: number) -- This function executes every frame and, as such, should be used as sparingly as possible
 	self:getPlayerLeader()
     self:checkAttributes()
 	self:updateTimers(dt)
@@ -152,7 +152,7 @@ local function onUpdate(self: Follower, dt: number)
 	end
 end
 
-local function onSave(self: Follower, payload: {string: any}): cmn.SaveData
+local function onSave(self: Follower, payload: {string: any}): cmn.SaveData -- This function executes whenever the player saves their game, and the return value of this function is used to store data to the player's save file that should persist across player sessions
 	for k, v in pairs(self.MWVars) do
 		self:updateMWVar(k, v)
 	end
@@ -172,7 +172,7 @@ local function onSave(self: Follower, payload: {string: any}): cmn.SaveData
 	)
 end
 
-local function onLoad(self: Follower, data: cmn.SaveData)
+local function onLoad(self: Follower, data: cmn.SaveData) -- This function will run only when the script loads data from a saved game. If onSave was not previously called, no data will have been saved to the player's game file and this function will not execute
 		self.player = data.player
 		self.doOnce = data.doOnce
 		self.doOnce2 = data.doOnce2
@@ -184,7 +184,7 @@ local function onLoad(self: Follower, data: cmn.SaveData)
 		self.posC = data.posC
 end
 
-local function onActivated(self: Follower, _: types.Actor)
+local function onActivated(self: Follower, _: types.Actor) -- This function will run any time the follower is activated for another actor, presumably a player
 	self:updateMWVar("questThoughts", 0)
 	self:updateMWVar("locationThoughts", 0)
 	self:updateMWVar("npcThoughts", 0)
