@@ -2,6 +2,8 @@ local util = require('openmw.util')
 local core = require('openmw.core')
 local types = require('openmw.types')
 
+local SCRIPT_VERSION <const> = 1 -- Increment whenever onSave is changed
+
 local interface PlayerQuest is types.PlayerQuest, types.PLAYERQuest end
 
 local type Flag = enum
@@ -101,6 +103,7 @@ end
 
 
 return {
+	SCRIPT_VERSION = SCRIPT_VERSION,
 	PlayerQuest = PlayerQuest,
 	Flag = Flag,
 	Timer = Timer,

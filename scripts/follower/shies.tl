@@ -15,7 +15,6 @@ local Shies = follower({
 })
 
 -- Shies Constants
-local SCRIPT_VERSION <const> = 1 -- Increment whenever onSave is changed
 local SHIES <const> = {
 	FLEE_THRESHOLD = 0.1, -- The health percentage at which shies should flee from combat via recall
 	SHIES_FLED_FOUND_STAGE = 40, -- The stage at which the player has found and spoken with shies after shies fled from combat for the first time
@@ -88,8 +87,9 @@ local function flee() -- Triggers if shies' health drops below a certain thresho
     time.newSimulationTimer(SHIES.RECALL_TIMEOUT, cb, self, nil)
 end
 
-local function shiesCheckAttributes() -- Calls shies-specific functions relating to attributes
-	if Shies.dynamicStats[1](Shies.selfObj).current > 0 and Shies.dynamicStats[1](Shies.selfObj).current / cmn.getMaxDynStat(Shies.dynamicStats[1](Shies.selfObj)) < SHIES.FLEE_THRESHOLD then -- Check health ratio
+local function shiesCheckDynStats() -- Calls shies-specific functions relating to dynamic stats
+	if Shies.dynamicStats[1](Shies.selfObj).current > 0
+	and Shies.dynamicStats[1](Shies.selfObj).current / cmn.getMaxDynStat(Shies.dynamicStats[1](Shies.selfObj)) < SHIES.FLEE_THRESHOLD then -- Check health ratio
 		Shies:updateMWVar("companion", Shies.mwBool.FALSE)
 		Shies.checks["cMove"] = false
         flee() -- Teleport Shies away from combat to whatever position he has marked
@@ -117,7 +117,7 @@ local function onUpdate(dt: number) -- Called every frame while the script is lo
 		return
 	end
 	
-	shiesCheckAttributes()
+	shiesCheckDynStats()
 	if Shies.checks["incapacitated"] == true then
 		-- Right now there is only one instance of shies being incapacitated, and only one condition under which he gets back up
 		-- However, if this mechanic is extended in the future, passing a boolean parameter as the get up condition makes this trivial
@@ -133,19 +133,19 @@ end
 
 local function onSave(): cmn.SaveData -- Called when the game saves, even if currently in an inactive state
 	return Shies:onSave({
-		version = SCRIPT_VERSION,
+		version = cmn.SCRIPT_VERSION,
 		recallLoc = RecallLoc,
 	})
 end
 
 local function onLoad(data: cmn.SaveData) -- Called only when the script loads, not the saved game. Will not be called if the script was not previously saved
-	if (not data) or (not data.version) or (data.version < SCRIPT_VERSION) then
+	if (not data) or (not data.version) or (data.version < cmn.SCRIPT_VERSION) then
 		print('Was saved with an old version of the script, initializing to default')
 		RecallLoc = SHIES.INIT_DATA.recallLoc
 		return
-	elseif (data.version > SCRIPT_VERSION) then
+	elseif (data.version > cmn.SCRIPT_VERSION) then
 		error('Required update to a new version of the script')
-	elseif (data.version == SCRIPT_VERSION) then
+	elseif (data.version == cmn.SCRIPT_VERSION) then
 		RecallLoc = data.recallLoc
 		Shies:onLoad(data)
 	end
