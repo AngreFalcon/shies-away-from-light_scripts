@@ -109,10 +109,12 @@ local function setNewRecallLoc()
             loop = false,
         }
     })
-	RecallLoc.cellId = Shies.selfObj.cell.id
-	RecallLoc.cellPos.x = Shies.selfObj.position.x
-	RecallLoc.cellPos.y = Shies.selfObj.position.y
-	RecallLoc.cellPos.z = Shies.selfObj.position.z
+	if (Shies.selfObj.cell.isExterior == true) then
+		RecallLoc.cellId = ""
+	else
+		RecallLoc.cellId = Shies.selfObj.cell.id
+	end
+		RecallLoc.cellPos = util.vector3(Shies.selfObj.position.x, Shies.selfObj.position.y, Shies.selfObj.position.z)
 end
 --
 
@@ -133,7 +135,13 @@ local function onUpdate(dt: number) -- Called every frame while the script is lo
 	if core.isWorldPaused() == true then
 		return
 	end
-	
+	print(Shies.selfObj.cell.id)
+	print(Shies.selfObj.position.x)
+	print(Shies.selfObj.position.y)
+	print(RecallLoc.cellId)
+	print(RecallLoc.cellPos.x)
+	print(RecallLoc.cellPos.y)
+
 	shiesCheckDynStats()
 	if Shies.checks["incapacitated"] == true then
 		-- Right now there is only one instance of shies being incapacitated, and only one condition under which he gets back up
@@ -141,7 +149,7 @@ local function onUpdate(dt: number) -- Called every frame while the script is lo
 		shiesIncapacitated((types.Player.quests(Shies.player) as {string: cmn.PlayerQuest})["SAFL_ShiesFled"].stage >= SHIES.SHIES_FLED_FOUND_STAGE)
 	end
 
-	if Shies.MWVars["markloc"] == Shies.mwBool.TRUE and RecallLoc.cellId ~= Shies.selfObj.cell.id then
+	if Shies.MWVars["markloc"] == Shies.mwBool.TRUE then
 		setNewRecallLoc()
 	end
 
