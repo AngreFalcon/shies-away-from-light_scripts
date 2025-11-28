@@ -3,7 +3,7 @@ local I = require('openmw.interfaces')
 I.Settings.registerPage {
     key = 'ShiesAwayFromLightPage',
     l10n = 'ShiesAwayFromLight',
-    name = 'Shies Away From Light',
+    name = 'Shies-Away-from-Light',
     description = 'Page description TBD',
 }
 

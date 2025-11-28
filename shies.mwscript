@@ -7,11 +7,12 @@ short nolore
 short compmove ; 1 if the player has asked follower to maintain their distance
 short onetimemove ; 1 if the player has asked follower to move out of the way 
 short weapuse ; 1 if the player has asked follower to use the same weapons as the player
-short questThoughts ; 1 if the player has asked follower for their opinion about ongoing quests. Enables dialogue topics for in-progress quests
-short locationThoughts ; 1 if the player has asked follower for their opinion about locations. Enables dialogue topics for visited locations
-short npcThoughts ; 1 if the player has asked follower for their opinion about individuals. Enables dialogue topics for various NPCs that have been met
+short questthoughts ; 1 if the player has asked follower for their opinion about ongoing quests. Enables dialogue topics for in-progress quests
+short locationthoughts ; 1 if the player has asked follower for their opinion about locations. Enables dialogue topics for visited locations
+short npcthoughts ; 1 if the player has asked follower for their opinion about individuals. Enables dialogue topics for various NPCs that have been met
 ; Shies-specific variables
 short fled ; 1 if shies has teleported away during combat
+short markloc ; 1 if the player has asked shies to mark a new location. Will be set to 0 when the location has been marked
 
 ; if the player has a menu open and the player is not sleeping, don't execute the rest of the script
 if ( MenuMode == 1 )

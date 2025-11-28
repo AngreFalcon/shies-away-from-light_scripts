@@ -97,6 +97,23 @@ local function shiesCheckDynStats() -- Calls shies-specific functions relating t
 		return
 	end
 end
+
+local function setNewRecallLoc()
+	Shies:updateMWVar("markloc", Shies.mwBool.FALSE)
+    local vfx = core.magic.effects.records["mark"] -- Trigger the Recall vfx
+    Shies.selfObj:sendEvent('AddVfx', {
+        model = types.Static.record(vfx.hitStatic).model,
+        options = {
+            vfxId = "vfxShiesFlee",
+            particleTextureOverride = vfx.particle,
+            loop = false,
+        }
+    })
+	RecallLoc.cellId = Shies.selfObj.cell.id
+	RecallLoc.cellPos.x = Shies.selfObj.position.x
+	RecallLoc.cellPos.y = Shies.selfObj.position.y
+	RecallLoc.cellPos.z = Shies.selfObj.position.z
+end
 --
 
 -- Handler functions - Functions that will be called directly by OpenMW
@@ -122,6 +139,10 @@ local function onUpdate(dt: number) -- Called every frame while the script is lo
 		-- Right now there is only one instance of shies being incapacitated, and only one condition under which he gets back up
 		-- However, if this mechanic is extended in the future, passing a boolean parameter as the get up condition makes this trivial
 		shiesIncapacitated((types.Player.quests(Shies.player) as {string: cmn.PlayerQuest})["SAFL_ShiesFled"].stage >= SHIES.SHIES_FLED_FOUND_STAGE)
+	end
+
+	if Shies.MWVars["markloc"] == Shies.mwBool.TRUE and RecallLoc.cellId ~= Shies.selfObj.cell.id then
+		setNewRecallLoc()
 	end
 
 	Shies:onUpdate(dt)
