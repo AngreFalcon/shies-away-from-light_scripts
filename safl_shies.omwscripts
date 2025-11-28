@@ -1,5 +1,6 @@
 GLOBAL: scripts/follower/global.lua
 
 PLAYER: scripts/follower/player.lua
+PLAYER: scripts/follower/settings.lua
 
 CUSTOM: scripts/follower/shies.lua
