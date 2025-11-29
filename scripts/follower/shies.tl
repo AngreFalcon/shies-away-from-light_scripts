@@ -140,12 +140,6 @@ function engine.onUpdate(dt: number) -- Called every frame while the script is l
 	if core.isWorldPaused() == true then
 		return
 	end
-	print(Shies.selfObj.cell.id)
-	print(Shies.selfObj.position.x)
-	print(Shies.selfObj.position.y)
-	print(RecallLoc.cellId)
-	print(RecallLoc.cellPos.x)
-	print(RecallLoc.cellPos.y)
 
 	shiesCheckDynStats()
 	if Shies.checks["incapacitated"] == true then

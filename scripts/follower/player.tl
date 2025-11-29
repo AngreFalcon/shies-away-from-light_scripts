@@ -13,22 +13,32 @@ local function getQuest(questName: string): cmn.PlayerQuest
 	return (types.Player.quests(selfObj) as {string: cmn.PlayerQuest})[questName]
 end
 
+local engine = {}
+		
+function engine.onKeyPress(key: input.KeyboardEvent)
+	-- Ignore anything that's not an 'x' keypress
+	if key.symbol ~= 'x' then return end
+	-- Scan nearby actors - if Shies is found in the list, send an event over to him
+	for _, obj in ipairs(nearby.actors) do
+    	if obj.recordId == "safl_shies" then
+			obj:sendEvent("shiesJump", nil)
+       		--obj:sendEvent("hurtShies", nil)
+       		--ui.showMessage('Your callous behaviour has injured the poor lizard... he run away.....', nil)
+       		return
+    	end
+ 	end
+end
+
+function engine.onQuestUpdate(questId: string, _: number) -- Adds each newly acquired quest's name to the player's list of dialogue topics
+	if questId == nil then return end
+	local quest = (((core.dialogue.journal as core.DialogueRecords).records as {any: any})[questId] as core.DialogueRecord)
+	if quest.questName ~= nil and types.Player.journal(selfObj).topics[quest.questName] == nil then
+		types.Player.addTopic(selfObj, quest.questName)
+	end
+end
+
 return {
-	engineHandlers = {
-		onKeyPress = function(key: input.KeyboardEvent)
-        	-- Ignore anything that's not an 'x' keypress
-        	if key.symbol ~= 'x' then return end
-        	-- Scan nearby actors - if Shies is found in the list, send an event over to him
-        	for _, obj in ipairs(nearby.actors) do
-            	if obj.recordId == "safl_shies" then
-					obj:sendEvent("shiesJump", nil)
-               		--obj:sendEvent("hurtShies", nil)
-               		--ui.showMessage('Your callous behaviour has injured the poor lizard... he run away.....', nil)
-               		return
-            	end
-         	end
-      	end,
-   	},
+	engineHandlers = engine,
    	eventHandlers = {
 		["shiesAttacked"] = function(message: string)
          	UI.showInteractiveMessage(message, nil)
