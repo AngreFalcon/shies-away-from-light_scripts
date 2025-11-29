@@ -99,7 +99,7 @@ local function shiesCheckDynStats() -- Calls shies-specific functions relating t
 	end
 end
 
-local function setNewRecallLoc()
+local function setNewRecallLoc() -- Mark a new location for shies to recall to when fleeing from combat
 	Shies:updateMWVar("markloc", Shies.mwBool.FALSE)
     local vfx = core.magic.effects.records["mark"] -- Trigger the Mark vfx
     core.sound.playSound3d("mysticism cast", Shies.selfObj, {})

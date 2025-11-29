@@ -9,13 +9,21 @@ local cmn = require('scripts.follower.common')
 
 local selfObj = self as core.GameObject
 
-local function getQuest(questName: string): cmn.PlayerQuest
+local function getQuest(questName: string): cmn.PlayerQuest -- Fetch a quest with the given quest name
 	return (types.Player.quests(selfObj) as {string: cmn.PlayerQuest})[questName]
+end
+
+local function addQuestNameTopic(questId: string) -- Adds each newly acquired quest's name to the player's list of dialogue topics
+	if questId == nil then return end
+	local quest = (((core.dialogue.journal as core.DialogueRecords).records as {any: any})[questId] as core.DialogueRecord)
+	if quest.questName ~= nil and types.Player.journal(selfObj).topics[quest.questName] == nil then -- Only add a new topic if the topic doesn't already exist in the player's journal. Do note that, as of API v97, the player's journal topics does not seem to update until the player uses the topic in conversation
+		types.Player.addTopic(selfObj, quest.questName)
+	end
 end
 
 local engine = {}
 		
-function engine.onKeyPress(key: input.KeyboardEvent)
+function engine.onKeyPress(key: input.KeyboardEvent) -- Triggered each time the player presses a key
 	-- Ignore anything that's not an 'x' keypress
 	if key.symbol ~= 'x' then return end
 	-- Scan nearby actors - if Shies is found in the list, send an event over to him
@@ -29,12 +37,8 @@ function engine.onKeyPress(key: input.KeyboardEvent)
  	end
 end
 
-function engine.onQuestUpdate(questId: string, _: number) -- Adds each newly acquired quest's name to the player's list of dialogue topics
-	if questId == nil then return end
-	local quest = (((core.dialogue.journal as core.DialogueRecords).records as {any: any})[questId] as core.DialogueRecord)
-	if quest.questName ~= nil and types.Player.journal(selfObj).topics[quest.questName] == nil then
-		types.Player.addTopic(selfObj, quest.questName)
-	end
+function engine.onQuestUpdate(questId: string, _: number) -- Triggered each time a quest stage changes
+	addQuestNameTopic(questId)
 end
 
 return {
