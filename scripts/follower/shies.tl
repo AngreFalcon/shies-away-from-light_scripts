@@ -64,7 +64,8 @@ local function flee() -- Triggers if shies' health drops below a certain thresho
             loop = false,
         }
     })
-
+	core.sound.playSound3d("mysticism cast", Shies.selfObj, {})
+	
     local cb = time.registerTimerCallback( -- Teleport away after RECALL_TIMEOUT seconds
         Shies.selfObj.id .. "_FleeCallback",
         function(actor: core.GameObject)
@@ -100,8 +101,9 @@ end
 
 local function setNewRecallLoc()
 	Shies:updateMWVar("markloc", Shies.mwBool.FALSE)
-    local vfx = core.magic.effects.records["mark"] -- Trigger the Recall vfx
-    Shies.selfObj:sendEvent('AddVfx', {
+    local vfx = core.magic.effects.records["mark"] -- Trigger the Mark vfx
+    core.sound.playSound3d("mysticism cast", Shies.selfObj, {})
+	Shies.selfObj:sendEvent('AddVfx', {
         model = types.Static.record(vfx.hitStatic).model,
         options = {
             vfxId = "vfxShiesFlee",
@@ -114,7 +116,7 @@ local function setNewRecallLoc()
 	else
 		RecallLoc.cellId = Shies.selfObj.cell.id
 	end
-		RecallLoc.cellPos = util.vector3(Shies.selfObj.position.x, Shies.selfObj.position.y, Shies.selfObj.position.z)
+	RecallLoc.cellPos = util.vector3(Shies.selfObj.position.x, Shies.selfObj.position.y, Shies.selfObj.position.z)
 end
 --
 
@@ -131,7 +133,10 @@ time.runRepeatedly( -- This function runs once every x seconds, where x = DELAY2
 	end, Shies.DELAY2, {}
 )
 
-local function onUpdate(dt: number) -- Called every frame while the script is loaded
+	-- Engine handlers
+local engine = {}
+
+function engine.onUpdate(dt: number) -- Called every frame while the script is loaded
 	if core.isWorldPaused() == true then
 		return
 	end
@@ -156,18 +161,18 @@ local function onUpdate(dt: number) -- Called every frame while the script is lo
 	Shies:onUpdate(dt)
 end
 
-local function onInit() -- Called when the script is created but not loaded
+function engine.onInit() -- Called when the script is created but not loaded
 	RecallLoc = SHIES.INIT_DATA.recallLoc
 end
 
-local function onSave(): cmn.SaveData -- Called when the game saves, even if currently in an inactive state
+function engine.onSave(): cmn.SaveData -- Called when the game saves, even if currently in an inactive state
 	return Shies:onSave({
 		version = cmn.SCRIPT_VERSION,
 		recallLoc = RecallLoc,
 	})
 end
 
-local function onLoad(data: cmn.SaveData) -- Called only when the script loads, not the saved game. Will not be called if the script was not previously saved
+function engine.onLoad(data: cmn.SaveData) -- Called only when the script loads, not the saved game. Will not be called if the script was not previously saved
 	if (not data) or (not data.version) or (data.version < cmn.SCRIPT_VERSION) then
 		print('Was saved with an old version of the script, initializing to default')
 		RecallLoc = SHIES.INIT_DATA.recallLoc
@@ -180,19 +185,13 @@ local function onLoad(data: cmn.SaveData) -- Called only when the script loads, 
 	end
 end
 
-local function onActivated(actor: types.Actor) -- Called whenever a player activates shies, initiating dialogue
+function engine.onActivated(actor: types.Actor) -- Called whenever a player activates shies, initiating dialogue
 	Shies:onActivated(actor)
 end
 --
 
 return {
-    engineHandlers = {
-        onUpdate = onUpdate,
-		onInit = onInit,
-		onSave = onSave,
-		onLoad = onLoad,
-		onActivated = onActivated,
-    },
+    engineHandlers = engine,
     eventHandlers = {
 		["fetchMWVars"] = function(data: {string: number})
 			Shies.MWVars = data
