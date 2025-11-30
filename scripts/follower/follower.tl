@@ -91,7 +91,7 @@ local interface Follower is Follower.OMW_SELF
 	onSave: function(self: Follower, payload: {string: any}): cmn.SaveData
 	onLoad: function(self: Follower, data: cmn.SaveData)
 	onActivated: function(self: Follower, actor: types.Actor)
-	updateMWVar: function(self: Follower, varName: string, varData: number)
+	updateMWVars: function(self: Follower, data: {string: number})
 	isFollowing: function(self: Follower): boolean
 	getPlayerLeader: function(self: Follower)
 	fullHeal: function(self: Follower)
@@ -99,6 +99,7 @@ local interface Follower is Follower.OMW_SELF
 	getPlayerCellPos: function(self: Follower): cmn.CellLoc
 	setSheatheWarpTimers: function(self: Follower, dt: number)
 	updateTimers: function(self: Follower, dt: number)
+	resetDialogueVars: function(self: Follower)
 	setSneak: function(self: Follower)
 	makeCompanionFollow: function(self: Follower)
 	toggleEffect: function(self: Follower, flag: cmn.Flag, effectType: string)
@@ -151,7 +152,9 @@ local FollowerWanderThreshold <const> = 300 -- The distance parameter for follow
 
 -- Function Definitions
 -- Handler functions - Functions that will be called directly by OpenMW
-local function delayUpdate1(self: Follower) -- This function runs once every x seconds, where x = DELAY1
+local handler = {}
+
+function handler.delayUpdate1(self: Follower) -- This function runs once every x seconds, where x = DELAY1
 	if self:isFollowing() then
 		self:toggleEffect("fly", (core.magic.EFFECT_TYPE.Levitate as string))
 		self:toggleEffect("ww", (core.magic.EFFECT_TYPE.WaterWalking as string))
@@ -162,10 +165,11 @@ local function delayUpdate1(self: Follower) -- This function runs once every x s
 	end
 end
 
-local function delayUpdate2(_: Follower) -- This function runs once every x seconds, where x = DELAY2
+function handler.delayUpdate2(_: Follower) -- This function runs once every x seconds, where x = DELAY2
 end
 
-local function onUpdate(self: Follower, dt: number) -- This function executes every frame and, as such, should be used as sparingly as possible
+function handler.onUpdate(self: Follower, dt: number) -- This function executes every frame and, as such, should be used as sparingly as possible
+	self:resetDialogueVars()
 	self:getPlayerLeader()
     self:checkDynStats()
 	self:updateTimers(dt)
@@ -181,9 +185,9 @@ local function onUpdate(self: Follower, dt: number) -- This function executes ev
 	end
 end
 
-local function onSave(self: Follower, payload: {string: any}): cmn.SaveData -- This function executes whenever the player saves their game, and the return value of this function is used to store data to the player's save file that should persist across player sessions
+function handler.onSave(self: Follower, payload: {string: any}): cmn.SaveData -- This function executes whenever the player saves their game, and the return value of this function is used to store data to the player's save file that should persist across player sessions
 	for k, v in pairs(self.MWVars) do
-		self:updateMWVar(k, v)
+		self:updateMWVars({[k] = v})
 	end
 	return cmn.merge(
 		{
@@ -201,7 +205,7 @@ local function onSave(self: Follower, payload: {string: any}): cmn.SaveData -- T
 	)
 end
 
-local function onLoad(self: Follower, data: cmn.SaveData) -- This function will run only when the script loads data from a saved game. If onSave was not previously called, no data will have been saved to the player's game file and this function will not execute
+function handler.onLoad(self: Follower, data: cmn.SaveData) -- This function will run only when the script loads data from a saved game. If onSave was not previously called, no data will have been saved to the player's game file and this function will not execute
 		self.player = data.player
 		self.doOnce = data.doOnce
 		self.doOnce2 = data.doOnce2
@@ -213,42 +217,42 @@ local function onLoad(self: Follower, data: cmn.SaveData) -- This function will 
 		self.posC = data.posC
 end
 
-local function onActivated(self: Follower, _: types.Actor) -- This function will run any time the follower is activated for another actor, presumably a player
-	self:updateMWVar("questThoughts", 0)
-	self:updateMWVar("locationThoughts", 0)
-	self:updateMWVar("npcThoughts", 0)
+function handler.onActivated(self: Follower, _: types.Actor) -- This function will run any time the follower is activated for another actor, presumably a player
+	self:resetDialogueVars()
 end
 
 -- Utility functions -- Functions that may return game values or that other functions may depend on for calculations or checks
-local function updateMWVar(self: Follower, varName: string, varData: number) -- Send an event to the global script to update a single mwscript variable with the provided value
-	core.sendGlobalEvent("updateMWVar", {varName, varData, self.selfObj})
+local utility = {}
+
+function utility.updateMWVars(self: Follower, data: {string: number}) -- Send an event to the global script to update a single mwscript variable with the provided value
+	core.sendGlobalEvent("updateMWVar", {data, self.selfObj})
 end
 
-local function isFollowing(self: Follower): boolean -- Simply return true or false if companion is currently following any player
+function utility.isFollowing(self: Follower): boolean -- Simply return true or false if companion is currently following any player
 	local currentPackage = self.ai.getActivePackage()
 	return ((currentPackage ~= nil) and (currentPackage.type == "Follow"))
 end
 
-local function getPlayerLeader(self: Follower) -- Gets the player object that companion is currently following
+function utility.getPlayerLeader(self: Follower) -- Gets the player object that companion is currently following
 	if self:isFollowing() then
 		self.player = self.ai.getActiveTarget("Follow")
 	end
 end
 
-local function fullHeal(self: Follower) -- Fully restore follower's health
+function utility.fullHeal(self: Follower) -- Fully restore follower's health
 	self.dynamicStats[1](self.selfObj).current = cmn.getMaxDynStat(self.dynamicStats[1](self.selfObj))
 end
 
-local function checkForPotion(self: Follower, potionName: string): boolean -- Returns true if follower has any of the specified potions in their inventory
+function utility.checkForPotion(self: Follower, potionName: string): boolean -- Returns true if follower has any of the specified potions in their inventory
 	local inventory = types.Actor.inventory(self.selfObj)
 	return inventory:countOf(potionName) > 0
 end
 
-local function getPlayerCellPos(self: Follower): cmn.CellLoc -- Get the cell location of the player that companion is currently following
+function utility.getPlayerCellPos(self: Follower): cmn.CellLoc -- Get the cell location of the player that companion is currently following
 	return {cellId = self.player.cell.name, cellPos = self.player.position}
 end
 
-local function setSheatheWarpTimers(self: Follower, dt: number) -- Sheathe weapon after combat check
+function utility.setSheatheWarpTimers(self: Follower, dt: number) -- Sheathe weapon after combat check
 	if self.checks["combat"] == true then
 		self.timers["warp"] = self.defaultCd.WARP
 		self.timers["sheathe"] = self.timers["sheathe"] - dt
@@ -278,7 +282,7 @@ local function setSheatheWarpTimers(self: Follower, dt: number) -- Sheathe weapo
 	end
 end
 
-local function updateTimers(self: Follower, dt: number) -- This function updates our various timers by dt, the time passed since this script's last executions
+function utility.updateTimers(self: Follower, dt: number) -- This function updates our various timers by dt, the time passed since this script's last executions
 	for i = 1, #self.restoreDynStat do
 		if self.restoreDynStat[i].spellTimer > 0 then
 			self.restoreDynStat[i].spellTimer = self.restoreDynStat[i].spellTimer - dt
@@ -306,10 +310,29 @@ local function updateTimers(self: Follower, dt: number) -- This function updates
 	end
 	self:setSheatheWarpTimers(dt)
 end
+
+function utility.resetDialogueVars(self: Follower) -- This function sets all dialogue mwscript variables back to 0 when called
+	local vars = {
+		["locationThoughts"] = self.mwBool.FALSE,
+		["npcThoughts"] = self.mwBool.FALSE,
+		["mainquestThoughts"] = self.mwBool.FALSE,
+		["magequestThoughts"] = self.mwBool.FALSE,
+		["moragquestThoughts"] = self.mwBool.FALSE,
+		["thiefquestThoughts"] = self.mwBool.FALSE,
+		["fighterquestThoughts"] = self.mwBool.FALSE,
+		["legionquestThoughts"] = self.mwBool.FALSE,
+		["cultquestThoughts"] = self.mwBool.FALSE,
+		["templequestThoughts"] = self.mwBool.FALSE,
+		["housequestThoughts"] = self.mwBool.FALSE,
+	}
+	self:updateMWVars(vars)
+end
 --
 
 -- Gameplay functions -- Functions that modify follower's gameplay behavior
-local function setSneak(self: Follower) -- Make sure if the player is sneaking, follower sneaks as well
+local gameplay = {}
+
+function gameplay.setSneak(self: Follower) -- Make sure if the player is sneaking, follower sneaks as well
 	if self.player ~= nil then
 		self.player:sendEvent("getSneakVal", self.selfObj)
 	end
@@ -318,14 +341,14 @@ local function setSneak(self: Follower) -- Make sure if the player is sneaking, 
 	end
 end
 
-local function makeCompanionFollow(self: Follower) -- Helper function for setting the Follow AI package
+function gameplay.makeCompanionFollow(self: Follower) -- Helper function for setting the Follow AI package
 	self.ai.startPackage({
 		type = "Follow",
 		target = self.player
 	})
 end
 
-local function toggleEffect(self: Follower, flag: cmn.Flag, effectType: string) -- This function should apply the levitate effect to companion if the player is levitating, and remove it if the player isn't
+function gameplay.toggleEffect(self: Follower, flag: cmn.Flag, effectType: string) -- This function should apply the levitate effect to companion if the player is levitating, and remove it if the player isn't
 	local playerEffect = types.Actor.activeEffects(self.player):getEffect(effectType, nil).magnitude
 	if playerEffect > 0 and self.checks[flag] == false then
 		types.Actor.activeEffects(self.selfObj):modify(playerEffect, effectType, nil)
@@ -337,14 +360,14 @@ local function toggleEffect(self: Follower, flag: cmn.Flag, effectType: string) 
 	end
 end
 
-local function freeFall(self: Follower) -- Used to call various functions that should trigger while follower is in freefall
+function gameplay.freeFall(self: Follower) -- Used to call various functions that should trigger while follower is in freefall
 	if self.timers["freefall"] > 1 and self:checkForPotion("p_slowfall_s") then
 		self.timers["freefall"] = -(self:consumePotion("p_slowfall_s", "SlowFall"))
 	end
 end
 
 	-- Restore dynamic stat logic
-local function castSpell(self: Follower, spell: core.Spell, castSound: string): number -- Applies the effect of the specified spell to the follower, including vfx and sound, and then consumes follower's magicka equal to the cost of the spell. 
+function gameplay.castSpell(self: Follower, spell: core.Spell, castSound: string): number -- Applies the effect of the specified spell to the follower, including vfx and sound, and then consumes follower's magicka equal to the cost of the spell. 
 	local duration: number = self.defaultCd.SPELL
 	-- This should be the correct way to do this. However, it appears this event does not work properly, possibly a feature that's not present in openmw 0.50?
 	-- selfObj:sendEvent('ModifyStat', {name = 'magicka', amount = -10}) -- Subtract the cost of the spell from the follower's current magicka
@@ -377,7 +400,7 @@ local function castSpell(self: Follower, spell: core.Spell, castSound: string): 
 	return duration
 end
 
-local function useEnchantment(self: Follower, itemRecord: cmn.EnchRecord, effectName: string, castSound: string): number -- Makes follower use the specified enchanted item, applying its magic effect and consuming some of the item's charge
+function gameplay.useEnchantment(self: Follower, itemRecord: cmn.EnchRecord, effectName: string, castSound: string): number -- Makes follower use the specified enchanted item, applying its magic effect and consuming some of the item's charge
 	local item = types.Actor.inventory(self.selfObj):find(itemRecord.id)
 	local enchantment = (core.magic.enchantments.records as {string: core.Enchantment})[itemRecord.enchant]
 	local duration: number = self.defaultCd.SCROLL
@@ -409,7 +432,7 @@ local function useEnchantment(self: Follower, itemRecord: cmn.EnchRecord, effect
 	return duration
 end
 
-local function consumePotion(self: Follower, potionID: string, effectName: string): number -- Sends a global event to trigger follower to consume the specified potion. Returns the duration of whatever effect is specified, or 60 if the potion does not have that effect
+function gameplay.consumePotion(self: Follower, potionID: string, effectName: string): number -- Sends a global event to trigger follower to consume the specified potion. Returns the duration of whatever effect is specified, or 60 if the potion does not have that effect
 	local potion = types.Actor.inventory(self.selfObj):find(potionID)
 	local potionEffects = types.Potion.record(potion).effects
 	local duration: number = self.defaultCd.POTION
@@ -425,7 +448,7 @@ local function consumePotion(self: Follower, potionID: string, effectName: strin
 	return duration
 end
 
-local function useScroll(self: Follower, scrollId: string, effectName: string, castSound: string): number -- Sends a global event to trigger follower to use the specified scroll. Returns the duration of whatever effect is specified, or 60 if the scroll does not have that effect
+function gameplay.useScroll(self: Follower, scrollId: string, effectName: string, castSound: string): number -- Sends a global event to trigger follower to use the specified scroll. Returns the duration of whatever effect is specified, or 60 if the scroll does not have that effect
 	local scroll = types.Actor.inventory(self.selfObj):find(scrollId)
 	local scrollRecord = types.Book.record(scroll)
 	local scrollEffects: {core.MagicEffectWithParams} = (core.magic.enchantments.records as {string: core.Enchantment})[scrollRecord.enchant].effects
@@ -459,7 +482,7 @@ local function useScroll(self: Follower, scrollId: string, effectName: string, c
 	return duration
 end
 
-local function selectRestoreEnch(self: Follower, effectId: string, attrDiff: number, itemType: cmn.EnchType): {cmn.EnchRecord, number} -- Scans through the follower's inventory, finding the enchanted item that has the most applicable restorative effect
+function gameplay.selectRestoreEnch(self: Follower, effectId: string, attrDiff: number, itemType: cmn.EnchType): {cmn.EnchRecord, number} -- Scans through the follower's inventory, finding the enchanted item that has the most applicable restorative effect
 	local inventory = types.Actor.inventory(self.selfObj)
 	local selectedItem: cmn.EnchRecord
 	local selectedHealQuality: number
@@ -488,7 +511,7 @@ local function selectRestoreEnch(self: Follower, effectId: string, attrDiff: num
 	end
 end
 
-local function selectRestoreSpell(self: Follower, effectId: string, attrDiff: number): {core.Spell, number} -- Selects the best restorative spell the NPC currently has (prioritizes magnitude over cost). Prefers the spell that restores closest to the missing amount of whichever attribute is being restored rather than just the spell with the greatest magnitude, currently ignores all side effects of casting the spell. Returns nil if no spell is found
+function gameplay.selectRestoreSpell(self: Follower, effectId: string, attrDiff: number): {core.Spell, number} -- Selects the best restorative spell the NPC currently has (prioritizes magnitude over cost). Prefers the spell that restores closest to the missing amount of whichever attribute is being restored rather than just the spell with the greatest magnitude, currently ignores all side effects of casting the spell. Returns nil if no spell is found
 	local spells = types.Actor.spells(self.selfObj)
 	local currentMagicka = self.dynamicStats[2](self.selfObj).current
 	local selectedSpell: core.Spell
@@ -519,7 +542,7 @@ local function selectRestoreSpell(self: Follower, effectId: string, attrDiff: nu
 	end
 end
 
-local function selectRestorePotion(self: Follower, effectId: string, attrDiff: number, attrMax: number): {string, number} -- Find the potion whose restore amount is closest to the amount missing from the specified attribute
+function gameplay.selectRestorePotion(self: Follower, effectId: string, attrDiff: number, attrMax: number): {string, number} -- Find the potion whose restore amount is closest to the amount missing from the specified attribute
 	local inventory = types.Actor.inventory(self.selfObj)
 	local selectedPotion: types.PotionRecord
 	local selectedMagnitude: number
@@ -548,7 +571,7 @@ local function selectRestorePotion(self: Follower, effectId: string, attrDiff: n
 	end
 end
 
-local function selectRestoreScroll(self: Follower, effectId: string, attrDiff: number, attrMax: number): {string, number} -- Find whichever scroll is enchanted with an effect that has the most suitable restore health/magicka/fatigue amount out of all scrolls in the follower's inventory
+function gameplay.selectRestoreScroll(self: Follower, effectId: string, attrDiff: number, attrMax: number): {string, number} -- Find whichever scroll is enchanted with an effect that has the most suitable restore health/magicka/fatigue amount out of all scrolls in the follower's inventory
 	local inventory = types.Actor.inventory(self.selfObj)
 	local selectedScroll: types.BookRecord
 	local selectedMagnitude: number
@@ -582,7 +605,7 @@ local function selectRestoreScroll(self: Follower, effectId: string, attrDiff: n
 	end
 end
 
-local function chooseRestoreMethod(self: Follower, iter: integer) -- Intelligently selects the most appropriate healing method to use when health is low based on what spells, potions, scrolls, and enchantments are available. As of OpenMW 0.50, scrolls and enchantments are not available due to API limitations
+function gameplay.chooseRestoreMethod(self: Follower, iter: integer) -- Intelligently selects the most appropriate healing method to use when health is low based on what spells, potions, scrolls, and enchantments are available. As of OpenMW 0.50, scrolls and enchantments are not available due to API limitations
 	local enum RESTORE_METHOD
 		"encharmor"
 		"enchclothing"
@@ -673,7 +696,7 @@ local function chooseRestoreMethod(self: Follower, iter: integer) -- Intelligent
 	self.timers["restorecooldown"] = self.defaultCd.RESTORE
 end
 
-local function checkDynStats(self: Follower) -- Used to call various functions that affect follower's dynamic attributes like health, fatigue, and magicka
+function gameplay.checkDynStats(self: Follower) -- Used to call various functions that affect follower's dynamic attributes like health, fatigue, and magicka
 	for i = 1, #self.dynamicStats do
 		if cmn.getDynStatMissingPerc(self.dynamicStats[i](self.selfObj)) <= self.restoreConsts.TRIGGER_PERC and self.timers["restorecooldown"] <= 0 then
 			self:chooseRestoreMethod(i)
@@ -683,7 +706,9 @@ end
 --
 
 -- Movement functions - Functions that modify follower's movement behavior
-local function forceZLevel(self: Follower) -- If in combat, levitating and the player Z level is different from follower's, force follower's Z level to the player's
+local movement = {}
+
+function movement.forceZLevel(self: Follower) -- If in combat, levitating and the player Z level is different from follower's, force follower's Z level to the player's
 	local playerPos: cmn.CellLoc = (self:getPlayerCellPos() as cmn.CellLoc)
 	local followerPos = self.selfObj.position
 	if self.checks["fly"] == true and types.Actor.getStance(self.selfObj) == types.Actor.STANCE.Weapon then
@@ -695,7 +720,7 @@ local function forceZLevel(self: Follower) -- If in combat, levitating and the p
 	end
 end
 
-local function maintainDistance(self: Follower) -- Toggles follower between wandering and following the player in order to maintain a small window of distance from the player. Works only if the player activates it from dialogue by updating the "compmove" variable
+function movement.maintainDistance(self: Follower) -- Toggles follower between wandering and following the player in order to maintain a small window of distance from the player. Works only if the player activates it from dialogue by updating the "compmove" variable
 	local followerPos = self.selfObj.position
 	local playerPos: cmn.CellLoc = (self:getPlayerCellPos() as cmn.CellLoc)
 	if playerPos == nil then
@@ -718,18 +743,18 @@ local function maintainDistance(self: Follower) -- Toggles follower between wand
 	end
 end
 
-local function nudge(self: Follower, timePassed: number) -- Waits 4 seconds before making companion follow the player again. onetimemove is set true in dialogue while simultaneously triggering the Wander AI package to make them move
+function movement.nudge(self: Follower, timePassed: number) -- Waits 4 seconds before making companion follow the player again. onetimemove is set true in dialogue while simultaneously triggering the Wander AI package to make them move
 	if self.MWVars["onetimemove"] == self.mwBool.TRUE then
 		self.timers["move"] = self.timers["move"] + timePassed
 		if self.timers["move"] >= self.NUDGE_DELAY then
 			self.timers["move"] = 0
 			self:makeCompanionFollow()
-			self:updateMWVar("onetimemove", self.mwBool.FALSE)
+			self:updateMWVars({["onetimemove"] = self.mwBool.FALSE})
 		end
 	end
 end
 
-local function warpToPlayer(self: Follower) -- If the player gets too far from follower, teleport follower closer to the player
+function movement.warpToPlayer(self: Follower) -- If the player gets too far from follower, teleport follower closer to the player
 	self.posA = self:getPlayerCellPos()
 	if self.posA == nil then return end
 	if self.doOnce == false then
@@ -763,11 +788,11 @@ local function warpToPlayer(self: Follower) -- If the player gets too far from f
 	end
 end
 
-local function setDefaultSpeed(self: Follower) -- Sets follower's speed modifier while not following the player
+function movement.setDefaultSpeed(self: Follower) -- Sets follower's speed modifier while not following the player
 	types.Actor.stats.attributes.speed(self.selfObj).modifier = self.statMod.WANDER
 end
 
-local function modSpeedAndAthletics(self: Follower) -- Set follower's speed and athletics modifier to a flat value if they're within a certain distance of the player, or add a multiplier based off the player's stats if they're too far
+function movement.modSpeedAndAthletics(self: Follower) -- Set follower's speed and athletics modifier to a flat value if they're within a certain distance of the player, or add a multiplier based off the player's stats if they're too far
 	local followerSpeed = types.Actor.stats.attributes.speed(self.selfObj)
 	local followerAthletics = types.NPC.stats.skills.athletics(self.selfObj)
 	local cSpeed = types.Actor.stats.attributes.speed(self.player).modified * self.statMod.CATCHUP_MULT
@@ -902,43 +927,44 @@ local function defaultFollower(): Follower
 		]]
 		
 		-- Handler functions - Functions that will be called directly by OpenMW
-		delayUpdate1 = delayUpdate1,
-		delayUpdate2 = delayUpdate2,
-		onUpdate = onUpdate,
-		onSave = onSave,
-		onLoad = onLoad,
-		onActivated = onActivated,
+		delayUpdate1 = handler.delayUpdate1,
+		delayUpdate2 = handler.delayUpdate2,
+		onUpdate = handler.onUpdate,
+		onSave = handler.onSave,
+		onLoad = handler.onLoad,
+		onActivated = handler.onActivated,
 		-- Utility functions -- Functions that may return game values or that other functions may depend on for calculations or checks
-		updateMWVar = updateMWVar, -- Send an event to the global script to update a single mwscript variable with the provided value
-		isFollowing = isFollowing, -- Simply return true or false if companion is currently following any player
-		getPlayerLeader = getPlayerLeader, -- Gets the player object that companion is currently following		
-		fullHeal = fullHeal, -- Fully restore follower's health		
-		checkForPotion = checkForPotion, -- Returns true if follower has any of the specified potions in their inventory
-		getPlayerCellPos = getPlayerCellPos, -- Get the cell location of the player that companion is currently following
-		setSheatheWarpTimers = setSheatheWarpTimers, -- Sheathe weapon after combat check
-		updateTimers = updateTimers, -- This function updates our various timers by dt, the time passed since this script's last executions
+		updateMWVars = utility.updateMWVars, -- Send an event to the global script to update a single mwscript variable with the provided value
+		isFollowing = utility.isFollowing, -- Simply return true or false if companion is currently following any player
+		getPlayerLeader = utility.getPlayerLeader, -- Gets the player object that companion is currently following		
+		fullHeal = utility.fullHeal, -- Fully restore follower's health		
+		checkForPotion = utility.checkForPotion, -- Returns true if follower has any of the specified potions in their inventory
+		getPlayerCellPos = utility.getPlayerCellPos, -- Get the cell location of the player that companion is currently following
+		setSheatheWarpTimers = utility.setSheatheWarpTimers, -- Sheathe weapon after combat check
+		updateTimers = utility.updateTimers, -- This function updates our various timers by dt, the time passed since this script's last executions
+		resetDialogueVars = utility.resetDialogueVars, -- This function sets all dialogue mwscript variables back to 0 when called
 		-- Gameplay functions -- Functions that modify follower's gameplay behavior
-		setSneak = setSneak, -- Make sure if the player is sneaking, follower sneaks as well
-		makeCompanionFollow = makeCompanionFollow, -- Helper function for setting the Follow AI package
-		toggleEffect = toggleEffect, -- This function should apply the levitate effect to companion if the player is levitating, and remove it if the player isn't
-		castSpell = castSpell, -- Applies the effect of the specified spell to the follower, including vfx and sound, and then consumes follower's magicka equal to the cost of the spell. 
-		useEnchantment = useEnchantment, -- Makes follower use the specified enchanted item, applying its magic effect and consuming some of the item's charge
-		consumePotion = consumePotion, -- Sends a global event to trigger follower to consume the specified potion. Returns the duration of whatever effect is specified, or 60 if the potion does not have that effect
-		useScroll = useScroll, -- Sends a global event to trigger follower to use the specified scroll. Returns the duration of whatever effect is specified, or 60 if the scroll does not have that effect
-		selectRestoreEnch = selectRestoreEnch, -- Scans through the follower's inventory, finding the enchanted item that has the most applicable restorative effect
-		selectRestoreSpell = selectRestoreSpell, -- Selects the best restorative spell the NPC currently has (prioritizes magnitude over cost). Prefers the spell that restores closest to the missing amount of whichever attribute is being restored rather than just the spell with the greatest magnitude, currently ignores all side effects of casting the spell. Returns nil if no spell is found
-		selectRestorePotion = selectRestorePotion, -- Find the potion whose restore amount is closest to the amount missing from the specified attribute
-		selectRestoreScroll = selectRestoreScroll, -- Find whichever scroll is enchanted with an effect that has the most suitable restore health/magicka/fatigue amount out of all scrolls in the follower's inventory
-		chooseRestoreMethod = chooseRestoreMethod, -- Intelligently selects the most appropriate healing method to use when health is low based on what spells, potions, scrolls, and enchantments are available. As of OpenMW 0.50, scrolls and enchantments are not available due to API limitations
-		checkDynStats = checkDynStats, -- Used to call various functions that affect follower's dynamic stats like health, fatigue, and magicka
-		freeFall = freeFall, -- Used to call various functions that should trigger while follower is in freefall
+		setSneak = gameplay.setSneak, -- Make sure if the player is sneaking, follower sneaks as well
+		makeCompanionFollow = gameplay.makeCompanionFollow, -- Helper function for setting the Follow AI package
+		toggleEffect = gameplay.toggleEffect, -- This function should apply the levitate effect to companion if the player is levitating, and remove it if the player isn't
+		castSpell = gameplay.castSpell, -- Applies the effect of the specified spell to the follower, including vfx and sound, and then consumes follower's magicka equal to the cost of the spell. 
+		useEnchantment = gameplay.useEnchantment, -- Makes follower use the specified enchanted item, applying its magic effect and consuming some of the item's charge
+		consumePotion = gameplay.consumePotion, -- Sends a global event to trigger follower to consume the specified potion. Returns the duration of whatever effect is specified, or 60 if the potion does not have that effect
+		useScroll = gameplay.useScroll, -- Sends a global event to trigger follower to use the specified scroll. Returns the duration of whatever effect is specified, or 60 if the scroll does not have that effect
+		selectRestoreEnch = gameplay.selectRestoreEnch, -- Scans through the follower's inventory, finding the enchanted item that has the most applicable restorative effect
+		selectRestoreSpell = gameplay.selectRestoreSpell, -- Selects the best restorative spell the NPC currently has (prioritizes magnitude over cost). Prefers the spell that restores closest to the missing amount of whichever attribute is being restored rather than just the spell with the greatest magnitude, currently ignores all side effects of casting the spell. Returns nil if no spell is found
+		selectRestorePotion = gameplay.selectRestorePotion, -- Find the potion whose restore amount is closest to the amount missing from the specified attribute
+		selectRestoreScroll = gameplay.selectRestoreScroll, -- Find whichever scroll is enchanted with an effect that has the most suitable restore health/magicka/fatigue amount out of all scrolls in the follower's inventory
+		chooseRestoreMethod = gameplay.chooseRestoreMethod, -- Intelligently selects the most appropriate healing method to use when health is low based on what spells, potions, scrolls, and enchantments are available. As of OpenMW 0.50, scrolls and enchantments are not available due to API limitations
+		checkDynStats = gameplay.checkDynStats, -- Used to call various functions that affect follower's dynamic stats like health, fatigue, and magicka
+		freeFall = gameplay.freeFall, -- Used to call various functions that should trigger while follower is in freefall
 		-- Movement functions - Functions that modify follower's movement behavior
-		forceZLevel = forceZLevel, -- If in combat, levitating and the player Z level is different from follower's, force follower's Z level to the player's
-		maintainDistance = maintainDistance, -- Toggles follower between wandering and following the player in order to maintain a small window of distance from the player. Works only if the player activates it from dialogue by updating the "compmove" variable
-		nudge = nudge, -- Waits 4 seconds before making companion follow the player again. onetimemove is set true in dialogue while simultaneously triggering the Wander AI package to make them move
-		warpToPlayer = warpToPlayer, -- If the player gets too far from follower, teleport follower closer to the player
-		setDefaultSpeed = setDefaultSpeed, -- Sets follower's speed modifier while not following the player
-		modSpeedAndAthletics = modSpeedAndAthletics, -- Set follower's speed and athletics modifier to a flat value if they're within a certain distance of the player, or add a multiplier based off the player's stats if they're too far
+		forceZLevel = movement.forceZLevel, -- If in combat, levitating and the player Z level is different from follower's, force follower's Z level to the player's
+		maintainDistance = movement.maintainDistance, -- Toggles follower between wandering and following the player in order to maintain a small window of distance from the player. Works only if the player activates it from dialogue by updating the "compmove" variable
+		nudge = movement.nudge, -- Waits 4 seconds before making companion follow the player again. onetimemove is set true in dialogue while simultaneously triggering the Wander AI package to make them move
+		warpToPlayer = movement.warpToPlayer, -- If the player gets too far from follower, teleport follower closer to the player
+		setDefaultSpeed = movement.setDefaultSpeed, -- Sets follower's speed modifier while not following the player
+		modSpeedAndAthletics = movement.modSpeedAndAthletics, -- Set follower's speed and athletics modifier to a flat value if they're within a certain distance of the player, or add a multiplier based off the player's stats if they're too far
 	}
 end
 

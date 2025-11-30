@@ -91,7 +91,7 @@ end
 local function shiesCheckDynStats() -- Calls shies-specific functions relating to dynamic stats
 	if Shies.dynamicStats[1](Shies.selfObj).current > 0
 	and Shies.dynamicStats[1](Shies.selfObj).current / cmn.getMaxDynStat(Shies.dynamicStats[1](Shies.selfObj)) < SHIES.FLEE_THRESHOLD then -- Check health ratio
-		Shies:updateMWVar("companion", Shies.mwBool.FALSE)
+		Shies:updateMWVars({["companion"] = Shies.mwBool.FALSE})
 		Shies.checks["cMove"] = false
         flee() -- Teleport Shies away from combat to whatever position he has marked
 		Shies:fullHeal() -- Heal Shies to avoid the script triggering again, and also to ensure the player doesn't have to restore his health upon recovering him
@@ -100,7 +100,7 @@ local function shiesCheckDynStats() -- Calls shies-specific functions relating t
 end
 
 local function setNewRecallLoc() -- Mark a new location for shies to recall to when fleeing from combat
-	Shies:updateMWVar("markloc", Shies.mwBool.FALSE)
+	Shies:updateMWVars({["markloc"] = Shies.mwBool.FALSE})
     local vfx = core.magic.effects.records["mark"] -- Trigger the Mark vfx
     core.sound.playSound3d("mysticism cast", Shies.selfObj, {})
 	Shies.selfObj:sendEvent('AddVfx', {

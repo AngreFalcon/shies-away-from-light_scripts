@@ -21,10 +21,12 @@ local function disable(actor: core.GameObject)
    	actor.enabled = false
 end
 
-local function updateMWVar(data: {string, number, core.GameObject}) -- Updates the value of the specified mwscript variable
-	local localScript = world.mwscript.getLocalScript(data[3], nil)
+local function updateMWVar(data: {{string: number}, core.GameObject}) -- Updates the value of the specified mwscript variable
+	local localScript = world.mwscript.getLocalScript(data[2], nil)
 	if localScript ~= nil then
-		(localScript as world.MWScript).variables[data[1]] = data[2]
+		for k, v in pairs(data[1]) do
+			(localScript as world.MWScript).variables[k] = v
+		end
 	end
 end
 

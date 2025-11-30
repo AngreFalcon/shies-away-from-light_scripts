@@ -7,9 +7,18 @@ short nolore
 short compmove ; 1 if the player has asked follower to maintain their distance
 short onetimemove ; 1 if the player has asked follower to move out of the way 
 short weapuse ; 1 if the player has asked follower to use the same weapons as the player
-short questthoughts ; 1 if the player has asked follower for their opinion about ongoing quests. Enables dialogue topics for in-progress quests
 short locationthoughts ; 1 if the player has asked follower for their opinion about locations. Enables dialogue topics for visited locations
 short npcthoughts ; 1 if the player has asked follower for their opinion about individuals. Enables dialogue topics for various NPCs that have been met
+; Quest dialogue variables
+short mainquestthoughts ; 1 if the player has asked follower for their opinion about ongoing quests. Enables dialogue topics for in-progress quests
+short magequestthoughts ; 1 if the player has asked follower for their opinion about ongoing quests. Enables dialogue topics for in-progress quests
+short moragquestthoughts ; 1 if the player has asked follower for their opinion about ongoing quests. Enables dialogue topics for in-progress quests
+short thiefquestthoughts ; 1 if the player has asked follower for their opinion about ongoing quests. Enables dialogue topics for in-progress quests
+short fighterquestthoughts ; 1 if the player has asked follower for their opinion about ongoing quests. Enables dialogue topics for in-progress quests
+short legionquestthoughts ; 1 if the player has asked follower for their opinion about ongoing quests. Enables dialogue topics for in-progress quests
+short cultquestthoughts ; 1 if the player has asked follower for their opinion about ongoing quests. Enables dialogue topics for in-progress quests
+short templequestthoughts ; 1 if the player has asked follower for their opinion about ongoing quests. Enables dialogue topics for in-progress quests
+short housequestthoughts ; 1 if the player has asked follower for their opinion about ongoing quests. Enables dialogue topics for in-progress quests
 ; Shies-specific variables
 short fled ; 1 if shies has teleported away during combat
 short markloc ; 1 if the player has asked shies to mark a new location. Will be set to 0 when the location has been marked
