@@ -9,6 +9,13 @@ local cmn = require('scripts.follower.common')
 local interface Follower is Follower.OMW_SELF
 	metamethod __call: function(Follower, ...: DerivedFollower): DerivedFollower
     type DynamicStats = { function(core.GameObject): types.DynamicStat }
+	interface FEATURES
+		REST_DYN_STATS: boolean
+		REST_ENCHANT_USE: boolean
+		REST_SPELL_USE: boolean
+		REST_POTION_USE: boolean
+		REST_SCROLL_USE: boolean
+	end
     interface STAT_MOD
         CATCHUP_MULT: number
         FOLLOW: number
@@ -66,6 +73,7 @@ local interface Follower is Follower.OMW_SELF
     ai: OMW_AI
 	controls: OMW_SELF_CONTROLS
 	dynamicStats: DynamicStats
+	features: FEATURES
 	statMod: STAT_MOD
 	defaultCd: DEFAULT_CD
 	restoreConsts: RESTORE_CONSTS
@@ -123,20 +131,32 @@ local interface Follower is Follower.OMW_SELF
 end
 
 -- Constant Definitions
+-- Feature enable flags
+local RestoreDynamicStats <const> = true -- If true, follower will attempt to restore their dynamic stats with an appropriate method
+local RestoreEnchantTrue <const> = true -- If true, follower will restore their dynamic stats using appropriate enchanted items
+local RestoreSpellTrue <const> = true -- If true, follower will restore their dynamic stats using appropriate spells
+local RestorePotionTrue <const> = true -- If true, follower will restore their dynamic stats using appropriate potions
+local RestoreScrollTrue <const> = true -- If true, follower will restore their dynamic stats using appropriate scrolls
 --local SkillLevelGainMultiplier <const> = 1.5 -- The multiplier to apply to all skill increases
 local NudgeDelay <const> = 4 -- The number of seconds follower should wander after being nudged before following the player again
 local Delay1 <const> = 0.5 * time.second -- The number of seconds to wait before executing our delayed, non-priority functions
 local Delay2 <const> = 5 * time.second -- The number of seconds to wait before executing our delayed, non-priority functions
+local DefaultWarpCooldown <const> = 6 -- Default value for the warp timer
+local DefaultSheatheCooldown <const> = 4.4 -- Default value for the sheathe timer
+-- Attribute modifier variables
 local FollowerCatchupMultiplier <const> = 2.25 -- Multiplier that is applied to the player's athletics and speed, the product of which is then added to the follower's athletics and speed as a modifier
 local FollowerDefaultSpeedMod <const> = 15 -- Flat modifier to be applied to follower's speed and athletics when normally following the player
 local FollowerDefaultWanderSpeedMod <const> = 40 -- Flat modifier to be applies to follower's speed when wandering instead of followings
+local FollowerModifySpeedThreshold <const> = 300 -- The distance threshold that determines whether follower moves at normal speed or speeds up to catch up with the player
+local FollowerMaintainLowerThreshold <const> = 70 -- The lower distance threshold that forces follower to wander away from the player
+local FollowerMaintainUpperThreshold <const> = 100 -- The upper distance threshold that makes companion follow the player again after moving away
+local FollowerWanderThreshold <const> = 300 -- The distance parameter for follower's wander package when maintaining their distance
+-- Restore dynamic stat variables
 local RestoreDefaultCooldown <const> = 10 -- The general cooldown to wait before using any other restore effects, regardless of individual method cooldown
 local RestoreDefaultEnchantmentCooldown <const> = 10 -- The default cooldown for a restorative enchantment if the actual duration couldn't be found
 local RestoreDefaultSpellCooldown <const> = 10 -- The default cooldown for a restorative spell if the actual duration couldn't be found
 local RestoreDefaultPotionCooldown <const> = 60 -- The default cooldown for a restorative potion if the actual duration couldn't be found
 local RestoreDefaultScrollCooldown <const> = 60 -- The default cooldown for a restorative scroll if the actual duration couldn't be found
-local DefaultWarpCooldown <const> = 6 -- Default value for the warp timer
-local DefaultSheatheCooldown <const> = 4.4 -- Default value for the sheathe timer
 local RestoreTriggerThreshold <const> = 0.15 -- What percentage of the dynamic stat must be missing before a restore method is triggered
 local RestorePanicThreshold <const> = 0.75 -- The percentage missing from an attribute before follower should ignore the waste threshold and consume a restorative consumable anyway. At 0.75, if follower is missing more than 75% health, follower will use a restore health consumable whether its effect would be considered wasted or not
 local RestoreEnchantmentWeight <const> = 0.75 -- Multiplier to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection. The smaller, the better
@@ -145,10 +165,6 @@ local RestorePotionWeight <const> = 1.25 -- Multiplier to be applied to each res
 local RestorePotionWasteThreshold <const> = 0.25 -- At 0.25, if follower is only missing 25 health or less, a restorative effect with magnitude greater than 100 would be considered wasted
 local RestoreScrollWeight <const> = 1.5 -- Multiplier to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection. The smaller, the better
 local RestoreScrollWasteThreshold <const> = 0.50 -- At 0.50, if follower is only missing 50 health or less, a restorative effect with magnitude greater than 100 would be considered wasted
-local FollowerModifySpeedThreshold <const> = 300 -- The distance threshold that determines whether follower moves at normal speed or speeds up to catch up with the player
-local FollowerMaintainLowerThreshold <const> = 70 -- The lower distance threshold that forces follower to wander away from the player
-local FollowerMaintainUpperThreshold <const> = 100 -- The upper distance threshold that makes companion follow the player again after moving away
-local FollowerWanderThreshold <const> = 300 -- The distance parameter for follower's wander package when maintaining their distance
 
 -- Function Definitions
 -- Handler functions - Functions that will be called directly by OpenMW
@@ -629,7 +645,7 @@ function gameplay.chooseRestoreMethod(self: Follower, iter: integer) -- Intellig
 	}
 	local attrDiff = cmn.getDynStatDiff(self.dynamicStats[iter](self.selfObj))
 	local restoreMethods: {RestoreMethod} = {}
-	if self.restoreDynStat[iter].enchantmentTimer <= 0 then
+	if self.features.REST_ENCHANT_USE == true and self.restoreDynStat[iter].enchantmentTimer <= 0 then
 		local armor = self:selectRestoreEnch(self.restoreDynStat[iter].effectId, attrDiff, types.Armor as cmn.EnchType)
 		if armor ~= nil then
 			table.insert(restoreMethods, {
@@ -655,7 +671,7 @@ function gameplay.chooseRestoreMethod(self: Follower, iter: integer) -- Intellig
 			})
 		end
 	end
-	if self.restoreDynStat[iter].spellTimer <= 0 and self.dynamicStats[2](self.selfObj).current > 0 then
+	if self.features.REST_SPELL_USE == true and self.restoreDynStat[iter].spellTimer <= 0 and self.dynamicStats[2](self.selfObj).current > 0 then
 		local spell = self:selectRestoreSpell(self.restoreDynStat[iter].effectId, attrDiff)
 		if spell ~= nil then
 			table.insert(restoreMethods, {
@@ -665,7 +681,7 @@ function gameplay.chooseRestoreMethod(self: Follower, iter: integer) -- Intellig
 			})
 		end
 	end
-	if self.restoreDynStat[iter].potionTimer <= 0 then
+	if self.features.REST_POTION_USE == true and self.restoreDynStat[iter].potionTimer <= 0 then
 		local potion = self:selectRestorePotion(self.restoreDynStat[iter].effectId, attrDiff, cmn.getMaxDynStat(self.dynamicStats[iter](self.selfObj)))
 		if potion ~= nil then
 			table.insert(restoreMethods, {
@@ -675,7 +691,7 @@ function gameplay.chooseRestoreMethod(self: Follower, iter: integer) -- Intellig
 			})
 		end
 	end
-	if self.restoreDynStat[iter].scrollTimer <= 0 then
+	if self.features.REST_SCROLL_USE == true and self.restoreDynStat[iter].scrollTimer <= 0 then
 		local scroll = self:selectRestoreScroll(self.restoreDynStat[iter].effectId, attrDiff, cmn.getMaxDynStat(self.dynamicStats[iter](self.selfObj)))
 		if scroll ~= nil then
 			table.insert(restoreMethods, {
@@ -698,7 +714,7 @@ end
 
 function gameplay.checkDynStats(self: Follower) -- Used to call various functions that affect follower's dynamic attributes like health, fatigue, and magicka
 	for i = 1, #self.dynamicStats do
-		if cmn.getDynStatMissingPerc(self.dynamicStats[i](self.selfObj)) <= self.restoreConsts.TRIGGER_PERC and self.timers["restorecooldown"] <= 0 then
+		if self.features.REST_DYN_STATS == true and cmn.getDynStatMissingPerc(self.dynamicStats[i](self.selfObj)) <= self.restoreConsts.TRIGGER_PERC and self.timers["restorecooldown"] <= 0 then
 			self:chooseRestoreMethod(i)
 		end
 	end
@@ -828,6 +844,13 @@ local function defaultFollower(): Follower
 		NUDGE_DELAY = NudgeDelay,
 		DELAY1 = Delay1,
 		DELAY2 = Delay2,
+		features = {
+			REST_DYN_STATS = RestoreDynamicStats,
+			REST_ENCHANT_USE = RestoreEnchantTrue,
+			REST_SPELL_USE = RestoreSpellTrue,
+			REST_POTION_USE = RestorePotionTrue,
+			REST_SCROLL_USE = RestoreScrollTrue,
+		},
 	    statMod = {
 	        CATCHUP_MULT = FollowerCatchupMultiplier,
 	        FOLLOW = FollowerDefaultSpeedMod,
