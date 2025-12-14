@@ -49,6 +49,7 @@ local interface SaveData
 	posC: CellLoc
 	doOnce: boolean
 	doOnce2: boolean
+	rapportCounter: number
 end
 
 local interface EnchType is types.Item

@@ -1,0 +1,4 @@
+valid guild names in lua:
+	"mages guild"
+	"thieves guild"
+	"fighters guild"
