@@ -1,4 +1,23 @@
 valid guild names in lua:
-	"mages guild"
-	"thieves guild"
-	"fighters guild"
+	normal guilds:
+		vanilla:
+			"mages guild"
+			"thieves guild"
+			"fighters guild"
+			"morag tong"
+			"imperial cult"
+			"imperial legion"
+			"temple"
+		bloodmoon:
+			"east empire company"
+
+	great houses:
+		vanilla:
+			"hlaalu"
+			"redoran"
+			"telvanni"
+
+	mandatory, automatically joined:
+		vanilla:
+			"ashlanders"
+			"blades"

@@ -60,6 +60,8 @@ local interface Follower is Follower.OMW_SELF
 		DISP_MOD: number
 		DISP_DIV: number
 		EXPELLED_MOD: number
+		MAX: number
+		MIN: number
 	end
 	interface OMW_SELF_CONTROLS
 		sneak: boolean
@@ -81,23 +83,26 @@ local interface Follower is Follower.OMW_SELF
 	end
 
     selfObj: core.GameObject
+	player: core.GameObject
     ai: OMW_AI
+	mwBool: BOOL
 	controls: OMW_SELF_CONTROLS
 	dynamicStats: DynamicStats
-	features: FEATURES
-	statMod: STAT_MOD
-	defaultCd: DEFAULT_CD
-	restoreConsts: RESTORE_CONSTS
-	distanceThreshold: DISTANCE_THRESHOLD
-	mwBool: BOOL
-	followerPrefs: FOLLOWER_PREFS
-	rapportMods: RAPPORT_MODS
-	rapportCounter: number
+	
+	RAPPORT_GROWTH_THRESHOLD: number
 	NUDGE_DELAY: number
 	DELAY1: number
 	DELAY2: number
 	DELAY3 : number
-	player: core.GameObject
+	features: FEATURES
+	defaultCd: DEFAULT_CD
+	statMod: STAT_MOD
+	restoreConsts: RESTORE_CONSTS
+	distanceThreshold: DISTANCE_THRESHOLD
+	followerPrefs: FOLLOWER_PREFS
+	rapportMods: RAPPORT_MODS
+
+	rapportCounter: number
     checks: {cmn.Flag: boolean}
     restoreDynStat: {cmn.RestoreDynStat}
 	timers: {cmn.Timer: number}
@@ -149,46 +154,73 @@ local interface Follower is Follower.OMW_SELF
 end
 
 -- Constant Definitions
--- Feature enable flags
-local RestoreDynamicStats <const> = true -- If true, follower will attempt to restore their dynamic stats with an appropriate method
-local RestoreEnchantTrue <const> = true -- If true, follower will restore their dynamic stats using appropriate enchanted items
-local RestoreSpellTrue <const> = true -- If true, follower will restore their dynamic stats using appropriate spells
-local RestorePotionTrue <const> = true -- If true, follower will restore their dynamic stats using appropriate potions
-local RestoreScrollTrue <const> = true -- If true, follower will restore their dynamic stats using appropriate scrolls
---local SkillLevelGainMultiplier <const> = 1.5 -- The multiplier to apply to all skill increases
-local preferredRace <const>: {string: number} = {["argonian"] = 0.01} -- The race this follower prefers, if any. If the player's race matches this value, the player's rapport with this follower will grow faster and decrease slower by the associated value
-local preferredSex <const>: {boolean: number} = {[true] = 0.01} -- The sex this follower prefers, if any (true for male, false for female). If the player's sex matches this value, the player's rapport with this follower will grow faster and decrease slower by the associated value
-local preferredGuilds <const>: {string: number} = {["mages guild"] = 0.01} -- The guilds this follower prefers. For each of these guilds the player belongs to, their rapport with this follower will grow faster and decrease slower by the associated value
-local rapportBaseModifier <const>: number = 0.01 -- The value that will be used to increase the player's rapport growth every Delay3 seconds
-local rapportDispModifier <const>: number = 80 -- This modifier is subtracted from the player's current disposition with the follower
-local rapportDispDivisor <const>: number = 2000 -- This value is used to divide the player's modified disposition to then be applied to the player's rapport growth. For instance, with a default modifier value of 80 and default divisor of 2000, at 0 disposition, the player's rapport growth with the follower will be modified by -0.04. At a max disposition of 100, rapport growth would be modified by +0.01
-local rapportExpelledModifier <const>: number = -0.01 -- This value is applied to the player's rapport growth for every guild the player is expelled from that the follower favors
-local NudgeDelay <const>: number = 4 -- The number of seconds follower should wander after being nudged before following the player again
 local Delay1 <const>: number = 0.5 * time.second -- The number of seconds to wait before executing our delayed, non-priority functions
-local Delay2 <const>: number = 5 * time.second -- The number of seconds to wait before executing our delayed, non-priority functions
-local Delay3 <const>: number = 10 * time.second -- The number of seconds to wait before executing our delayed, non-priority functions
-local FollowerCatchupMultiplier <const>: number = 2.25 -- Multiplier that is applied to the player's athletics and speed, the product of which is then added to the follower's athletics and speed as a modifier
-local FollowerDefaultSpeedMod <const>: number = 15 -- Flat modifier to be applied to follower's speed and athletics when normally following the player
-local FollowerDefaultWanderSpeedMod <const>: number = 40 -- Flat modifier to be applies to follower's speed when wandering instead of followings
-local RestoreDefaultCooldown <const>: number = 10 -- The general cooldown to wait before using any other restore effects, regardless of individual method cooldown
-local RestoreDefaultEnchantmentCooldown <const>: number = 10 -- The default cooldown for a restorative enchantment if the actual duration couldn't be found
-local RestoreDefaultSpellCooldown <const>: number = 10 -- The default cooldown for a restorative spell if the actual duration couldn't be found
-local RestoreDefaultPotionCooldown <const>: number = 60 -- The default cooldown for a restorative potion if the actual duration couldn't be found
-local RestoreDefaultScrollCooldown <const>: number = 60 -- The default cooldown for a restorative scroll if the actual duration couldn't be found
-local DefaultWarpCooldown <const>: number = 6 -- Default value for the warp timer
-local DefaultSheatheCooldown <const>: number = 4.4 -- Default value for the sheathe timer
-local RestoreTriggerThreshold <const>: number = 0.15 -- What percentage of the dynamic stat must be missing before a restore method is triggered
-local RestorePanicThreshold <const>: number = 0.75 -- The percentage missing from an attribute before follower should ignore the waste threshold and consume a restorative consumable anyway. At 0.75, if follower is missing more than 75% health, follower will use a restore health consumable whether its effect would be considered wasted or not
-local RestoreEnchantmentWeight <const>: number = 0.75 -- Multiplier to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection. The smaller, the better
-local RestoreSpellWeight <const>: number = 1 -- Multiplier to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection. The smaller, the better
-local RestorePotionWeight <const>: number = 1.25 -- Multiplier to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection. The smaller, the better
-local RestorePotionWasteThreshold <const>: number = 0.25 -- At 0.25, if follower is only missing 25 health or less, a restorative effect with magnitude greater than 100 would be considered wasted
-local RestoreScrollWeight <const>: number = 1.5 -- Multiplier to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection. The smaller, the better
-local RestoreScrollWasteThreshold <const>: number = 0.50 -- At 0.50, if follower is only missing 50 health or less, a restorative effect with magnitude greater than 100 would be considered wasted
-local FollowerModifySpeedThreshold <const>: number = 300 -- The distance threshold that determines whether follower moves at normal speed or speeds up to catch up with the player
-local FollowerMaintainLowerThreshold <const>: number = 70 -- The lower distance threshold that forces follower to wander away from the player
-local FollowerMaintainUpperThreshold <const>: number = 100 -- The upper distance threshold that makes companion follow the player again after moving away
-local FollowerWanderThreshold <const>: number = 300 -- The distance parameter for follower's wander package when maintaining their distance
+local Delay2 <const>: number = 10 * time.second -- The number of seconds to wait before executing our delayed, non-priority functions
+--local SkillLevelGainMultiplier <const> = 1.5 -- The multiplier to apply to all skill increases
+-- Feature enable flags
+local FeatureFlags <const> = {
+	RestoreDynStats = { -- Dynamic stat restoration flags used to enable or disable mechanics
+		Enable = true, -- If true, will use one of the following methods to restore dynamic stats
+		Enchant = true, -- If true, will use enchantments to restore dynamic stats
+		Spell = true, -- If true, will use spells to restore dynamic stats
+		Potion = true, -- If true, will use potions to restore dynamic stats
+		Scroll = true, -- If true, will use scrolls to restore dynamic stats
+	}
+}
+local PreferredRace <const>: {string: number} = { -- The race this follower prefers, if any. If the player's race matches this value, the player's rapport with this follower will grow faster and decrease slower by the associated value
+	["argonian"] = 0.005,
+	["khajiit"] = 0.002,
+}
+local PreferredSex <const>: {boolean: number} = { -- The sex this follower prefers, if any (true for male, false for female). If the player's sex matches this value, the player's rapport with this follower will grow faster and decrease slower by the associated value
+	[true] = 0.005,
+}
+local PreferredGuilds <const>: {string: number} = { -- For each of these guilds the player belongs to, their rapport with this follower will grow faster and decrease slower by the associated value. This value is further modified by being multiplied by the player's rank in the guild, so smaller values are recommended
+	["morag tong"] = 0.002,
+	["mages guild"] = 0.003,
+	["telvanni"] = 0.003,
+}
+local Rapport <const> = {
+	BaseModifier = 0.01, -- The value that will be used to increase the player's rapport growth every Delay3 seconds
+	DispModifier = 80, -- This modifier is subtracted from the player's current disposition with the follower
+	DispDivisor = 10000, -- This value is used to divide the player's modified disposition to then be applied to the player's rapport growth. For instance, with a default modifier value of 80 and default divisor of 10000, at 0 disposition, the player's rapport growth with the follower will be modified by -0.008. At a max disposition of 100, rapport growth would be modified by +0.002
+	ExpelledModifier = -10, -- This multiplier is applied to the rapport modifier of the guild that the player is expelled from, and the product is applied to the player's rapport growth
+	GrowthThreshold = 1, -- This is the required value the player's rapport growth must reach before their rapport with the follower increases
+	Min = -1000, -- The minimum rapport the player can attain with this follower
+	Max = 1000, -- The maximum rapport the player can attain with this follower
+}
+local RestoreCDs <const> = {
+	General = 10, -- The general cooldown to wait before using any other restore effects, regardless of individual method cooldown
+	Enchantment = 10, -- The default cooldown for a restorative enchantment if the actual duration couldn't be found
+	Spell = 10, -- The default cooldown for a restorative spell if the actual duration couldn't be found
+	Potion = 60, -- The default cooldown for a restorative potion if the actual duration couldn't be found
+	Scroll = 60, -- The default cooldown for a restorative scroll if the actual duration couldn't be found
+}
+local RestoreConsts <const> = {
+	TriggerThreshold = 0.15, -- What percentage of the dynamic stat must be missing before a restore method is triggered
+	PanicThreshold = 0.75, -- The percentage missing from an attribute before follower should ignore the waste threshold and consume a restorative consumable anyway. At 0.75, if follower is missing more than 75% health, follower will use a restore health consumable whether its effect would be considered wasted or not
+	EnchantmentWeight = 0.75, -- Multiplier to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection. The smaller, the better
+	SpellWeight = 1, -- Multiplier to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection. The smaller, the better
+	PotionWeight = 1.25, -- Multiplier to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection. The smaller, the better
+	PotionWasteThreshold = 0.25, -- At 0.25, if follower is only missing 25 health or less, a restorative effect with magnitude greater than 100 would be considered wasted
+	ScrollWeight = 1.5, -- Multiplier to be applied to each restoration method when comparing against other restoration methods to make each appear more or less favorable for selection. The smaller, the better
+	ScrollWasteThreshold = 0.50, -- At 0.50, if follower is only missing 50 health or less, a restorative effect with magnitude greater than 100 would be considered wasted
+}
+local CDs <const> = {
+	Warp = 6, -- Duration for the warp timer
+	Sheathe = 4.4, -- Duration for the sheathe timer
+	NudgeDelay = 4, -- The number of seconds follower should wander after being nudged before following the player again
+}
+local StatMods <const> = {
+	CatchupMultiplier = 2.25, -- Multiplier that is applied to the player's athletics and speed, the product of which is then added to the follower's athletics and speed as a modifier
+	DefaultSpeed = 15, -- Flat modifier to be applied to follower's speed and athletics when normally following the player
+	WanderSpeed = 40, -- Flat modifier to be applies to follower's speed when wandering instead of followings
+}
+local Thresholds <const> = {
+	ModifySpeed = 300, -- The distance threshold that determines whether follower moves at normal speed or speeds up to catch up with the player
+	MaintainDistLower = 70, -- The lower distance threshold that forces follower to wander away from the player
+	MaintainDistUpper = 100, -- The upper distance threshold that makes companion follow the player again after moving away
+	Wander = 300, -- The distance parameter for follower's wander package when maintaining their distance
+}
 
 -- Function Definitions
 -- Handler functions - Functions that will be called directly by OpenMW
@@ -207,12 +239,7 @@ function handler.delayUpdate1(self: Follower) -- This function runs once every x
 	end
 end
 
-function handler.delayUpdate2(_: Follower) -- This function runs once every x seconds, where x = DELAY2
-	if core.isWorldPaused() == true then return end
-
-end
-
-function handler.delayUpdate3(self: Follower) -- This function runs once every x seconds, where x = DELAY3
+function handler.delayUpdate2(self: Follower) -- This function runs once every x seconds, where x = DELAY2
 	if core.isWorldPaused() == true then return end
 
 	if self:isFollowing() == true then
@@ -420,9 +447,9 @@ function gameplay.freeFall(self: Follower) -- Used to call various functions tha
 end
 
 function gameplay.incrementRapport(self: Follower) -- Used to increment or decrement the player's rapport with the follower
-	if self.rapportCounter >= 1 then
+	if self.rapportCounter >= 1 and self.MWVars["rapport"] < self.rapportMods.MAX then
 		self:updateMWVars({["rapport"] = 1})
-	elseif self.rapportCounter <= -1 then
+	elseif self.rapportCounter <= -1 and self.MWVars["rapport"] > self.rapportMods.MIN then
 		self:updateMWVars({["rapport"] = -1})
 	end
 end
@@ -444,9 +471,9 @@ function gameplay.checkRapportGrowth(self: Follower)
 	for _, v in ipairs(playerFactions) do
 		if self.followerPrefs.GUILDS[v] ~= nil then
 			if types.NPC.isExpelled(self.player, v) == false then
-				rapportGrowth = rapportGrowth + self.followerPrefs.GUILDS[v]
+				rapportGrowth = rapportGrowth + (self.followerPrefs.GUILDS[v] * types.NPC.getFactionRank(self.player, v))
 			else
-				rapportGrowth = rapportGrowth + self.rapportMods.EXPELLED_MOD
+				rapportGrowth = rapportGrowth + (self.followerPrefs.GUILDS[v] * self.rapportMods.EXPELLED_MOD)
 			end
 		end
 	end
@@ -919,57 +946,59 @@ local function defaultFollower(): Follower
 		
 	    -- Constants
 	    --SKILL_LEVEL_MULT = SkillLevelGainMultiplier
-		NUDGE_DELAY = NudgeDelay,
+		RAPPORT_GROWTH_THRESHOLD = Rapport.GrowthThreshold,
+		NUDGE_DELAY = CDs.NudgeDelay,
 		DELAY1 = Delay1,
 		DELAY2 = Delay2,
-		DELAY3 = Delay3,
 	    features = {
-			REST_DYN_STATS = RestoreDynamicStats,
-			REST_ENCHANT_USE = RestoreEnchantTrue,
-			REST_SPELL_USE = RestoreSpellTrue,
-			REST_POTION_USE = RestorePotionTrue,
-			REST_SCROLL_USE = RestoreScrollTrue,
+			REST_DYN_STATS = FeatureFlags.RestoreDynStats.Enable,
+			REST_ENCHANT_USE = FeatureFlags.RestoreDynStats.Enchant,
+			REST_SPELL_USE = FeatureFlags.RestoreDynStats.Spell,
+			REST_POTION_USE = FeatureFlags.RestoreDynStats.Potion,
+			REST_SCROLL_USE = FeatureFlags.RestoreDynStats.Scroll,
 		},
 	    statMod = {
-	        CATCHUP_MULT = FollowerCatchupMultiplier,
-	        FOLLOW = FollowerDefaultSpeedMod,
-	        WANDER = FollowerDefaultWanderSpeedMod,
+	        CATCHUP_MULT = StatMods.CatchupMultiplier,
+	        FOLLOW = StatMods.DefaultSpeed,
+	        WANDER = StatMods.WanderSpeed,
 	    },
 		defaultCd = {
-			RESTORE = RestoreDefaultCooldown,
-			ENCHANTMENT = RestoreDefaultEnchantmentCooldown,
-			SPELL = RestoreDefaultSpellCooldown,
-			POTION = RestoreDefaultPotionCooldown,
-			SCROLL = RestoreDefaultScrollCooldown,
-			WARP = DefaultWarpCooldown,
-			SHEATHE = DefaultSheatheCooldown,
+			RESTORE = RestoreCDs.General,
+			ENCHANTMENT = RestoreCDs.Enchantment,
+			SPELL = RestoreCDs.Spell,
+			POTION = RestoreCDs.Potion,
+			SCROLL = RestoreCDs.Scroll,
+			WARP = CDs.Warp,
+			SHEATHE = CDs.Sheathe,
 		},
 		restoreConsts = {
-			TRIGGER_PERC = RestoreTriggerThreshold,
-			PANIC_THRESHOLD = RestorePanicThreshold,
-			ENCHANTMENT_WEIGHT = RestoreEnchantmentWeight,
-			SPELL_WEIGHT = RestoreSpellWeight,
-			POTION_WEIGHT = RestorePotionWeight,
-			POTION_WASTE = RestorePotionWasteThreshold,
-			SCROLL_WEIGHT = RestoreScrollWeight,
-			SCROLL_WASTE = RestoreScrollWasteThreshold,
+			TRIGGER_PERC = RestoreConsts.TriggerThreshold,
+			PANIC_THRESHOLD = RestoreConsts.PanicThreshold,
+			ENCHANTMENT_WEIGHT = RestoreConsts.EnchantmentWeight,
+			SPELL_WEIGHT = RestoreConsts.SpellWeight,
+			POTION_WEIGHT = RestoreConsts.PotionWeight,
+			POTION_WASTE = RestoreConsts.PotionWasteThreshold,
+			SCROLL_WEIGHT = RestoreConsts.ScrollWeight,
+			SCROLL_WASTE = RestoreConsts.ScrollWasteThreshold,
 		},
 		distanceThreshold = {
-			MOD_SPEED = FollowerModifySpeedThreshold,
-			MAINTAIN_LOWER = FollowerMaintainLowerThreshold,
-			MAINTAIN_UPPER = FollowerMaintainUpperThreshold,
-			WANDER = FollowerWanderThreshold,
+			MOD_SPEED = Thresholds.ModifySpeed,
+			MAINTAIN_LOWER = Thresholds.MaintainDistLower,
+			MAINTAIN_UPPER = Thresholds.MaintainDistUpper,
+			WANDER = Thresholds.Wander,
 		},
 		followerPrefs = {
-			RACE = preferredRace,
-			SEX = preferredSex,
-			GUILDS = preferredGuilds,
+			RACE = PreferredRace,
+			SEX = PreferredSex,
+			GUILDS = PreferredGuilds,
 		},
 		rapportMods = {
-			BASE = rapportBaseModifier,
-			DISP_MOD = rapportDispModifier,
-			DISP_DIV = rapportDispDivisor,
-			EXPELLED_MOD = rapportExpelledModifier,
+			BASE = Rapport.BaseModifier,
+			DISP_MOD = Rapport.DispModifier,
+			DISP_DIV = Rapport.DispDivisor,
+			EXPELLED_MOD = Rapport.ExpelledModifier,
+			MAX = Rapport.Max,
+			MIN = Rapport.Min,
 		},
 	
 		-- Variables
@@ -1043,7 +1072,6 @@ local function defaultFollower(): Follower
 		-- Handler functions - Functions that will be called directly by OpenMW
 		delayUpdate1 = handler.delayUpdate1,
 		delayUpdate2 = handler.delayUpdate2,
-		delayUpdate3 = handler.delayUpdate3,
 		onUpdate = handler.onUpdate,
 		onSave = handler.onSave,
 		onLoad = handler.onLoad,

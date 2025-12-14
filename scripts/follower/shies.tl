@@ -133,12 +133,6 @@ time.runRepeatedly( -- This function runs once every x seconds, where x = DELAY2
 	end, Shies.DELAY2, {}
 )
 
-time.runRepeatedly( -- This function runs once every x seconds, where x = DELAY3
-	function()
-		Shies:delayUpdate3()
-	end, Shies.DELAY3, {}
-)
-
 	-- Engine handlers
 local engine = {}
 
@@ -207,15 +201,7 @@ return {
             Shies.dynamicStats[1](Shies.selfObj).current = 1
         end,
 		["shiesJump"] = function()
-			print(types.NPC.stats.skills.acrobatics(Shies.selfObj).progress)
 			Shies.controls.jump = true
-			print(types.NPC.stats.skills.acrobatics(Shies.selfObj).progress)
-			local playerRecord = types.NPC.record(Shies.player)
-			local playerFactions = types.NPC.getFactions(Shies.player)
-			print(playerRecord.race)
-			for _, v in ipairs(playerFactions) do
-				print(v)
-			end
 		end,
 		["shiesActivated"] = function()
 		end,
