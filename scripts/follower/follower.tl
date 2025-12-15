@@ -20,6 +20,7 @@ local interface Follower is Follower.OMW_SELF
 		RAPP_SEX: boolean
 		RAPP_GUILDS: boolean
 		RAPP_BIRTH_SIGN: boolean
+		RAPP_CLASS: boolean
 		RAPP_DISP: boolean
 		RAPP_BOUNTY: boolean
 	end
@@ -62,6 +63,7 @@ local interface Follower is Follower.OMW_SELF
 		SEX: {boolean: number}
 		GUILDS: {string: number}
 		BIRTH_SIGN: {string: number}
+		CLASS: {string: number}
 	end
 	interface RAPPORT_MODS
 		BASE: number
@@ -178,6 +180,7 @@ local Const <const> = {
 			Sex: boolean = true, -- If true, player's sex will be taken into account when calculating rapport growth
 			Guilds: boolean = true, -- If true, player's guilds will be taken into account when calculating rapport growth
 			BirthSign: boolean = true, -- If true, player's birthsign will be taken into account when calculating rapport growth
+			Class: boolean = true, -- If true, player's class will be taken into account when calculating rapport growth
 			Disp: boolean = true, -- If true, player's disposition will be taken into account when calculating rapport growth
 			Bounty: boolean = true, -- If true, player's current bounty will be taken into account when calculating rapport growth
 		},
@@ -191,11 +194,11 @@ local Const <const> = {
 	},
 	Rapport = {
 		Preferences = {
-			Race = { -- The races this follower prefers, if any. If the player's race matches any of these values, the player's rapport with this follower will grow faster and decrease slower by the associated value
+			Races = { -- The races this follower prefers, if any. If the player's race matches any of these values, the player's rapport with this follower will grow faster and decrease slower by the associated value
 				["argonian"] = 0.005,
 				["khajiit"] = 0.002,
 			},
-			Sex = { -- The sexes this follower prefers, if any (true for male, false for female). If the player's sex matches any of these values, the player's rapport with this follower will grow faster and decrease slower by the associated value
+			Sexes = { -- The sexes this follower prefers, if any (true for male, false for female). If the player's sex matches any of these values, the player's rapport with this follower will grow faster and decrease slower by the associated value
 				[true] = 0.005,
 			},
 			Guilds = { -- For each of these guilds the player belongs to, their rapport with this follower will grow faster and decrease slower by the associated value. This value is further modified by being multiplied by the player's rank in the guild, so smaller values are recommended
@@ -205,6 +208,9 @@ local Const <const> = {
 			},
 			BirthSigns = { -- The birth signs this follower prefers, if any. If the player's birth sign matches any of the below, the accompanying value is added to their rapport growth, resulting in faster growth and slower decay
 				["moonshadow sign"] = 0.001,
+			},
+			Classes = { -- The classes this follower prefers, if any. If the player's class matches any of the below, the accompanying value is added to their rapport growth, resulting in faster growth and slower decay
+				["nightblade"] = 0.001,
 			},
 		},
 		BaseModifier: number = 0.01, -- The value that will be used to increase the player's rapport growth every Delay3 seconds
@@ -518,6 +524,10 @@ function gameplay.checkRapportGrowth(self: Follower) -- Calculate the player's r
 
 	if self.features.RAPP_BIRTH_SIGN == true and self.followerPrefs.BIRTH_SIGN[birthsign] ~= nil then
 		rapportGrowth = rapportGrowth + self.followerPrefs.BIRTH_SIGN[birthsign]
+	end
+
+	if self.features.RAPP_CLASS == true and self.followerPrefs.CLASS[playerRecord.class] ~= nil then
+		rapportGrowth = rapportGrowth + self.followerPrefs.CLASS[playerRecord.class]
 	end
 
 	if self.features.RAPP_DISP == true then
@@ -1010,6 +1020,7 @@ local function defaultFollower(): Follower
 			RAPP_SEX = Const.FeatureFlags.Rapport.Sex,
 			RAPP_GUILDS = Const.FeatureFlags.Rapport.Guilds,
 			RAPP_BIRTH_SIGN = Const.FeatureFlags.Rapport.BirthSign,
+			RAPP_CLASS = Const.FeatureFlags.Rapport.Class,
 			RAPP_DISP = Const.FeatureFlags.Rapport.Disp,
 			RAPP_BOUNTY = Const.FeatureFlags.Rapport.Bounty,
 		},
@@ -1044,10 +1055,11 @@ local function defaultFollower(): Follower
 			WANDER = Const.Thresholds.Wander,
 		},
 		followerPrefs = {
-			RACE = Const.Rapport.Preferences.Race,
-			SEX = Const.Rapport.Preferences.Sex,
+			RACE = Const.Rapport.Preferences.Races,
+			SEX = Const.Rapport.Preferences.Sexes,
 			GUILDS = Const.Rapport.Preferences.Guilds,
 			BIRTH_SIGN = Const.Rapport.Preferences.BirthSigns,
+			CLASS = Const.Rapport.Preferences.Classes,
 		},
 		rapportMods = {
 			BASE = Const.Rapport.BaseModifier,
