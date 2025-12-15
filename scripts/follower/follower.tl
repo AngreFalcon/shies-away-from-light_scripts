@@ -475,7 +475,6 @@ end
 function gameplay.checkRapportGrowth(self: Follower) -- Calculate the player's rapport growth based on the player's time spent traveling with the follower and the follower's preferences toward the player
 	if self.features.RAPP_EN == false then return end
 	local playerRecord = types.NPC.record(self.player)
-	local playerFactions = types.NPC.getFactions(self.player)
 	local rapportGrowth = self.rapportMods.BASE
 
 	if self.features.RAPP_RACE == true and self.followerPrefs.RACE[playerRecord.race] ~= nil then
@@ -487,6 +486,7 @@ function gameplay.checkRapportGrowth(self: Follower) -- Calculate the player's r
 	end
 	
 	if self.features.RAPP_GUILDS == true then
+		local playerFactions = types.NPC.getFactions(self.player)
 		for _, v in ipairs(playerFactions) do
 			if self.followerPrefs.GUILDS[v] ~= nil then
 				if types.NPC.isExpelled(self.player, v) == false then
