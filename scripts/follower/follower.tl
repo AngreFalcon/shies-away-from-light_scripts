@@ -19,7 +19,9 @@ local interface Follower is Follower.OMW_SELF
 		RAPP_RACE: boolean
 		RAPP_SEX: boolean
 		RAPP_GUILDS: boolean
+		RAPP_BIRTH_SIGN: boolean
 		RAPP_DISP: boolean
+		RAPP_BOUNTY: boolean
 	end
     interface STAT_MOD
         CATCHUP_MULT: number
@@ -59,12 +61,17 @@ local interface Follower is Follower.OMW_SELF
 		RACE: {string: number}
 		SEX: {boolean: number}
 		GUILDS: {string: number}
+		BIRTH_SIGN: {string: number}
 	end
 	interface RAPPORT_MODS
 		BASE: number
 		DISP_MOD: number
 		DISP_DIV: number
+		BOUNTY_MOD: number
+		BOUNTY_MULT: number
 		EXPELLED_MOD: number
+		GROWTH_THRESHOLD: number
+		DECAY_THRESHOLD: number
 		MAX: number
 		MIN: number
 	end
@@ -164,6 +171,15 @@ local Delay2 <const>: number = 10 * time.second -- The number of seconds to wait
 --local SkillLevelGainMultiplier <const> = 1.5 -- The multiplier to apply to all skill increases
 -- Feature enable flags
 local FeatureFlags <const> = {
+	Rapport = {
+		Enable: boolean = true, -- If true, rapport mechanic will be used
+		Race: boolean = true, -- If true, player's race will be taken into account when calculating rapport growth
+		Sex: boolean = true, -- If true, player's sex will be taken into account when calculating rapport growth
+		Guilds: boolean = true, -- If true, player's guilds will be taken into account when calculating rapport growth
+		BirthSign: boolean = true, -- If true, player's birthsign will be taken into account when calculating rapport growth
+		Disp: boolean = true, -- If true, player's disposition will be taken into account when calculating rapport growth
+		Bounty: boolean = true, -- If true, player's current bounty will be taken into account when calculating rapport growth
+	},
 	RestoreDynStats = { -- Dynamic stat restoration flags used to enable or disable mechanics
 		Enable: boolean = true, -- If true, will use one of the following methods to restore dynamic stats
 		Enchant: boolean = true, -- If true, will use enchantments to restore dynamic stats
@@ -171,34 +187,33 @@ local FeatureFlags <const> = {
 		Potion: boolean = true, -- If true, will use potions to restore dynamic stats
 		Scroll: boolean = true, -- If true, will use scrolls to restore dynamic stats
 	},
-	Rapport = {
-		Enable: boolean = true, -- If true, rapport mechanic will be used
-		Race: boolean = true, -- If true, player's race will be taken into account when calculating rapport growth
-		Sex: boolean = true, -- If true, player's sex will be taken into account when calculating rapport growth
-		Guilds: boolean = true, -- If true, player's guilds will be taken into account when calculating rapport growth
-		Disp: boolean = true, -- If true, player's disposition will be taken into account when calculating rapport growth
-	},
 }
 local Rapport <const> = {
 	Preferences = {
-		Race = { -- The race this follower prefers, if any. If the player's race matches this value, the player's rapport with this follower will grow faster and decrease slower by the associated value
+		Race = { -- The races this follower prefers, if any. If the player's race matches any of these values, the player's rapport with this follower will grow faster and decrease slower by the associated value
 			["argonian"] = 0.005,
 			["khajiit"] = 0.002,
 		},
-		Sex = { -- The sex this follower prefers, if any (true for male, false for female). If the player's sex matches this value, the player's rapport with this follower will grow faster and decrease slower by the associated value
+		Sex = { -- The sexes this follower prefers, if any (true for male, false for female). If the player's sex matches any of these values, the player's rapport with this follower will grow faster and decrease slower by the associated value
 			[true] = 0.005,
 		},
 		Guilds = { -- For each of these guilds the player belongs to, their rapport with this follower will grow faster and decrease slower by the associated value. This value is further modified by being multiplied by the player's rank in the guild, so smaller values are recommended
 			["morag tong"] = 0.002,
 			["mages guild"] = 0.003,
 			["telvanni"] = 0.003,
-		}
+		},
+		BirthSigns = { -- The birth signs this follower prefers, if any. If the player's birth sign matches any of the below, the accompanying value is added to their rapport growth, resulting in faster growth and slower decay
+			["moonshadow sign"] = 0.001,
+		},
 	},
 	BaseModifier: number = 0.01, -- The value that will be used to increase the player's rapport growth every Delay3 seconds
-	DispModifier: number = 80, -- This modifier is subtracted from the player's current disposition with the follower
-	DispDivisor: number = 10000, -- This value is used to divide the player's modified disposition to then be applied to the player's rapport growth. For instance, with a default modifier value of 80 and default divisor of 10000, at 0 disposition, the player's rapport growth with the follower will be modified by -0.008. At a max disposition of 100, rapport growth would be modified by +0.002
+	DispModifier: number = -80, -- This modifier is added to the player's current disposition with the follower
+	DispDivisor: number = 10000, -- This value is used to divide the player's modified disposition to then be applied to the player's rapport growth. For instance, with a default modifier value of -80 and default divisor of 10000, at 0 disposition, the player's rapport growth will be modified by -0.008. At a max disposition of 100, rapport growth would be modified by +0.002
+	BountyModifier: number = -0.1, -- This is a flat value added to the player's rapport growth so long as they have a bounty
+	BountyMultiplier: number = -0.0, -- The player's bounty is multiplied by this value and then applied to their rapport growth. At a bounty of 1 with a multiplier of -0.01, the player's rapport growth will be modified by -0.01. With a bounty of 100 and the same multiplier, rapport growth would be modified by -1
 	ExpelledModifier: number = -10, -- This multiplier is applied to the rapport modifier of the guild that the player is expelled from, and the product is applied to the player's rapport growth
 	GrowthThreshold: number = 1, -- This is the required value the player's rapport growth must reach before their rapport with the follower increases
+	DecayThreshold: number = -1, -- This is the required value the player's rapport growth must drop to before the player's rapport value decreases
 	Min: number = -1000, -- The minimum rapport the player can attain with this follower
 	Max: number = 1000, -- The maximum rapport the player can attain with this follower
 }
@@ -475,7 +490,9 @@ end
 function gameplay.checkRapportGrowth(self: Follower) -- Calculate the player's rapport growth based on the player's time spent traveling with the follower and the follower's preferences toward the player
 	if self.features.RAPP_EN == false then return end
 	local playerRecord = types.NPC.record(self.player)
+	local birthsign = types.Player.getBirthSign(self.player)
 	local rapportGrowth = self.rapportMods.BASE
+	local bounty = types.Player.getCrimeLevel(self.player)
 
 	if self.features.RAPP_RACE == true and self.followerPrefs.RACE[playerRecord.race] ~= nil then
 		rapportGrowth = rapportGrowth + self.followerPrefs.RACE[playerRecord.race]
@@ -498,13 +515,21 @@ function gameplay.checkRapportGrowth(self: Follower) -- Calculate the player's r
 		end
 	end
 
+	if self.features.RAPP_BIRTH_SIGN == true and self.followerPrefs.BIRTH_SIGN[birthsign] ~= nil then
+		rapportGrowth = rapportGrowth + self.followerPrefs.BIRTH_SIGN[birthsign]
+	end
+
 	if self.features.RAPP_DISP == true then
-		local dispositionMod = ((types.NPC.getDisposition(self.selfObj, self.player) - self.rapportMods.DISP_MOD) / self.rapportMods.DISP_DIV)
+		local dispositionMod = ((types.NPC.getDisposition(self.selfObj, self.player) + self.rapportMods.DISP_MOD) / self.rapportMods.DISP_DIV)
 		rapportGrowth = rapportGrowth + dispositionMod
 	end
 
+	if self.features.RAPP_BOUNTY == true and bounty > 0 then
+		self.rapportCounter = self.rapportCounter + self.rapportMods.BOUNTY_MOD + (bounty * self.rapportMods.BOUNTY_MULT)
+	end
+
 	self.rapportCounter = self.rapportCounter + rapportGrowth
-	if (self.rapportCounter >= 1 or self.rapportCounter <= -1) then
+	if (self.rapportCounter >= self.rapportMods.GROWTH_THRESHOLD or self.rapportCounter <= self.rapportMods.DECAY_THRESHOLD) then
 		self:incrementRapport()
 		self.rapportCounter = 0
 	end
@@ -983,7 +1008,9 @@ local function defaultFollower(): Follower
 			RAPP_RACE = FeatureFlags.Rapport.Race,
 			RAPP_SEX = FeatureFlags.Rapport.Sex,
 			RAPP_GUILDS = FeatureFlags.Rapport.Guilds,
+			RAPP_BIRTH_SIGN = FeatureFlags.Rapport.BirthSign,
 			RAPP_DISP = FeatureFlags.Rapport.Disp,
+			RAPP_BOUNTY = FeatureFlags.Rapport.Bounty,
 		},
 	    statMod = {
 	        CATCHUP_MULT = StatMods.CatchupMultiplier,
@@ -1019,12 +1046,15 @@ local function defaultFollower(): Follower
 			RACE = Rapport.Preferences.Race,
 			SEX = Rapport.Preferences.Sex,
 			GUILDS = Rapport.Preferences.Guilds,
+			BIRTH_SIGN = Rapport.Preferences.BirthSigns,
 		},
 		rapportMods = {
 			BASE = Rapport.BaseModifier,
 			DISP_MOD = Rapport.DispModifier,
 			DISP_DIV = Rapport.DispDivisor,
 			EXPELLED_MOD = Rapport.ExpelledModifier,
+			GROWTH_THRESHOLD = Rapport.GrowthThreshold,
+			DECAY_THRESHOLD = Rapport.DecayThreshold,
 			MAX = Rapport.Max,
 			MIN = Rapport.Min,
 		},

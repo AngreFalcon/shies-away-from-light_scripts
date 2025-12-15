@@ -21,3 +21,18 @@ valid guild names in lua:
 		vanilla:
 			"ashlanders"
 			"blades"
+
+valid birthsigns:
+	"moonshadow sign" - the shadow
+	"elfborn" - the apprentice
+	"wombburned" - the atronach
+	"lady's favor" - the lady
+	"trollkin" - the lord
+	"mooncalf" - the lover
+	"fay" - the mage
+	"blessed touch sign" - the ritual
+	"star-cursed" - the serpent
+	"charioteer" - the steed
+	"hara" - the thief
+	"beggar's nose" - the tower
+	"warwyrd" - the warrior
