@@ -4,22 +4,31 @@ short companion
 short nohello
 short nolore
 ; Follower variables
-long rapport ; value that tracks the player's rapport with the follower. this value is incremented in lua
 short compmove ; 1 if the player has asked follower to maintain their distance
 short onetimemove ; 1 if the player has asked follower to move out of the way 
 short weapuse ; 1 if the player has asked follower to use the same weapons as the player
-short locationthoughts ; 1 if the player has asked follower for their opinion about locations. Enables dialogue topics for visited locations
-short npcthoughts ; 1 if the player has asked follower for their opinion about individuals. Enables dialogue topics for various NPCs that have been met
-; Quest dialogue variables
-short mainquestthoughts ; 1 if the player has asked follower for their opinion about ongoing quests. Enables dialogue topics for in-progress quests
-short magequestthoughts ; 1 if the player has asked follower for their opinion about ongoing quests. Enables dialogue topics for in-progress quests
-short moragquestthoughts ; 1 if the player has asked follower for their opinion about ongoing quests. Enables dialogue topics for in-progress quests
-short thiefquestthoughts ; 1 if the player has asked follower for their opinion about ongoing quests. Enables dialogue topics for in-progress quests
-short fighterquestthoughts ; 1 if the player has asked follower for their opinion about ongoing quests. Enables dialogue topics for in-progress quests
-short legionquestthoughts ; 1 if the player has asked follower for their opinion about ongoing quests. Enables dialogue topics for in-progress quests
-short cultquestthoughts ; 1 if the player has asked follower for their opinion about ongoing quests. Enables dialogue topics for in-progress quests
-short templequestthoughts ; 1 if the player has asked follower for their opinion about ongoing quests. Enables dialogue topics for in-progress quests
-short housequestthoughts ; 1 if the player has asked follower for their opinion about ongoing quests. Enables dialogue topics for in-progress quests
+long rapport ; value that tracks the player's rapport with the follower. this value is incremented in lua
+long thoughts ; This variable is used to keep track of what we're asking our follower about. To avoid massively overwhelming the player with topics, only one context is valid at a time. For instance, if the player asks about great house questions, then asks about blades (main) quests, any topics relating to great house quests will disappear until the player asks about them again
+; List of expected thoughts states:
+
+
+; |1|xxxxxxx - The player has asked about quests
+  ; 1|1|000000 - The player has asked about blades quests
+  ; 1|2|xxxxxx - The player has asked about house quests
+    ; 12|X|xxxxx - The player has asked about quests from a specific house
+  ; 1|3|xxxxxx - The player has asked about guild quests
+    ; 13|XX|xxxx - The player has asked about quests from a specific guild
+      ; 13xx|XX|xx - The player has asked about guild quests on a specific landmass (vvardenfell, solstheim, mainland morrowind, etc.)
+        ; 13xxxx|XX| - The player has asked about guild quests in a specific town
+  ; 1|4|xxxxxx - The player has asked about misc quests
+    ; 14|XX|xxxx - The player has asked about misc quests on a specific landmass (vvardenfell, solstheim, mainland morrowind, etc.)
+      ; 14xx|XX|xx - The player has asked about misc quests in a specific region/town (azura's coast, bitter coast, balmora, etc.)
+; |2|xxxxxxx - The player has asked about locations (generally towns/camps or other notable regions)
+  ; 2|XX|xxxxx - The player has asked about locations on a specific landmass (vvardenfell, solstheim, mainland morrowind, etc.)
+; |3|xxxxxxx - The player has asked about people (usually noteworthy NPCs)
+  ; 3|XX|xxxxx - The player has asked about people on a specific landmass (vvardenfell, solstheim, mainland morrowind, etc.)
+    ; 3xx|XX|xxx - The player has asked about people in a specific region/town (azura's cost, bitter coast, balmora, etc.)
+
 ; Shies-specific variables
 short fled ; 1 if shies has teleported away during combat
 short markloc ; 1 if the player has asked shies to mark a new location. Will be set to 0 when the location has been marked
