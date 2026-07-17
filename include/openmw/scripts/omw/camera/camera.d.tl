@@ -74,12 +74,12 @@ local record Camera
   )
   
   --[[
-    Get base third person distance (without applying angle and speed modifiers).
+    Get the base third person distance (without applying angle and speed modifiers).
   ]]
   getBaseThirdPersonDistance: function(): number
   
   --[[
-    Return primary mode (MODE.FirstPerson or MODE.ThirdPerson).
+    Return the primary mode (MODE.FirstPerson or MODE.ThirdPerson).
   ]]
   getPrimaryMode: function(): number
   
@@ -114,7 +114,7 @@ local record Camera
   isZoomEnabled: function(): boolean
   
   --[[
-    Set base third person distance
+    Set the base third person distance
   ]]
   setBaseThirdPersonDistance: function(
     value: number

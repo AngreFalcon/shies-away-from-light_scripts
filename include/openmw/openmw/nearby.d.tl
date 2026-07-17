@@ -62,31 +62,23 @@ local record nearby
     radius: number
     
   end
-  --[[
-    A table of parameters to specify relative path cost per each area type
-  ]]
-  interface AreaCosts
+  interface COLLISION_SHAPE_TYPE
     --[[
-      Value >= 0, used in combination with @{#NAVIGATOR_FLAGS.OpenDoor}
-      (default: 2).
+      Axis-Aligned Bounding Box is used for NPC and symmetric
+      Creatures.
     ]]
-    door: number
+    Aabb: number
     
     --[[
-      Value >= 0, used in combination with @{#NAVIGATOR_FLAGS.Walk} (default: 1).
+      is used for NPC and symmetric Creatures.
     ]]
-    ground: number
+    Cylinder: number
     
     --[[
-      Value >= 0, used in combination with @{#NAVIGATOR_FLAGS.UsePathgrid}
-      (default: 1).
+      is used for Creatures with big difference in width and
+      height.
     ]]
-    pathgrid: number
-    
-    --[[
-      Value >= 0, used in combination with @{#NAVIGATOR_FLAGS.Swim} (default: 1).
-    ]]
-    water: number
+    RotatingBox: number
     
   end
   --[[
@@ -211,23 +203,31 @@ local record nearby
     TargetPolygonNotFound: number
     
   end
-  interface COLLISION_SHAPE_TYPE
+  --[[
+    A table of parameters to specify relative path cost per each area type
+  ]]
+  interface AreaCosts
     --[[
-      Axis-Aligned Bounding Box is used for NPC and symmetric
-      Creatures.
+      Value >= 0, used in combination with @{#NAVIGATOR_FLAGS.OpenDoor}
+      (default: 2).
     ]]
-    Aabb: number
+    door: number
     
     --[[
-      is used for NPC and symmetric Creatures.
+      Value >= 0, used in combination with @{#NAVIGATOR_FLAGS.Walk} (default: 1).
     ]]
-    Cylinder: number
+    ground: number
     
     --[[
-      is used for Creatures with big difference in width and
-      height.
+      Value >= 0, used in combination with @{#NAVIGATOR_FLAGS.UsePathgrid}
+      (default: 1).
     ]]
-    RotatingBox: number
+    pathgrid: number
+    
+    --[[
+      Value >= 0, used in combination with @{#NAVIGATOR_FLAGS.Swim} (default: 1).
+    ]]
+    water: number
     
   end
   --[[
@@ -330,12 +330,13 @@ local record nearby
   actors: openmw_core.ObjectList
   
   --[[
-    Asynchronously cast ray from one point to another and find the first visual intersection with anything in the scene.
+    Asynchronously cast a ray from one point to another and find the first visual intersection with anything in the scene.
   ]]
   asyncCastRenderingRay: function(
     callback: openmw_async.Callback, --[[The callback to pass the result to (should accept a single argument @{openmw.nearby#RayCastingResult}).]]
     from: openmw_util.Vector3, --[[Start point of the ray.]]
-    to: openmw_util.Vector3
+    to: openmw_util.Vector3, --[[End point of the ray.]]
+    options: nearby.CastRenderingRayOptions
   )
   
   --[[
@@ -350,7 +351,7 @@ local record nearby
   ): openmw_util.Vector3 | nil
   
   --[[
-    Cast ray from one point to another and return the first collision.
+    Cast a ray from one point to another and return the first collision.
     if nearby.castRay(pointA, pointB).hit then print('obstacle between A and B') end
   ]]
   castRay: function(
@@ -360,10 +361,13 @@ local record nearby
   ): nearby.RayCastingResult
   
   --[[
-    Cast ray from one point to another and find the first visual intersection with anything in the scene.
-    As opposite to `castRay` can find an intersection with an object without collisions.
-    In order to avoid threading issues can be used only in player scripts only in `onFrame` or
-    in engine handlers for user input. In other cases use `asyncCastRenderingRay` instead.
+    Cast a ray from one point to another and find the first visual intersection with anything in the scene.
+    Unlike `castRay`, `castRenderingRay` can find an intersection with an object without collisions.
+    To avoid threading issues, `castRenderingRay` can only be used in:
+    - The `onFrame` engine handler.
+    - Engine handlers for user input.
+    - Callbacks provided to @{openmw.input#registerActionHandler}
+    In other cases, use `asyncCastRenderingRay` instead.
   ]]
   castRenderingRay: function(
     from: openmw_util.Vector3, --[[Start point of the ray.]]
@@ -391,7 +395,7 @@ local record nearby
   ): openmw_util.Vector3 | nil
   
   --[[
-    Find path over navigation mesh from source to destination with given options.
+    Find a path over the navigation mesh from the source to the destination with the given options.
     Result is unstable since navigation
     mesh generation is asynchronous.
     local status, path = nearby.findPath(source, destination)
@@ -404,7 +408,7 @@ local record nearby
     { openmw_util.Vector3 }
   
   --[[
-    Returns random location on navigation mesh within the reach of specified location.
+    Returns a random location on the navigation mesh within the reach of the specified location.
     The location is not exactly constrained by the circle, but it limits the area.
     local position = nearby.findRandomPointAroundCircle(position, maxRadius)
   ]]

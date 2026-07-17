@@ -22,15 +22,15 @@ local record util
   ): any
   
   --[[
-    Works like `tostring` but shows also content of tables.
+    Works like `tostring` but also shows the content of tables.
   ]]
   deepToString: function(
-    value: any, --[[The value to convert to string]]
+    value: any, --[[The value to convert to a string]]
     maxDepth: number
   )
   
   --[[
-    Finds the element the minimizes `scoreFn`.
+    Finds the element in the array given the lowest score by `scoreFn`.
     -- Find the nearest NPC
     local nearestNPC, distToNPC = aux_util.findMinScore(
         nearby.actors,
@@ -41,8 +41,8 @@ local record util
   findMinScore: function(
     array: table, --[[Any array]]
     scoreFn: function
-  ): any, --[[element The element the minimizes `scoreFn`]]
-    number, --[[score The output of `scoreFn(element)`]]
+  ): any, --[[element The element given the lowest score]]
+    number, --[[score The score given to the chosen element by `scoreFn`]]
     number
   
   --[[
@@ -73,6 +73,13 @@ local record util
     scoreFn: function
   ): table, --[[Output array]]
     table
+  
+  --[[
+    Copies all key-value pairs from the input table to a new table.
+  ]]
+  shallowCopy: function(
+    table: table
+  ): table
   
 end
 return util

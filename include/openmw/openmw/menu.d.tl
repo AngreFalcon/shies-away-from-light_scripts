@@ -48,7 +48,7 @@ local record menu
   --[[
     List of all available saves, grouped by directory
   ]]
-  getAllSaves: function(): { any: { any: menu.SaveInfo } }
+  getAllSaves: function(): { string: { string: menu.SaveInfo } }
   
   --[[
     Current save directory
@@ -60,7 +60,7 @@ local record menu
   ]]
   getSaves: function(
     directory: string
-  ): { any: menu.SaveInfo }
+  ): { string: menu.SaveInfo }
   
   --[[
     Current game state

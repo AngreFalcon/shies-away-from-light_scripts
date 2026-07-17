@@ -1,5 +1,5 @@
 --[[
-  Defines functions and types that are available in local, global and menu scripts.
+  Defines functions and types that are available in local, global, menu, and load scripts.
   local core = require('openmw.core')
 ]]
 
@@ -55,7 +55,7 @@ local record core
   ]]
   interface Enchantment
     --[[
-      If set, the casting cost should be computed based on the effect list rather than read from the cost field
+      (DEPRECATED, use isAutocalc) If set, the casting cost should be computed based on the effect list rather than read from the cost field
     ]]
     autocalcFlag: boolean
     
@@ -75,6 +75,11 @@ local record core
       Enchantment id
     ]]
     id: string
+    
+    --[[
+      If set, the casting cost should be computed based on the effect list rather than read from the cost field
+    ]]
+    isAutocalc: boolean
     
     --[[
       @{#EnchantmentType}
@@ -209,51 +214,6 @@ local record core
     records: { core.WeatherRecord }
     
   end
-  interface Dialogue
-    --[[
-      @{#DialogueRecords} functions for greeting read-only records.
-      --print ids of all greeting records
-      for _, greetingRecord in pairs(core.dialogue.greeting.records) do
-          print(greetingRecord.id)
-      end
-    ]]
-    greeting: any
-    
-    --[[
-      @{#DialogueRecords} functions for journal (quest) read-only records.
-      --print the name of the record, which is a capitalized version of its id
-      print(core.dialogue.journal.records["ms_fargothring"].name) -- MS_FargothRing
-    ]]
-    journal: any
-    
-    --[[
-      @{#DialogueRecords} functions for persuasion read-only records.
-      --print ids of all persuasion records
-      for _, persuasionRecord in pairs(core.dialogue.persuasion.records) do
-          print(persuasionRecord.id)
-      end
-    ]]
-    persuasion: any
-    
-    --[[
-      @{#DialogueRecords} functions for topic read-only records.
-      --print ids of all topic records
-      for _, topicRecord in pairs(core.dialogue.topic.records) do
-          print(topicRecord.id)
-      end
-    ]]
-    topic: any
-    
-    --[[
-      @{#DialogueRecords} functions for voice read-only records.
-      --print ids of all voice records
-      for _, voiceRecord in pairs(core.dialogue.voice.records) do
-          print(voiceRecord.id)
-      end
-    ]]
-    voice: any
-    
-  end
   interface MWScripts
     --[[
       A read-only list of all @{#MWScriptRecord}s in the world database.
@@ -272,7 +232,20 @@ local record core
           end
       end
     ]]
-    records: { any: core.MagicEffect }
+    records: { number: core.MagicEffect }
+    
+  end
+  --[[
+    Interpolates colors for weathers based on time of day
+  ]]
+  interface TimeOfDayInterpolatorColor
+    day: openmw_util.Color
+    
+    night: openmw_util.Color
+    
+    sunrise: openmw_util.Color
+    
+    sunset: openmw_util.Color
     
   end
   --[[
@@ -295,34 +268,129 @@ local record core
     relativePosition: openmw_util.Vector3
     
   end
+  interface Spell
+    --[[
+      If set, the spell should ignore skill checks and always succeed.
+    ]]
+    alwaysSucceedFlag: boolean
+    
+    --[[
+      (DEPRECATED, use isAutocalc) If set, the casting cost should be computed based on the effect list rather than read from the cost field
+    ]]
+    autocalcFlag: boolean
+    
+    cost: number
+    
+    --[[
+      The effects (@{#MagicEffectWithParams}) of the spell
+    ]]
+    effects: { core.MagicEffectWithParams }
+    
+    --[[
+      Spell id
+    ]]
+    id: string
+    
+    --[[
+      If set, the casting cost should be computed based on the effect list rather than read from the cost field
+    ]]
+    isAutocalc: boolean
+    
+    --[[
+      Spell name
+    ]]
+    name: string
+    
+    --[[
+      If set, the spell can be selected as a player's starting spell.
+    ]]
+    starterSpellFlag: boolean
+    
+    --[[
+      @{#SpellType}
+    ]]
+    type: number
+    
+  end
   interface Regions
-  end
-  --[[
-    Interpolates colors for weathers based on time of day
-  ]]
-  interface TimeOfDayInterpolatorColor
-    day: openmw_util.Color
-    
-    night: openmw_util.Color
-    
-    sunrise: openmw_util.Color
-    
-    sunset: openmw_util.Color
+    --[[
+      A read-only list of all @{#RegionRecord}s in the world database.
+      local record = core.regions.records['bitter coast region']
+    ]]
+    records: { core.RegionRecord }
     
   end
-  --[[
-    Region sound reference
-  ]]
-  interface RegionSoundRef
+  interface MWScript
+  end
+  interface ActiveEffect
     --[[
-      Multiplicative percentage used to determine whether to play the sound
+      Optional attribute ID
     ]]
-    chance: number
+    affectedAttribute: string
     
     --[[
-      Sound record ID
+      Optional skill ID
     ]]
-    soundId: string
+    affectedSkill: string
+    
+    --[[
+      Effect id string
+    ]]
+    id: string
+    
+    --[[
+      Current magnitude of the effect. Will be set to 0 when the effect is removed or expires.
+    ]]
+    magnitude: number
+    
+    magnitudeBase: number
+    
+    magnitudeModifier: number
+    
+    --[[
+      Localized name of the effect
+    ]]
+    name: string
+    
+  end
+  --[[
+    Faction data record
+  ]]
+  interface FactionRecord
+    --[[
+      A read-only list containing IDs of attributes to advance ranks in the faction.
+    ]]
+    attributes: { string }
+    
+    --[[
+      If true, the faction won't show in the player's skills menu
+    ]]
+    hidden: boolean
+    
+    --[[
+      Faction id
+    ]]
+    id: string
+    
+    --[[
+      Faction name
+    ]]
+    name: string
+    
+    --[[
+      A read-only list containing data for all ranks in the faction, in order.
+    ]]
+    ranks: { core.FactionRank }
+    
+    --[[
+      A read-only map containing reactions of other factions to this faction.
+    ]]
+    reactions: { string: number }
+    
+    --[[
+      A read-only list containing IDs of skills to advance ranks in the faction.
+    ]]
+    skills: { string }
     
   end
   --[[
@@ -332,6 +400,12 @@ local record core
     local aa = core.dialogue.topic.records['advancement'].infos[100].text
   ]]
   interface DialogueRecordInfo
+    --[[
+      A read-only list of @{#DialogueInfoCondition}s.
+      Always nil for journal records.
+    ]]
+    conditions: { core.DialogueInfoCondition }
+    
     --[[
       Speaker class allowing for this info entry to appear.
       Always nil for journal records. Otherwise the nil value represents no conditions, i.e. no filtering applied using these criteria.
@@ -421,7 +495,7 @@ local record core
     isQuestRestart: boolean
     
     --[[
-      Quest stage (same as in @{openmw_types#PlayerQuest.stage}) this info entry is associated with.
+      Quest stage (same as in @{openmw_types#PLAYERQuest.stage}) this info entry is associated with.
       Non-nil only for journal records.
     ]]
     questStage: number
@@ -444,40 +518,59 @@ local record core
     text: string
     
   end
-  interface ActiveEffect
+  --[[
+    `core.dialogue.CONDITION_OPERATOR`
+  ]]
+  interface DialogueConditionOperator
     --[[
-      Optional attribute ID
+      ==
     ]]
-    affectedAttribute: string
-    
-    --[[
-      Optional skill ID
-    ]]
-    affectedSkill: string
+    Equal: number
     
     --[[
-      Effect id string
+      >
     ]]
-    id: string
+    Greater: number
     
     --[[
-      current magnitude of the effect. Will be set to 0 when effect is removed or expires.
+      >=
     ]]
-    magnitude: number
-    
-    magnitudeBase: number
-    
-    magnitudeModifier: number
+    GreaterEqual: number
     
     --[[
-      Localized name of the effect
+      <
     ]]
-    name: string
+    Less: number
+    
+    --[[
+      <=
+    ]]
+    LessEqual: number
+    
+    --[[
+      !=
+    ]]
+    NotEqual: number
     
   end
   --[[
-    A read-only list of all @{#RegionRecord}s in the world database.
-    local record = core.regions.records['bitter coast region']
+    Region sound reference
+  ]]
+  interface RegionSoundRef
+    --[[
+      Multiplicative percentage used to determine whether to play the sound
+    ]]
+    chance: number
+    
+    --[[
+      Sound record ID
+    ]]
+    soundId: string
+    
+  end
+  --[[
+    Region data record
+    print(region.weatherProbabilities["rain"])
   ]]
   interface RegionRecord
     --[[
@@ -494,8 +587,6 @@ local record core
       Region display name
     ]]
     name: string
-    
-    records: { core.RegionRecord }
     
     --[[
       A leveled creature list used when sleeping outdoors in this region
@@ -516,7 +607,443 @@ local record core
     weatherProbabilities: table
     
   end
-  interface MWScript
+  --[[
+    `core.dialogue.CONDITION_TYPE`
+  ]]
+  interface DialogueConditionType
+    --[[
+      The speaker's current alarm
+    ]]
+    Alarm: number
+    
+    --[[
+      Whether the speaker was alarmed by the player's crime
+    ]]
+    Alarmed: number
+    
+    --[[
+      Whether the speaker was attacked
+    ]]
+    Attacked: number
+    
+    --[[
+      The choice index
+    ]]
+    Choice: number
+    
+    --[[
+      Whether the speaker is targeting a creature
+    ]]
+    CreatureTarget: number
+    
+    --[[
+      The number of dead actors of the given @{#DialogueInfoCondition.recordId}
+    ]]
+    Dead: number
+    
+    --[[
+      Whether the speaker has detected the player
+    ]]
+    Detected: number
+    
+    --[[
+      Highest faction reaction from the speaker's primary faction to the player's factions
+    ]]
+    FacReactionHighest: number
+    
+    --[[
+      Lowest faction reaction from the speaker's primary faction to the player's factions
+    ]]
+    FacReactionLowest: number
+    
+    --[[
+      The difference between the player's rank in the speaker's primary faction and the speaker's
+    ]]
+    FactionRankDifference: number
+    
+    --[[
+      The speaker's current fight
+    ]]
+    Fight: number
+    
+    --[[
+      The speaker's current flee
+    ]]
+    Flee: number
+    
+    --[[
+      The number of times the player has hit the speaker follower
+    ]]
+    FriendHit: number
+    
+    --[[
+      A comparison to the @{#DialogueInfoCondition.variableName} global variable
+    ]]
+    Global: number
+    
+    --[[
+      The speaker's health percentage
+    ]]
+    HealthPercent: number
+    
+    --[[
+      The speaker's current hello
+    ]]
+    Hello: number
+    
+    --[[
+      The number of copies of @{#DialogueInfoCondition.recordId} the player is carrying
+    ]]
+    Item: number
+    
+    --[[
+      A comparison to the player's @{#DialogueInfoCondition.recordId} journal index
+    ]]
+    Journal: number
+    
+    --[[
+      The speaker's level
+    ]]
+    Level: number
+    
+    --[[
+      A comparison to the speaker's @{#DialogueInfoCondition.variableName} local variable
+    ]]
+    Local: number
+    
+    --[[
+      The player's cell name should not start with @{#DialogueInfoCondition.cellName}
+    ]]
+    NotCell: number
+    
+    --[[
+      The speaker's class should not match @{#DialogueInfoCondition.recordId}
+    ]]
+    NotClass: number
+    
+    --[[
+      The speaker's faction ID should not match @{#DialogueInfoCondition.recordId}
+    ]]
+    NotFaction: number
+    
+    --[[
+      The speaker's recordId should not match @{#DialogueInfoCondition.recordId}
+    ]]
+    NotId: number
+    
+    --[[
+      A comparison to the speaker's @{#DialogueInfoCondition.variableName} local variable
+    ]]
+    NotLocal: number
+    
+    --[[
+      The speaker's race should not match @{#DialogueInfoCondition.recordId}
+    ]]
+    NotRace: number
+    
+    --[[
+      The player's current acrobatics
+    ]]
+    PcAcrobatics: number
+    
+    --[[
+      The player's current agility
+    ]]
+    PcAgility: number
+    
+    --[[
+      The player's current alchemy
+    ]]
+    PcAlchemy: number
+    
+    --[[
+      The player's current alteration
+    ]]
+    PcAlteration: number
+    
+    --[[
+      The player's current armorer
+    ]]
+    PcArmorer: number
+    
+    --[[
+      The player's current athletics
+    ]]
+    PcAthletics: number
+    
+    --[[
+      The player's current axe
+    ]]
+    PcAxe: number
+    
+    --[[
+      Check if the player has a blight disease
+    ]]
+    PcBlightDisease: number
+    
+    --[[
+      The player's current block
+    ]]
+    PcBlock: number
+    
+    --[[
+      The player's current blunt weapon
+    ]]
+    PcBluntWeapon: number
+    
+    --[[
+      Check the combined value of the player's outfit
+    ]]
+    PcClothingModifier: number
+    
+    --[[
+      Check if the player has a common disease
+    ]]
+    PcCommonDisease: number
+    
+    --[[
+      The player's current conjuration
+    ]]
+    PcConjuration: number
+    
+    --[[
+      Whether the player is affected by the Corprus magic effect
+    ]]
+    PcCorprus: number
+    
+    --[[
+      The player's bounty
+    ]]
+    PcCrimeLevel: number
+    
+    --[[
+      The player's current destruction
+    ]]
+    PcDestruction: number
+    
+    --[[
+      The player's current enchant
+    ]]
+    PcEnchant: number
+    
+    --[[
+      The player's current endurance
+    ]]
+    PcEndurance: number
+    
+    --[[
+      Check whether the player has been expelled from the speaker's primary faction
+    ]]
+    PcExpelled: number
+    
+    --[[
+      The player's current fatigue
+    ]]
+    PcFatigue: number
+    
+    --[[
+      The player's gender
+    ]]
+    PcGender: number
+    
+    --[[
+      The player's current hand to hand
+    ]]
+    PcHandToHand: number
+    
+    --[[
+      The player's current health
+    ]]
+    PcHealth: number
+    
+    --[[
+      The player's health percentage
+    ]]
+    PcHealthPercent: number
+    
+    --[[
+      The player's current heavy armor
+    ]]
+    PcHeavyArmor: number
+    
+    --[[
+      The player's current illusion
+    ]]
+    PcIllusion: number
+    
+    --[[
+      The player's current intelligence
+    ]]
+    PcIntelligence: number
+    
+    --[[
+      The player's level
+    ]]
+    PcLevel: number
+    
+    --[[
+      The player's current light armor
+    ]]
+    PcLightArmor: number
+    
+    --[[
+      The player's current long blade
+    ]]
+    PcLongBlade: number
+    
+    --[[
+      The player's current luck
+    ]]
+    PcLuck: number
+    
+    --[[
+      The player's current magicka
+    ]]
+    PcMagicka: number
+    
+    --[[
+      The player's current marksman
+    ]]
+    PcMarksman: number
+    
+    --[[
+      The player's current medium armor
+    ]]
+    PcMediumArmor: number
+    
+    --[[
+      The player's current mercantile
+    ]]
+    PcMercantile: number
+    
+    --[[
+      The player's current mysticism
+    ]]
+    PcMysticism: number
+    
+    --[[
+      The player's current personality
+    ]]
+    PcPersonality: number
+    
+    --[[
+      The player's reputation
+    ]]
+    PcReputation: number
+    
+    --[[
+      The player's current restoration
+    ]]
+    PcRestoration: number
+    
+    --[[
+      The player's current security
+    ]]
+    PcSecurity: number
+    
+    --[[
+      The player's current short blade
+    ]]
+    PcShortBlade: number
+    
+    --[[
+      The player's current sneak
+    ]]
+    PcSneak: number
+    
+    --[[
+      The player's current spear
+    ]]
+    PcSpear: number
+    
+    --[[
+      The player's current speechcraft
+    ]]
+    PcSpeechcraft: number
+    
+    --[[
+      The player's current speed
+    ]]
+    PcSpeed: number
+    
+    --[[
+      The player's current strength
+    ]]
+    PcStrength: number
+    
+    --[[
+      The player's current unarmored
+    ]]
+    PcUnarmored: number
+    
+    --[[
+      Whether the player is affected by the Vampirism magic effect
+    ]]
+    PcVampire: number
+    
+    --[[
+      The number of werewolves killed by the player
+    ]]
+    PcWerewolfKills: number
+    
+    --[[
+      The player's current willpower
+    ]]
+    PcWillpower: number
+    
+    --[[
+      Check whether the player can advance in the speaker's primary faction
+    ]]
+    RankRequirement: number
+    
+    --[[
+      The speaker's reputation
+    ]]
+    Reputation: number
+    
+    --[[
+      Check if the player is a member of the speaker's primary faction
+    ]]
+    SameFaction: number
+    
+    --[[
+      Check if the speaker's gender matches the player's
+    ]]
+    SameGender: number
+    
+    --[[
+      Check if the speaker's race matches the player's
+    ]]
+    SameRace: number
+    
+    --[[
+      Whether the speaker would start combat with the player
+    ]]
+    ShouldAttack: number
+    
+    --[[
+      Whether the speaker has talked to the player before
+    ]]
+    TalkedToPc: number
+    
+    --[[
+      Checks the scriptId of the weather in the player's cell
+    ]]
+    Weather: number
+    
+    --[[
+      Whether the speaker is in werewolf form
+    ]]
+    Werewolf: number
+    
+  end
+  interface Factions
+    --[[
+      A read-only list of all @{#FactionRecord}s in the world database.
+      local record = core.factions.records['example_recordid']
+    ]]
+    records: { core.FactionRecord }
+    
   end
   interface MagicSchoolData
     --[[
@@ -550,44 +1077,36 @@ local record core
     name: string
     
   end
-  --[[
-    Faction data record
-  ]]
-  interface FactionRecord
+  interface DialogueInfoCondition
     --[[
-      A read-only list containing IDs of attributes to advance ranks in the faction.
+      The cell name to compare to
     ]]
-    attributes: { string }
+    cellName: string
     
     --[[
-      If true, the faction won't show in the player's skills menu
+      The #{#DialogueConditionOperator} to use in the comparison
     ]]
-    hidden: boolean
+    operator: core.DialogueConditionOperator
     
     --[[
-      Faction id
+      The record ID to use in the comparison
     ]]
-    id: string
+    recordId: string
     
     --[[
-      Faction name
+      The condition's @{#DialogueConditionType}
     ]]
-    name: string
+    type: core.DialogueConditionType
     
     --[[
-      A read-only list containing data for all ranks in the faction, in order.
+      The value to compare to
     ]]
-    ranks: { core.FactionRank }
+    value: number
     
     --[[
-      A read-only map containing reactions of other factions to this faction.
+      The name of the global or local mwscript variable to compare to
     ]]
-    reactions: { any: number }
-    
-    --[[
-      A read-only list containing IDs of skills to advance ranks in the faction.
-    ]]
-    skills: { string }
+    variableName: string
     
   end
   --[[
@@ -614,12 +1133,30 @@ local record core
     list: { string }
     
   end
-  interface Factions
+  --[[
+    Depending on which store this read-only dialogue record is from, it may either be a journal, topic, greeting, persuasion or voice.
+    local journalId = core.dialogue.journal.records['A2_4_MiloGone'].id -- "a2_4_milogone"
+  ]]
+  interface DialogueRecord
     --[[
-      A read-only list of all @{#FactionRecord}s in the world database.
-      local record = core.factions.records['example_recordid']
+      Record identifier
     ]]
-    records: { core.FactionRecord }
+    id: string
+    
+    --[[
+      A read-only list containing all @{#DialogueRecordInfo}s for this record, in order.
+    ]]
+    infos: { core.DialogueRecordInfo }
+    
+    --[[
+      Same as id, but with upper cases preserved.
+    ]]
+    name: string
+    
+    --[[
+      Non-nil only for journal records with available value. Holds the quest name for this journal entry. Same info may be available under `infos[1].text` as well, but this variable is made for convenience.
+    ]]
+    questName: string
     
   end
   --[[
@@ -645,6 +1182,15 @@ local record core
       Enchantment is always active when equipped.
     ]]
     ConstantEffect: number
+    
+  end
+  interface DialogueRecords
+    --[[
+      A read-only list of all @{#DialogueRecord}s in the world database, may be indexed by recordId, which doesn't have to be lowercase.
+      Implements [iterables#List](iterables.html#list-iterable) of #DialogueRecord.
+      local record = core.dialogue.journal.records['ms_fargothring']
+    ]]
+    records: { core.DialogueRecord }
     
   end
   --[[
@@ -676,83 +1222,6 @@ local record core
     
   end
   --[[
-    Depending on which store this read-only dialogue record is from, it may either be a journal, topic, greeting, persuasion or voice.
-    local journalId = core.dialogue.journal.records['A2_4_MiloGone'].id -- "a2_4_milogone"
-  ]]
-  interface DialogueRecord
-    --[[
-      Record identifier
-    ]]
-    id: string
-    
-    --[[
-      A read-only list containing all @{#DialogueRecordInfo}s for this record, in order.
-    ]]
-    infos: { core.DialogueRecordInfo }
-    
-    --[[
-      Same as id, but with upper cases preserved.
-    ]]
-    name: string
-    
-    --[[
-      Non-nil only for journal records with available value. Holds the quest name for this journal entry. Same info may be available under `infos[1].text` as well, but this variable is made for convenience.
-    ]]
-    questName: string
-    
-  end
-  interface DialogueRecords
-    --[[
-      A read-only list of all @{#DialogueRecord}s in the world database, may be indexed by recordId, which doesn't have to be lowercase.
-      Implements [iterables#List](iterables.html#list-iterable) of #DialogueRecord.
-      local record = core.dialogue.journal.records['ms_fargothring']
-    ]]
-    records: { core.DialogueRecord }
-    
-  end
-  interface SkillRecord
-    --[[
-      The id of the skill's governing attribute
-    ]]
-    attribute: string
-    
-    --[[
-      Human-readable description
-    ]]
-    description: string
-    
-    --[[
-      VFS path to the icon
-    ]]
-    icon: string
-    
-    --[[
-      Record id
-    ]]
-    id: string
-    
-    --[[
-      Human-readable name
-    ]]
-    name: string
-    
-    --[[
-      Optional magic school
-    ]]
-    school: core.MagicSchoolData
-    
-    --[[
-      Table of the 4 possible skill gain values. See [SkillProgression#SkillUseType](interface_skill_progression.html#SkillUseType).
-    ]]
-    skillGain: table
-    
-    --[[
-      Skill specialization. Either combat, magic, or stealth.
-    ]]
-    specialization: string
-    
-  end
-  --[[
     `core.stats.Skill`
     local record = core.stats.Skill.records['example_recordid']
   ]]
@@ -770,21 +1239,6 @@ local record core
     ]]
     records: { core.SkillRecord }
     
-  end
-  interface Spells
-    --[[
-      List of all @{#Spell}s.
-      local spell = core.magic.spells.records['thunder fist']  -- get by id
-    ]]
-    records: { core.Spell }
-    
-  end
-  --[[
-    List of GameObjects.
-    Implements [iterables#List](iterables.html#List) of #GameObject
-  ]]
-  interface ObjectList
-    { core.GameObject }
   end
   interface AttributeRecord
     --[[
@@ -827,12 +1281,35 @@ local record core
     records: { core.AttributeRecord }
     
   end
+  interface Spells
+    --[[
+      Creates a @{#Spell} without adding it to the world database.
+      Use @{openmw_world#(world).createRecord} to add the record to the world.
+    ]]
+    createRecordDraft: function(
+      spell: core.Spell
+    ): core.Spell
+    
+    --[[
+      List of all @{#Spell}s.
+      local spell = core.magic.spells.records['thunder fist']  -- get by id
+    ]]
+    records: { core.Spell }
+    
+  end
+  --[[
+    List of GameObjects.
+    Implements [iterables#List](iterables.html#List) of #GameObject
+  ]]
+  interface ObjectList
+    { core.GameObject }
+  end
   --[[
     Inventory of a player/NPC or a content of a container.
   ]]
   interface Inventory
     --[[
-      The number of items with given recordId.
+      The number of items with the given recordId.
     ]]
     countOf: function(
       self: core.Inventory,
@@ -840,7 +1317,7 @@ local record core
     ): number
     
     --[[
-      Get first item with given recordId from the inventory.
+      Get first item with the given recordId from the inventory.
       Returns nil if not found.
       inventory:find('gold_001')
     ]]
@@ -850,7 +1327,7 @@ local record core
     ): core.GameObject
     
     --[[
-      Get all items with given recordId from the inventory.
+      Get all items with the given recordId from the inventory.
       for _, item in ipairs(inventory:findAll('common_shirt_01')) do ... end
     ]]
     findAll: function(
@@ -859,7 +1336,7 @@ local record core
     ): core.ObjectList
     
     --[[
-      Get all items of given type from the inventory.
+      Get all items of the given type from the inventory.
       local types = require('openmw.types')
       local self = require('openmw.self')
       local playerInventory = types.Actor.inventory(self.object)
@@ -889,43 +1366,165 @@ local record core
     )
     
   end
-  interface Spell
+  interface MagicEffect
     --[[
-      If set, the spell should ignore skill checks and always succeed.
+      True if the effect is available for enchanting
     ]]
-    alwaysSucceedFlag: boolean
+    allowsEnchanting: boolean
     
     --[[
-      If set, the casting cost should be computed based on the effect list rather than read from the cost field
+      True if the effect is available for spellmaking
     ]]
-    autocalcFlag: boolean
-    
-    cost: number
+    allowsSpellmaking: boolean
     
     --[[
-      The effects (@{#MagicEffectWithParams}) of the spell
+      Identifier of the sound used for AOE spells
     ]]
-    effects: { core.MagicEffectWithParams }
+    areaSound: string
     
     --[[
-      Spell id
+      Identifier of the vfx static used for AOE spells
+    ]]
+    areaStatic: string
+    
+    baseCost: number
+    
+    --[[
+      Identifier of the projectile used for ranged spells
+    ]]
+    bolt: string
+    
+    --[[
+      Identifier of the projectile sound used for ranged spells
+    ]]
+    boltSound: string
+    
+    --[[
+      Identifier of the sound used for casting
+    ]]
+    castSound: string
+    
+    --[[
+      Identifier of the vfx static used for casting
+    ]]
+    castStatic: string
+    
+    --[[
+      If set, it is implied the magic effect links back to the caster in some way and should end immediately or never be applied if the caster dies or is not an actor.
+    ]]
+    casterLinked: boolean
+    
+    color: openmw_util.Color
+    
+    --[[
+      Whether the magic effect's vfx should loop or not
+    ]]
+    continuousVfx: boolean
+    
+    --[[
+      Localized description of the effect
+    ]]
+    description: string
+    
+    --[[
+      If set, the effect is considered harmful and should elicit a hostile reaction from affected NPCs.
+    ]]
+    harmful: boolean
+    
+    --[[
+      True if the effect requires an attribute parameter
+    ]]
+    hasAttribute: boolean
+    
+    --[[
+      If set, the magic effect has a duration. As an example, divine intervention has no duration while fire damage does.
+    ]]
+    hasDuration: boolean
+    
+    --[[
+      If set, the magic effect depends on a magnitude. As an example, cure common disease has no magnitude while chameleon does.
+    ]]
+    hasMagnitude: boolean
+    
+    --[[
+      True if the effect requires a skill parameter
+    ]]
+    hasSkill: boolean
+    
+    --[[
+      Identifier of the sound used on hit
+    ]]
+    hitSound: string
+    
+    --[[
+      Identifier of the vfx static used on hit
+    ]]
+    hitStatic: string
+    
+    --[[
+      Effect Icon Path
+    ]]
+    icon: string
+    
+    --[[
+      Effect ID
     ]]
     id: string
     
     --[[
-      Spell name
+      If set, the magic effect is applied fully on cast, rather than being continuously applied over the effect's duration. For example, chameleon is applied once, while fire damage is continuously applied for the duration.
+    ]]
+    isAppliedOnce: boolean
+    
+    --[[
+      Localized name of the effect
     ]]
     name: string
     
     --[[
-      If set, the spell can be selected as a player's starting spell.
+      True if the effect casts negative light
     ]]
-    starterSpellFlag: boolean
+    negativeLight: boolean
     
     --[[
-      @{#SpellType}
+      If set, this effect cannot be re-applied until it has ended. This is used by bound equipment spells.
     ]]
-    type: number
+    nonRecastable: boolean
+    
+    --[[
+      True if the effect can be cast on self
+    ]]
+    onSelf: boolean
+    
+    --[[
+      True if the effect can be cast on target
+    ]]
+    onTarget: boolean
+    
+    --[[
+      True if the effect can be cast on touch
+    ]]
+    onTouch: boolean
+    
+    --[[
+      Identifier of the particle texture
+    ]]
+    particle: string
+    
+    --[[
+      Skill ID that is this effect's school
+    ]]
+    school: string
+    
+    --[[
+      Projectile speed
+    ]]
+    speed: number
+    
+    --[[
+      True if the effect cannot be reflected
+    ]]
+    unreflectable: boolean
     
   end
   --[[
@@ -938,9 +1537,14 @@ local record core
     attributeValues: { number }
     
     --[[
-      Reaction of faction members if player is in this faction.
+      (DEPRECATED) Returns the same as factionReputation.
     ]]
     factionReaction: number
+    
+    --[[
+      Required amount of faction reputation to reach this rank.
+    ]]
+    factionReputation: number
     
     --[[
       Secondary skill value required to get this rank.
@@ -1033,12 +1637,49 @@ local record core
       nil | string
     
   end
+  interface MagicEffectWithParams
+    --[[
+      Optional attribute ID
+    ]]
+    affectedAttribute: string
+    
+    --[[
+      Optional skill ID
+    ]]
+    affectedSkill: string
+    
+    area: number
+    
+    duration: number
+    
+    --[[
+      @{#MagicEffect}
+    ]]
+    effect: core.MagicEffect
+    
+    --[[
+      ID of the associated @{#MagicEffect}
+    ]]
+    id: string
+    
+    --[[
+      Index of this effect within the original list of @{#MagicEffectWithParams} of the spell/enchantment/potion this effect came from.
+    ]]
+    index: number
+    
+    magnitudeMax: number
+    
+    magnitudeMin: number
+    
+    range: number
+    
+  end
   --[[
     A cell of the game world.
   ]]
   interface Cell
     --[[
-      Human-readable cell name (takes into account *.cel file localizations). Can be empty string.
+      Human-readable cell name (takes into account *.cel file localizations). Can be an empty string.
     ]]
     displayName: string
     
@@ -1152,7 +1793,7 @@ local record core
     ): boolean
     
     --[[
-      Check if sound file is playing on given object
+      Check if a sound file is playing on the given object
       local isPlaying = core.sound.isSoundFilePlaying("Sound\\test.mp3", object);
     ]]
     isSoundFilePlaying: function(
@@ -1161,7 +1802,7 @@ local record core
     ): boolean
     
     --[[
-      Check if sound is playing on given object
+      Check if a sound is playing on the given object
       local isPlaying = core.sound.isSoundPlaying("shock bolt", object);
     ]]
     isSoundPlaying: function(
@@ -1257,110 +1898,21 @@ local record core
     )
     
   end
-  interface MagicEffect
+  interface Enchantments
     --[[
-      Identifier of the sound used for AOE spells
+      Creates an @{#Enchantment} without adding it to the world database.
+      Use @{openmw_world#(world).createRecord} to add the record to the world.
     ]]
-    areaSound: string
-    
-    --[[
-      Identifier of the vfx static used for AOE spells
-    ]]
-    areaStatic: string
-    
-    baseCost: number
+    createRecordDraft: function(
+      enchantment: core.Enchantment
+    ): core.Enchantment
     
     --[[
-      Identifier of the projectile used for ranged spells
+      A read-only list of all @{#Enchantment} records in the world database, may be indexed by recordId.
+      Implements [iterables#List](iterables.html#List) and [iterables#Map](iterables.html#map-iterable) of #Enchantment.
+      local enchantment = core.magic.enchantments.records['marara's boon']  -- get by id
     ]]
-    bolt: string
-    
-    --[[
-      Identifier of the projectile sound used for ranged spells
-    ]]
-    boltSound: string
-    
-    --[[
-      Identifier of the sound used for casting
-    ]]
-    castSound: string
-    
-    --[[
-      Identifier of the vfx static used for casting
-    ]]
-    castStatic: string
-    
-    --[[
-      If set, it is implied the magic effect links back to the caster in some way and should end immediately or never be applied if the caster dies or is not an actor.
-    ]]
-    casterLinked: boolean
-    
-    color: openmw_util.Color
-    
-    --[[
-      Whether the magic effect's vfx should loop or not
-    ]]
-    continuousVfx: boolean
-    
-    --[[
-      If set, the effect is considered harmful and should elicit a hostile reaction from affected NPCs.
-    ]]
-    harmful: boolean
-    
-    --[[
-      If set, the magic effect has a duration. As an example, divine intervention has no duration while fire damage does.
-    ]]
-    hasDuration: boolean
-    
-    --[[
-      If set, the magic effect depends on a magnitude. As an example, cure common disease has no magnitude while chameleon does.
-    ]]
-    hasMagnitude: boolean
-    
-    --[[
-      Identifier of the sound used on hit
-    ]]
-    hitSound: string
-    
-    --[[
-      Identifier of the vfx static used on hit
-    ]]
-    hitStatic: string
-    
-    --[[
-      Effect Icon Path
-    ]]
-    icon: string
-    
-    --[[
-      Effect ID
-    ]]
-    id: string
-    
-    --[[
-      If set, the magic effect is applied fully on cast, rather than being continuously applied over the effect's duration. For example, chameleon is applied once, while fire damage is continuously applied for the duration.
-    ]]
-    isAppliedOnce: boolean
-    
-    --[[
-      Localized name of the effect
-    ]]
-    name: string
-    
-    --[[
-      If set, this effect cannot be re-applied until it has ended. This is used by bound equipment spells.
-    ]]
-    nonRecastable: boolean
-    
-    --[[
-      Identifier of the particle texture
-    ]]
-    particle: string
-    
-    --[[
-      Skill ID that is this effect's school
-    ]]
-    school: string
+    records: { core.Enchantment }
     
   end
   --[[
@@ -1380,7 +1932,7 @@ local record core
     )
     
     --[[
-      Add new local script to the object.
+      Add a new local script to the object.
       Can be called only from a global script. Script should be specified in a content
       file (omwgame/omwaddon/omwscripts) with a CUSTOM flag. Scripts can not be attached to Statics.
     ]]
@@ -1396,7 +1948,7 @@ local record core
     cell: core.Cell
     
     --[[
-      Lower cased file name of the content file that defines this object; nil for dynamically created objects.
+      Lowercase file name of the content file that defines this object; nil for dynamically created objects.
     ]]
     contentFile: string
     
@@ -1418,7 +1970,7 @@ local record core
     ): openmw_util.Box
     
     --[[
-      Global Variable associated with this object(read only).
+      Global Variable associated with this object (read only).
     ]]
     globalVariable: string
     
@@ -1432,7 +1984,7 @@ local record core
     ): boolean
     
     --[[
-      A unique id of this object (not record id), can be used as a key in a table.
+      The unique id of this object (not record id), can be used as a key in a table.
     ]]
     id: string
     
@@ -1446,7 +1998,7 @@ local record core
     ): boolean
     
     --[[
-      Moves object into a container or an inventory.
+      Moves an object into a container or an inventory.
       Enables if was disabled.
       Can be called only from a global script.
       item:moveInto(types.Actor.inventory(actor))
@@ -1505,7 +2057,7 @@ local record core
     scale: number
     
     --[[
-      Send local event to the object.
+      Send a local event to the object.
     ]]
     sendEvent: function(
       self: core.GameObject,
@@ -1535,6 +2087,11 @@ local record core
     ): core.GameObject
     
     --[[
+      The object's original cell. Returns nil if `cell` of the object is nil.
+    ]]
+    startingCell: core.Cell
+    
+    --[[
       The object original position
     ]]
     startingPosition: openmw_util.Vector3
@@ -1545,7 +2102,7 @@ local record core
     startingRotation: openmw_util.Transform
     
     --[[
-      Moves object to given cell and position.
+      Moves the object to given cell and position.
       Can be called only from a global script.
       The effect is not immediate: the position will be updated only in the next
       frame. Can be called only from a global script. Enables object if it was disabled.
@@ -1565,17 +2122,8 @@ local record core
     type: any
     
   end
-  interface Enchantments
-    --[[
-      A read-only list of all @{#Enchantment} records in the world database, may be indexed by recordId.
-      Implements [iterables#List](iterables.html#List) and [iterables#Map](iterables.html#map-iterable) of #Enchantment.
-      local enchantment = core.magic.enchantments.records['marara's boon']  -- get by id
-    ]]
-    records: { core.Enchantment }
-    
-  end
   --[[
-    Either table with options or @{openmw.util#Vector3} rotation.
+    Either a table with options or a @{openmw.util#Vector3} rotation.
   ]]
   interface TeleportOptions
     --[[
@@ -2444,6 +2992,61 @@ local record core
     volume: number
     
   end
+  interface Dialogue
+    --[[
+      Possible @{#DialogueConditionOperator} values
+    ]]
+    CONDITION_OPERATOR: core.DialogueConditionOperator
+    
+    --[[
+      Possible @{#DialogueConditionType} values
+    ]]
+    CONDITION_TYPE: core.DialogueConditionType
+    
+    --[[
+      @{#DialogueRecords} functions for greeting read-only records.
+      --print ids of all greeting records
+      for _, greetingRecord in pairs(core.dialogue.greeting.records) do
+          print(greetingRecord.id)
+      end
+    ]]
+    greeting: any
+    
+    --[[
+      @{#DialogueRecords} functions for journal (quest) read-only records.
+      --print the name of the record, which is a capitalized version of its id
+      print(core.dialogue.journal.records["ms_fargothring"].name) -- MS_FargothRing
+    ]]
+    journal: any
+    
+    --[[
+      @{#DialogueRecords} functions for persuasion read-only records.
+      --print ids of all persuasion records
+      for _, persuasionRecord in pairs(core.dialogue.persuasion.records) do
+          print(persuasionRecord.id)
+      end
+    ]]
+    persuasion: any
+    
+    --[[
+      @{#DialogueRecords} functions for topic read-only records.
+      --print ids of all topic records
+      for _, topicRecord in pairs(core.dialogue.topic.records) do
+          print(topicRecord.id)
+      end
+    ]]
+    topic: any
+    
+    --[[
+      @{#DialogueRecords} functions for voice read-only records.
+      --print ids of all voice records
+      for _, voiceRecord in pairs(core.dialogue.voice.records) do
+          print(voiceRecord.id)
+      end
+    ]]
+    voice: any
+    
+  end
   interface Stats
     --[[
       @{#Attribute} functions
@@ -2456,11 +3059,53 @@ local record core
     Skill: core.Skill
     
   end
+  interface SkillRecord
+    --[[
+      The id of the skill's governing attribute
+    ]]
+    attribute: string
+    
+    --[[
+      Human-readable description
+    ]]
+    description: string
+    
+    --[[
+      VFS path to the icon
+    ]]
+    icon: string
+    
+    --[[
+      Record id
+    ]]
+    id: string
+    
+    --[[
+      Human-readable name
+    ]]
+    name: string
+    
+    --[[
+      Optional magic school
+    ]]
+    school: core.MagicSchoolData
+    
+    --[[
+      Table of the 4 possible skill gain values. See [SkillProgression#SkillUseType](interface_skill_progression.html#SkillUseType).
+    ]]
+    skillGain: table
+    
+    --[[
+      Skill specialization. Either combat, magic, or stealth.
+    ]]
+    specialization: string
+    
+  end
   interface ActiveSpell
     --[[
-      A number uniquely identifying this active spell within the affected actor's list of active spells.
+      Uniquely identifies this active spell within the affected actor's list of active spells.
     ]]
-    activeSpellId: number
+    activeSpellId: string
     
     --[[
       If set, this spell affects the base values of affected stats, rather than modifying current values.
@@ -2545,45 +3190,8 @@ local record core
     spells: core.Spells
     
   end
-  interface MagicEffectWithParams
-    --[[
-      Optional attribute ID
-    ]]
-    affectedAttribute: string
-    
-    --[[
-      Optional skill ID
-    ]]
-    affectedSkill: string
-    
-    area: number
-    
-    duration: number
-    
-    --[[
-      @{#MagicEffect}
-    ]]
-    effect: core.MagicEffect
-    
-    --[[
-      ID of the associated @{#MagicEffect}
-    ]]
-    id: string
-    
-    --[[
-      Index of this effect within the original list of @{#MagicEffectWithParams} of the spell/enchantment/potion this effect came from.
-    ]]
-    index: number
-    
-    magnitudeMax: number
-    
-    magnitudeMin: number
-    
-    range: number
-    
-  end
   --[[
-    The revision of OpenMW Lua API.
+    The revision of OpenMW's Lua API.
     It is an integer that is incremented every time the API is changed. See the actual value at the top of the page.
   ]]
   API_REVISION: number
@@ -2594,12 +3202,14 @@ local record core
   contentFiles: core.ContentFiles
   
   --[[
-    @{#Dialogue}: Dialogue
+    @{#Dialogue}: Dialogue.
+    Not available in load scripts.
   ]]
   dialogue: core.Dialogue
   
   --[[
-    @{#Factions}: Factions
+    @{#Factions}: Factions.
+    Not available in load scripts.
   ]]
   factions: core.Factions
   
@@ -2616,6 +3226,7 @@ local record core
   
   --[[
     Get a game setting with given name (from GMST ESM records or from openmw.cfg).
+    Not available in load scripts.
     local skillBonus = core.getGMST('fMinorSkillBonus') -- get a numeric GMST from ESM data
   ]]
   getGMST: function(
@@ -2629,39 +3240,43 @@ local record core
   
   --[[
     Game time in seconds.
+    Not available in load scripts.
   ]]
   getGameTime: function(): number
   
   --[[
     The scale of game time relative to simulation time.
+    Not available in load scripts.
   ]]
   getGameTimeScale: function(): number
   
   --[[
     Frame duration in seconds.
-    Not available in global scripts.
+    Not available in global or load scripts.
   ]]
   getRealFrameDuration: function(): number
   
   --[[
     Real time in seconds; starting point is not fixed (can be time since last reboot), use only for measuring intervals.
-    For Unix time use `os.time()`.
+    For Unix time use `os.time()`. Not available in load scripts.
   ]]
   getRealTime: function(): number
   
   --[[
     Simulation time in seconds.
-    The number of simulation seconds passed in the game world since starting a new game.
+    The number of simulation seconds passed in the game world since starting a new game. Not available in load scripts.
   ]]
   getSimulationTime: function(): number
   
   --[[
     The scale of simulation time relative to real time.
+    Not available in load scripts.
   ]]
   getSimulationTimeScale: function(): number
   
   --[[
     Whether the world is paused.
+    Not available in load scripts.
   ]]
   isWorldPaused: function(): boolean
   
@@ -2694,34 +3309,38 @@ local record core
   ): function
   
   --[[
-    @{#Land}: Functions for interacting with land data
+    @{#Land}: Functions for interacting with land data.
+    Not available in load scripts.
   ]]
   land: core.Land
   
   --[[
-    @{#Magic}: spells and spell effects
+    @{#Magic}: spells and spell effects.
+    Not available in load scripts.
   ]]
   magic: core.Magic
   
   --[[
-    @{#MWScripts}: MWScripts
+    @{#MWScripts}: MWScripts.
+    Not available in load scripts.
   ]]
   mwscripts: core.MWScript
   
   --[[
     Terminates the game and quits to the OS.
-    Should be used only for testing purposes.
+    Should be used only for testing purposes. Not available in load scripts.
   ]]
   quit: function()
   
   --[[
-    @{#Regions}: Regions
+    @{#Regions}: Regions.
+    Not available in load scripts.
   ]]
   regions: core.Regions
   
   --[[
     Send an event to global scripts.
-    Note: in menu scripts, errors if the game is not running (check @{openmw.menu#menu.getState})
+    Note: in menu scripts, errors if the game is not running (check @{openmw.menu#menu.getState}.) Not available in load scripts.
   ]]
   sendGlobalEvent: function(
     eventName: string,
@@ -2729,17 +3348,20 @@ local record core
   )
   
   --[[
-    @{#Sound}: Sounds and Speech
+    @{#Sound}: Sounds and Speech.
+    Not available in load scripts.
   ]]
   sound: core.Sound
   
   --[[
-    @{#Stats}: stats
+    @{#Stats}: stats.
+    Not available in load scripts.
   ]]
   stats: core.Stats
   
   --[[
-    @{#Weather}: Weather
+    @{#Weather}: Weather.
+    Not available in load scripts.
   ]]
   weather: core.Weather
   

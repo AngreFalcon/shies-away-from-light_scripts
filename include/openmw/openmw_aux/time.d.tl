@@ -49,7 +49,7 @@ local record time
   
   --[[
     Run given function repeatedly.
-    Note that loading a save stops the evaluation. If it should work always, call it during initialization of the script (i.e. not in a handler)
+    Note that loading a save stops the evaluation. If it should always work, call it during the initialization of the script (i.e. not in a handler)
     local stopFn = time.runRepeatedly(function() print('Test') end,
                                       5 * time.second)  -- print 'Test' every 5 seconds
     stopFn()  -- stop printing 'Test'

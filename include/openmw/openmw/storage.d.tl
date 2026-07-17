@@ -28,7 +28,7 @@ local record storage
     ): table
     
     --[[
-      Get value by a string key; if value is a table makes it readonly.
+      Get a value by a string key; if the value is a table it is readonly.
     ]]
     get: function(
       self: storage.StorageSection,
@@ -36,7 +36,7 @@ local record storage
     ): any
     
     --[[
-      Get value by a string key; if value is a table returns a copy.
+      Get a value by a string key; if the value is a table it returns a copy.
     ]]
     getCopy: function(
       self: storage.StorageSection,
@@ -67,7 +67,7 @@ local record storage
     )
     
     --[[
-      Set value by a string key; can not be used for global storage from a local script.
+      Set a value by a string key; can not be used for global storage from a local script.
     ]]
     set: function(
       self: storage.StorageSection,
@@ -76,8 +76,8 @@ local record storage
     )
     
     --[[
-      Set the life time of given storage section.
-      New sections initially have a Persistent life time.
+      Set the lifetime of given storage section.
+      New sections initially have a Persistent lifetime.
       This function can be used for a global storage section from a global script or for a player storage section from a player or menu script.
       local storage = require('openmw.storage')
       local myModData = storage.globalSection('MyModExample')

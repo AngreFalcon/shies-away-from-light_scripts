@@ -20,8 +20,8 @@ local record vfs
     fileName: string
     
     --[[
-      Get an iterator function to fetch the next line from given file.
-      Throws an exception if file is closed.
+      Get an iterator function to fetch the next line from a given file.
+      Throws an exception if the file is closed.
       
       Hint: since garbage collection works once per frame,
       you will get the whole file in RAM if you read it in one frame.
@@ -38,8 +38,8 @@ local record vfs
     ): function
     
     --[[
-      Read data from file to strings.
-      Throws an exception if file is closed, if there is too many arguments or if an invalid format encountered.
+      Read data from a file to strings.
+      Throws an exception if the file is closed, if there are too many arguments or if an invalid format is encountered.
       
       Hint: since garbage collection works once per frame,
       you will get the whole file in RAM if you read it in one frame.
@@ -56,8 +56,8 @@ local record vfs
     ): string
     
     --[[
-      Set new position in file.
-      Throws an exception if file is closed or seek base is incorrect.
+      Set new position in a file.
+      Throws an exception if the file is closed or seek base is incorrect.
       -- set pointer to beginning of file
       f = vfs.open("Test\\test.txt");
       f:seek("set");
@@ -75,7 +75,7 @@ local record vfs
     
   end
   --[[
-    Check if file exists in VFS
+    Check if a file exists in VFS
     local exists = vfs.fileExists("Test\\test.txt");
   ]]
   fileExists: function(
@@ -83,9 +83,9 @@ local record vfs
   ): boolean
   
   --[[
-    Get an iterator function to fetch the next line from file with given path.
-    Throws an exception if file is closed or file with given path does not exist.
-    Closes file automatically when it fails to read any more bytes.
+    Get an iterator function to fetch the next line from a file with the given path.
+    Throws an exception if the file is closed or the file with the given path does not exist.
+    Closes the file automatically when it fails to read any more bytes.
     
     Hint: since garbage collection works once per frame,
     you will get the whole file in RAM if you read it in one frame.
@@ -116,7 +116,7 @@ local record vfs
     nil | string
   
   --[[
-    Get iterator function to fetch file names with given path prefix from VFS
+    Get an iterator function to fetch file names with given path prefix from the VFS
     -- get all files with given prefix from VFS index
     for fileName in vfs.pathsWithPrefix("Music\\Explore") do
         print(fileName);

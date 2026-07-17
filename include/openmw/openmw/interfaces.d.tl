@@ -5,7 +5,7 @@
 local type scripts_omw_activationhandlers = require("scripts.omw.activationhandlers")
 local type scripts_omw_ai = require("scripts.omw.ai")
 local type scripts_omw_camera_camera = require("scripts.omw.camera.camera")
-local type scripts_omw_combat_local = require("scripts.omw.combat.local")
+local type scripts_omw_combat_interface = require("scripts.omw.combat.interface")
 local type scripts_omw_crimes = require("scripts.omw.crimes")
 local type scripts_omw_mechanics_animationcontroller = require("scripts.omw.mechanics.animationcontroller")
 local type scripts_omw_mwui_init = require("scripts.omw.mwui.init")
@@ -22,7 +22,7 @@ local record interfaces
   
   Camera: scripts_omw_camera_camera
   
-  Combat: scripts_omw_combat_local
+  Combat: scripts_omw_combat_interface
   
   Crimes: scripts_omw_crimes
   

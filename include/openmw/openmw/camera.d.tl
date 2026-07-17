@@ -44,24 +44,24 @@ local record camera
   
   --[[
     If set to true then after switching from Preview to ThirdPerson the player character turns to the camera view direction.
-    Otherwise the camera turns to the character view direction.
+    Otherwise, the camera turns to the character view direction.
   ]]
   allowCharacterDeferredRotation: function(
     boolValue: boolean
   )
   
   --[[
-    Return base field of view vertical angle in radians
+    Return the base field of view vertical angle in radians
   ]]
   getBaseFieldOfView: function(): number
   
   --[[
-    Return base view distance.
+    Return the base view distance.
   ]]
   getBaseViewDistance: function(): number
   
   --[[
-    Get current camera collision type (see @{openmw.nearby#COLLISION_TYPE}).
+    Get the current camera collision type (see @{openmw.nearby#COLLISION_TYPE}).
   ]]
   getCollisionType: function(): number
   
@@ -84,7 +84,7 @@ local record camera
   getExtraYaw: function(): number
   
   --[[
-    Return current field of view vertical angle in radians
+    Return the current field of view vertical angle in radians
   ]]
   getFieldOfView: function(): number
   
@@ -94,7 +94,7 @@ local record camera
   getFirstPersonOffset: function(): openmw_util.Vector3
   
   --[[
-    Preferred offset between tracked position (see `getTrackedPosition`) and the camera focal point (the center of the screen) in third person mode.
+    Preferred offset between the tracked position (see `getTrackedPosition`) and the camera focal point (the center of the screen) in third person mode.
     See `setFocalPreferredOffset`.
   ]]
   getFocalPreferredOffset: function(): openmw_util.Vector2
@@ -121,13 +121,18 @@ local record camera
   getPosition: function(): openmw_util.Vector3
   
   --[[
+    The offset applied to the cameras projection matrix, in pixels.
+  ]]
+  getProjectionOffset: function(): openmw_util.Vector2
+  
+  --[[
     Return the mode the camera will switch to after the end of the current animation.
     Can be nil.
   ]]
   getQueuedMode: function(): Mode
   
   --[[
-    Get camera roll angle (radians).
+    Get the camera roll angle (radians).
   ]]
   getRoll: function(): number
   
@@ -142,12 +147,12 @@ local record camera
   getTrackedPosition: function(): openmw_util.Vector3
   
   --[[
-    Return current view distance.
+    Return the current view distance.
   ]]
   getViewDistance: function(): number
   
   --[[
-    Get world to local transform for the camera.
+    Get the world to local transform for the camera.
   ]]
   getViewTransform: function(): openmw_util.Transform
   
@@ -163,7 +168,7 @@ local record camera
   instantTransition: function()
   
   --[[
-    Set camera collision type (see @{openmw.nearby#COLLISION_TYPE}).
+    Set the camera collision type (see @{openmw.nearby#COLLISION_TYPE}).
   ]]
   setCollisionType: function(
     collisionType: number
@@ -195,7 +200,7 @@ local record camera
   )
   
   --[[
-    Set field of view
+    Set the field of view
   ]]
   setFieldOfView: function(
     fov: number
@@ -209,10 +214,10 @@ local record camera
   )
   
   --[[
-    Set preferred offset between tracked position (see `getTrackedPosition`) and the camera focal point (the center of the screen) in third person mode.
+    Set the preferred offset between the tracked position (see `getTrackedPosition`) and the camera focal point (the center of the screen) in third person mode.
     The offset is a 2d vector (X, Y) where X is horizontal (to the right from the character) and Y component is vertical (upward).
     The real offset can differ from the preferred one during smooth transition or if blocked by an obstacle.
-    Smooth transition happens by default every time when the preferred offset was changed. Use `instantTransition()` to skip the current transition.
+    Smooth transition happens by default every time the preferred offset changes. Use `instantTransition()` to skip the current transition.
   ]]
   setFocalPreferredOffset: function(
     offset: openmw_util.Vector2
@@ -220,7 +225,7 @@ local record camera
   
   --[[
     Set the speed coefficient of focal point (the center of the screen in third person mode) smooth transition.
-    Smooth transition happens by default every time when the preferred offset was changed. Use `instantTransition()` to skip the current transition.
+    Smooth transition happens by default every time the preferred offset changes. Use `instantTransition()` to skip the current transition.
   ]]
   setFocalTransitionSpeed: function(
     speed: number
@@ -249,21 +254,29 @@ local record camera
   )
   
   --[[
-    Set camera roll angle (radians).
+    Applies an offset to the cameras projection matrix, measured in pixels.
+    Small offsets of up to roughly 2 pixels are safe, large offsets are only for debugging and will cause visual glitches.
+  ]]
+  setProjectionOffset: function(
+    offset: openmw_util.Vector2
+  )
+  
+  --[[
+    Set the camera roll angle (radians).
   ]]
   setRoll: function(
     value: number
   )
   
   --[[
-    Set camera position; can be used only if camera is in Static mode.
+    Set the camera position; can be used only if camera is in Static mode.
   ]]
   setStaticPosition: function(
     pos: openmw_util.Vector3
   )
   
   --[[
-    Set view distance.
+    Set the view distance.
     - Takes effect on the next frame.
   ]]
   setViewDistance: function(
@@ -278,14 +291,14 @@ local record camera
   )
   
   --[[
-    Show/hide crosshair.
+    Show/hide the crosshair.
   ]]
   showCrosshair: function(
     boolValue: boolean
   )
   
   --[[
-    Get vector from the camera to the world for the given point in viewport.
+    Get a vector from the camera to the world for the given point in the viewport.
     (0, 0) is the top left corner of the screen.
   ]]
   viewportToWorldVector: function(
@@ -293,7 +306,7 @@ local record camera
   ): openmw_util.Vector3
   
   --[[
-    Get vector from the world to the viewport for the given point in world space.
+    Get a vector from the world to the viewport for the given point in the world space.
     (0, 0) is the top left corner of the screen.
     The z component of the return value holds the distance from the camera to the position, in world space
   ]]

@@ -79,7 +79,7 @@ local record AI
   ): openmw_core.GameObject
   
   --[[
-    Get list of targets of all packages of the given type.
+    Get a list of targets from all packages of the given type.
   ]]
   getTargets: function(
     packageType: string
@@ -98,7 +98,7 @@ local record AI
   )
   
   --[[
-    Start new AI package.
+    Start a new AI package.
   ]]
   startPackage: function(
     options: table

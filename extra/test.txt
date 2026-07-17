@@ -1,0 +1,79 @@
+example config file:
+
+need to check if actor is npc or creature
+need to filter for equipment slots
+
+"effectID(taper)": {
+	conditions (any of these must be true): [
+		conditions (all of these must be true): {
+			characterid = [
+				"shies-away-from-light",
+			],
+			race: [
+				"argonian", "khajiit",
+			],
+			sex: "male",
+			class: [
+				""
+			],
+			werewolf: true/false,
+			dead: false,
+			mwscriptvariables: [
+				arousal: 100,
+				stinky: {min = 0, max = 1000000,},
+			]
+			attributes: {
+				health: {min = 50%, max = 100%,},
+				fatigue: 100,
+			},
+			equipmentslot (true for must be unequipped, false for must be equipped. exclude if either): {
+				"Ammunition" = true,
+				"Amulet" = false,
+				"Belt",
+				"Boots",
+				"CarriedLeft",
+				"CarriedRight",
+				"Cuirass",
+				"Greaves",
+				"Helmet",
+				"LeftGauntlet",
+				"LeftPauldron",
+				"LeftRing",
+				"Pants",
+				"RightGauntlet",
+				"RightPauldron",
+				"RightRing",
+				"Robe",
+				"Shirt",
+				"Skirt",
+			}
+		},
+		conditions (all of these must be true): {
+			
+		},
+	],
+	"mesh": "path/to/taper",
+	"node": "groin",
+	"duration": -1,
+}
+
+"effectID(sheath)": {
+	conditions (any of these must be true): [
+		conditions (all of these must be true): {
+			race: "khajiit",
+			sex: "male",
+			class: "",
+			werewolf: true/false,
+			mwscriptvariables: [
+				arousal: 100,
+				health: {min = 50%, max = 100%},
+			]
+		},
+		conditions (all of these must be true): {
+			
+		},
+	],
+	"mesh": "path/to/taper",
+	"node": "groin",
+	"duration": inf,
+}

@@ -8,13 +8,24 @@ local type openmw_util = require("openmw.util")
 local record world
   interface VFX
     --[[
+      Remove all VFX with the given vfxId.
+      Best invoked through the RemoveVfx global event
+      -- Remove all VFX with vfxId "myvfx"
+      core.sendGlobalEvent('RemoveVfx', "myvfx")
+      
+    ]]
+    remove: function(
+      vfxId: string
+    )
+    
+    --[[
       Spawn a VFX at the given location in the world.
       Best invoked through the SpawnVfx global event
       -- Spawn a sanctuary effect near the player
       local effect = core.magic.effects.records[core.magic.EFFECT_TYPE.Sanctuary]
       local pos = self.position + util.vector3(0, 100, 0)
       local model = types.Static.records[effect.castStatic].model
-      core.sendGlobalEvent('SpawnVfx', {model = model, position = pos})
+      core.sendGlobalEvent('SpawnVfx', {model = model, position = pos, options = { useAmbientLight = false, vfxId = "myVfx" }})
       
     ]]
     spawn: function(
@@ -100,6 +111,14 @@ local record world
   activeActors: openmw_core.ObjectList
   
   --[[
+    Advance the world time by a certain number of hours.
+    This advances time, weather, and AI, but does not perform other functions associated with the passage of time, e.g., regeneration.
+  ]]
+  advanceTime: function(
+    hours: number
+  )
+  
+  --[[
     List of all cells
     for i, cell in ipairs(world.cells) do print(cell) end
   ]]
@@ -127,10 +146,17 @@ local record world
     * @{openmw.types#ArmorRecord},
     * @{openmw.types#BookRecord},
     * @{openmw.types#ClothingRecord},
+    * @{openmw.types#ContainerRecord},
+    * @{openmw.types#CreatureRecord},
+    * @{openmw.types#DoorRecord},
+    * @{openmw.core#Enchantment},
     * @{openmw.types#LightRecord},
     * @{openmw.types#MiscellaneousRecord},
     * @{openmw.types#NpcRecord},
     * @{openmw.types#PotionRecord},
+    * @{openmw.types#ProbeRecord},
+    * @{openmw.core#Spell},
+    * @{openmw.types#StaticRecord},
     * @{openmw.types#WeaponRecord}
   ]]
   createRecord: function(
@@ -235,7 +261,7 @@ local record world
   )
   
   --[[
-    Remove given tag from the list of pause tags.
+    Remove the given tag from the list of pause tags.
     Resume the game starting from the next frame if the list became empty.
   ]]
   unpause: function(

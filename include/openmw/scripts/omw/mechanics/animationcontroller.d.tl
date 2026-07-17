@@ -20,7 +20,24 @@ local record AnimationController
   interface Package
   end
   --[[
-    Add new playBlendedAnimation handler for this actor
+    Add a new animationEnded handler for this actor
+    If `handler(groupname, info)` returns false, other handlers for
+    the call will be skipped.
+    info is a table that contains information related to
+    the animation that ended and will contain the following fields:
+    
+      * `time` - The absolute time in the animation when it was ended
+      * `completion` - The relative time (0-1) in the animation when it was ended
+      * `startKey` - The start key of the animation that ended
+      * `stopKey` - The stop key of the animation that ended
+    
+  ]]
+  addAnimationEndedHandler: function(
+    handler: function
+  )
+  
+  --[[
+    Add a new playBlendedAnimation handler for this actor
     If `handler(groupname, options)` returns false, other handlers for
     the call will be skipped.
   ]]
@@ -29,7 +46,7 @@ local record AnimationController
   )
   
   --[[
-    Add new text key handler for this actor
+    Add a new text key handler for this actor
     While playing, some animations emit text key events.
     Register a handle to listen for all
     text key events associated with this actor's animations.
@@ -37,7 +54,7 @@ local record AnimationController
     the call will be skipped.
   ]]
   addTextKeyHandler: function(
-    groupname: string, --[[Name of the animation group to listen to keys for. If the empty string or nil, all keys will be received]]
+    groupname: string, --[[Name of the animation group to listen to keys for. If it is an empty string or nil, all keys will be received]]
     handler: function
   )
   

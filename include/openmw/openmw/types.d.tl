@@ -5,17 +5,710 @@
 
 local type openmw_core = require("openmw.core")
 local type openmw_util = require("openmw.util")
-global interface ESM4MovableStatic
-end
-global interface ESM4Armor
-end
-global interface ESM4StaticCollection
-end
-global interface ESM4Flora
+global interface ESM4ItemMod
 end
 global interface ESM4Weapon
 end
-global interface ESM4Light
+global interface ESM4Static
+end
+--[[
+  Armor.TYPE
+]]
+global interface ArmorTYPE
+  Boots: number
+  
+  Cuirass: number
+  
+  Greaves: number
+  
+  Helmet: number
+  
+  LBracer: number
+  
+  LGauntlet: number
+  
+  LPauldron: number
+  
+  RBracer: number
+  
+  RGauntlet: number
+  
+  RPauldron: number
+  
+  Shield: number
+  
+end
+global interface Races
+  --[[
+    Returns a read-only @{#RaceRecord}
+  ]]
+  record: function(
+    recordId: string
+  ): types.RaceRecord
+  
+  --[[
+    A read-only list of all @{#RaceRecord}s in the world database.
+    Implements [iterables#List](iterables.html#List) of #RaceRecord.
+    local race = types.NPC.races.records['race id']  -- get by id
+  ]]
+  records: { types.RaceRecord }
+  
+end
+global interface ESM4Clothing
+end
+--[[
+  Value modification is delayed
+]]
+global interface ReputationStat
+  --[[
+    Current reputation value.
+  ]]
+  current: number
+  
+end
+global interface AIStats
+  --[[
+    Alarm (returns @{#AIStat})
+  ]]
+  alarm: function(
+    actor: openmw_core.GameObject
+  ): types.AIStat
+  
+  --[[
+    Fight (returns @{#AIStat})
+  ]]
+  fight: function(
+    actor: openmw_core.GameObject
+  ): types.AIStat
+  
+  --[[
+    Flee (returns @{#AIStat})
+  ]]
+  flee: function(
+    actor: openmw_core.GameObject
+  ): types.AIStat
+  
+  --[[
+    Hello (returns @{#AIStat})
+  ]]
+  hello: function(
+    actor: openmw_core.GameObject
+  ): types.AIStat
+  
+end
+global interface Static
+  --[[
+    Creates a @{#StaticRecord} without adding it to the world database.
+    Use @{openmw_world#(world).createRecord} to add the record to the world.
+  ]]
+  createRecordDraft: function(
+    static: types.StaticRecord
+  ): types.StaticRecord
+  
+  --[[
+    Whether the object is a Static.
+  ]]
+  objectIsInstance: function(
+    object: openmw_core.GameObject
+  ): boolean
+  
+  --[[
+    Returns the read-only @{#StaticRecord} of a Static
+  ]]
+  record: function(
+    objectOrRecordId: any
+  ): types.StaticRecord
+  
+  --[[
+    A read-only list of all @{#StaticRecord}s in the world database.
+    Implements [iterables#List](iterables.html#List) of #StaticRecord.
+    local record = types.Static.records['example_recordid']
+  ]]
+  records: { types.StaticRecord }
+  
+end
+global interface ESM4Ingredient
+end
+global interface ESM4Ammunition
+end
+global interface AttributeStats
+  --[[
+    Agility (returns @{#AttributeStat})
+  ]]
+  agility: function(
+    actor: openmw_core.GameObject
+  ): types.AttributeStat
+  
+  --[[
+    Endurance (returns @{#AttributeStat})
+  ]]
+  endurance: function(
+    actor: openmw_core.GameObject
+  ): types.AttributeStat
+  
+  --[[
+    Intelligence (returns @{#AttributeStat})
+  ]]
+  intelligence: function(
+    actor: openmw_core.GameObject
+  ): types.AttributeStat
+  
+  --[[
+    Luck (returns @{#AttributeStat})
+  ]]
+  luck: function(
+    actor: openmw_core.GameObject
+  ): types.AttributeStat
+  
+  --[[
+    Personality (returns @{#AttributeStat})
+  ]]
+  personality: function(
+    actor: openmw_core.GameObject
+  ): types.AttributeStat
+  
+  --[[
+    Speed (returns @{#AttributeStat})
+  ]]
+  speed: function(
+    actor: openmw_core.GameObject
+  ): types.AttributeStat
+  
+  --[[
+    Strength (returns @{#AttributeStat})
+  ]]
+  strength: function(
+    actor: openmw_core.GameObject
+  ): types.AttributeStat
+  
+  --[[
+    Willpower (returns @{#AttributeStat})
+  ]]
+  willpower: function(
+    actor: openmw_core.GameObject
+  ): types.AttributeStat
+  
+end
+--[[
+  Door.STATE
+]]
+global interface DoorSTATE
+  --[[
+    The door is in the process of closing.
+  ]]
+  Closing: number
+  
+  --[[
+    The door is either closed or open (usually closed).
+  ]]
+  Idle: number
+  
+  --[[
+    The door is in the process of opening.
+  ]]
+  Opening: number
+  
+end
+global interface Activator
+  --[[
+    Creates an @{#ActivatorRecord} without adding it to the world database.
+    Use @{openmw_world#(world).createRecord} to add the record to the world.
+  ]]
+  createRecordDraft: function(
+    activator: types.ActivatorRecord
+  ): types.ActivatorRecord
+  
+  --[[
+    Whether the object is an Activator.
+  ]]
+  objectIsInstance: function(
+    object: openmw_core.GameObject
+  ): boolean
+  
+  --[[
+    Returns the read-only @{#ActivatorRecord} of an activator
+  ]]
+  record: function(
+    objectOrRecordId: any
+  ): types.ActivatorRecord
+  
+  --[[
+    A read-only list of all @{#ActivatorRecord}s in the world database.
+    Implements [iterables#List](iterables.html#List) of #ActivatorRecord.
+    local record = types.Activator.records['example_recordid']
+  ]]
+  records: { types.ActivatorRecord }
+  
+end
+--[[
+  Clothing.TYPE
+]]
+global interface ClothingTYPE
+  Amulet: number
+  
+  Belt: number
+  
+  LGlove: number
+  
+  Pants: number
+  
+  RGlove: number
+  
+  Ring: number
+  
+  Robe: number
+  
+  Shirt: number
+  
+  Shoes: number
+  
+  Skirt: number
+  
+end
+--[[
+  Weapon.TYPE
+]]
+global interface WeaponTYPE
+  Arrow: number
+  
+  AxeOneHand: number
+  
+  AxeTwoHand: number
+  
+  BluntOneHand: number
+  
+  BluntTwoClose: number
+  
+  BluntTwoWide: number
+  
+  Bolt: number
+  
+  LongBladeOneHand: number
+  
+  LongBladeTwoHand: number
+  
+  MarksmanBow: number
+  
+  MarksmanCrossbow: number
+  
+  MarksmanThrown: number
+  
+  ShortBladeOneHand: number
+  
+  SpearTwoWide: number
+  
+end
+global interface ESM4StaticCollection
+end
+global interface SkillStats
+  --[[
+    Acrobatics (returns @{#SkillStat})
+  ]]
+  acrobatics: function(
+    actor: openmw_core.GameObject
+  ): types.SkillStat
+  
+  --[[
+    Alchemy (returns @{#SkillStat})
+  ]]
+  alchemy: function(
+    actor: openmw_core.GameObject
+  ): types.SkillStat
+  
+  --[[
+    Alteration (returns @{#SkillStat})
+  ]]
+  alteration: function(
+    actor: openmw_core.GameObject
+  ): types.SkillStat
+  
+  --[[
+    Armorer (returns @{#SkillStat})
+  ]]
+  armorer: function(
+    actor: openmw_core.GameObject
+  ): types.SkillStat
+  
+  --[[
+    Athletics (returns @{#SkillStat})
+  ]]
+  athletics: function(
+    actor: openmw_core.GameObject
+  ): types.SkillStat
+  
+  --[[
+    Axe (returns @{#SkillStat})
+  ]]
+  axe: function(
+    actor: openmw_core.GameObject
+  ): types.SkillStat
+  
+  --[[
+    Block (returns @{#SkillStat})
+  ]]
+  block: function(
+    actor: openmw_core.GameObject
+  ): types.SkillStat
+  
+  --[[
+    Blunt Weapon (returns @{#SkillStat})
+  ]]
+  bluntweapon: function(
+    actor: openmw_core.GameObject
+  ): types.SkillStat
+  
+  --[[
+    Conjuration (returns @{#SkillStat})
+  ]]
+  conjuration: function(
+    actor: openmw_core.GameObject
+  ): types.SkillStat
+  
+  --[[
+    Destruction (returns @{#SkillStat})
+  ]]
+  destruction: function(
+    actor: openmw_core.GameObject
+  ): types.SkillStat
+  
+  --[[
+    Enchant (returns @{#SkillStat})
+  ]]
+  enchant: function(
+    actor: openmw_core.GameObject
+  ): types.SkillStat
+  
+  --[[
+    Hand To Hand (returns @{#SkillStat})
+  ]]
+  handtohand: function(
+    actor: openmw_core.GameObject
+  ): types.SkillStat
+  
+  --[[
+    Heavy Armor (returns @{#SkillStat})
+  ]]
+  heavyarmor: function(
+    actor: openmw_core.GameObject
+  ): types.SkillStat
+  
+  --[[
+    Illusion (returns @{#SkillStat})
+  ]]
+  illusion: function(
+    actor: openmw_core.GameObject
+  ): types.SkillStat
+  
+  --[[
+    Light Armor (returns @{#SkillStat})
+  ]]
+  lightarmor: function(
+    actor: openmw_core.GameObject
+  ): types.SkillStat
+  
+  --[[
+    Long Blade (returns @{#SkillStat})
+  ]]
+  longblade: function(
+    actor: openmw_core.GameObject
+  ): types.SkillStat
+  
+  --[[
+    Marksman (returns @{#SkillStat})
+  ]]
+  marksman: function(
+    actor: openmw_core.GameObject
+  ): types.SkillStat
+  
+  --[[
+    Medium Armor (returns @{#SkillStat})
+  ]]
+  mediumarmor: function(
+    actor: openmw_core.GameObject
+  ): types.SkillStat
+  
+  --[[
+    Mercantile (returns @{#SkillStat})
+  ]]
+  mercantile: function(
+    actor: openmw_core.GameObject
+  ): types.SkillStat
+  
+  --[[
+    Mysticism (returns @{#SkillStat})
+  ]]
+  mysticism: function(
+    actor: openmw_core.GameObject
+  ): types.SkillStat
+  
+  --[[
+    Restoration (returns @{#SkillStat})
+  ]]
+  restoration: function(
+    actor: openmw_core.GameObject
+  ): types.SkillStat
+  
+  --[[
+    Security (returns @{#SkillStat})
+  ]]
+  security: function(
+    actor: openmw_core.GameObject
+  ): types.SkillStat
+  
+  --[[
+    Short Blade (returns @{#SkillStat})
+  ]]
+  shortblade: function(
+    actor: openmw_core.GameObject
+  ): types.SkillStat
+  
+  --[[
+    Sneak (returns @{#SkillStat})
+  ]]
+  sneak: function(
+    actor: openmw_core.GameObject
+  ): types.SkillStat
+  
+  --[[
+    Spear (returns @{#SkillStat})
+  ]]
+  spear: function(
+    actor: openmw_core.GameObject
+  ): types.SkillStat
+  
+  --[[
+    Speechcraft (returns @{#SkillStat})
+  ]]
+  speechcraft: function(
+    actor: openmw_core.GameObject
+  ): types.SkillStat
+  
+  --[[
+    Unarmored (returns @{#SkillStat})
+  ]]
+  unarmored: function(
+    actor: openmw_core.GameObject
+  ): types.SkillStat
+  
+end
+global interface ESM4Potion
+end
+global interface LOCKABLE
+  --[[
+    Returns the key record of a lockable object(door, container)
+  ]]
+  getKeyRecord: function(
+    object: openmw_core.GameObject
+  ): types.MiscellaneousRecord
+  
+  --[[
+    Returns the lock level of a lockable object(door, container).
+    Does not determine if an object is locked or not, if an object is locked while this is set above 0, this value will be used if no other value is specified.
+  ]]
+  getLockLevel: function(
+    object: openmw_core.GameObject
+  ): number
+  
+  --[[
+    Returns the trap spell of a lockable object(door, container)
+  ]]
+  getTrapSpell: function(
+    object: openmw_core.GameObject
+  ): openmw_core.Spell
+  
+  --[[
+    Returns true if the lockable object is locked, and false if it is not.
+  ]]
+  isLocked: function(
+    object: openmw_core.GameObject
+  ): boolean
+  
+  --[[
+    Sets the lock level level of a lockable object(door, container);Locks if not already locked; Must be used in a global script.
+  ]]
+  lock: function(
+    object: openmw_core.GameObject,
+    lockLevel: number
+  )
+  
+  --[[
+    Whether the object is a Lockable.
+  ]]
+  objectIsInstance: function(
+    object: openmw_core.GameObject
+  ): boolean
+  
+  --[[
+    Sets the key of a lockable object(door, container); removes it if empty string is provided.
+    Must be used in a global script.
+  ]]
+  setKeyRecord: function(
+    object: openmw_core.GameObject,
+    miscOrId: any
+  )
+  
+  --[[
+    Sets the trap spell of a lockable object(door, container); removes it if empty string is provided.
+    Must be used in a global script.
+  ]]
+  setTrapSpell: function(
+    object: openmw_core.GameObject,
+    spellOrId: any
+  )
+  
+  --[[
+    Unlocks the lockable object.
+    Does not change the lock level, it can be kept for future use.
+  ]]
+  unlock: function(
+    object: openmw_core.GameObject
+  )
+  
+end
+global interface ESM4Flora
+end
+global interface ESM4Miscellaneous
+end
+--[[
+  Apparatus.TYPE
+]]
+global interface ApparatusTYPE
+  Alembic: number
+  
+  Calcinator: number
+  
+  MortarPestle: number
+  
+  Retort: number
+  
+end
+global interface ESM4Armor
+end
+global interface EQUIPMENT_SLOT
+  Ammunition: number
+  
+  Amulet: number
+  
+  Belt: number
+  
+  Boots: number
+  
+  CarriedLeft: number
+  
+  CarriedRight: number
+  
+  Cuirass: number
+  
+  Greaves: number
+  
+  Helmet: number
+  
+  LeftGauntlet: number
+  
+  LeftPauldron: number
+  
+  LeftRing: number
+  
+  Pants: number
+  
+  RightGauntlet: number
+  
+  RightPauldron: number
+  
+  RightRing: number
+  
+  Robe: number
+  
+  Shirt: number
+  
+  Skirt: number
+  
+end
+global interface STANCE
+  --[[
+    Default stance
+  ]]
+  Nothing: number
+  
+  --[[
+    Magic stance
+  ]]
+  Spell: number
+  
+  --[[
+    Weapon stance
+  ]]
+  Weapon: number
+  
+end
+global interface Container is LOCKABLE
+  --[[
+    @{#LOCKABLE}
+  ]]
+  baseType: LOCKABLE
+  
+  --[[
+    Container content.
+  ]]
+  content: function(
+    object: openmw_core.GameObject
+  ): openmw_core.Inventory
+  
+  --[[
+    Creates a @{#ContainerRecord} without adding it to the world database.
+    Use @{openmw_world#(world).createRecord} to add the record to the world.
+    local chestTemplate = types.Container.records['chest_small_01']
+    local containerTable = {name = "Respawning Treasure Chest", template = chestTemplate, isRespawning = true, weight = 150.0}
+    local recordDraft = types.Container.createRecordDraft(containerTable)
+    local newRecord = world.createRecord(recordDraft)
+    world.createObject(newRecord.id):teleport(playerCell, playerPosition)
+  ]]
+  createRecordDraft: function(
+    container: types.ContainerRecord
+  ): types.ContainerRecord
+  
+  --[[
+    Returns the capacity of a container
+  ]]
+  getCapacity: function(
+    object: openmw_core.GameObject
+  ): number
+  
+  --[[
+    Returns the total weight of everything in a container
+  ]]
+  getEncumbrance: function(
+    object: openmw_core.GameObject
+  ): number
+  
+  --[[
+    Container content (same as `Container.content`, added for consistency with `Actor.inventory`).
+  ]]
+  inventory: function(
+    object: openmw_core.GameObject
+  ): openmw_core.Inventory
+  
+  --[[
+    Whether the object is a Container.
+  ]]
+  objectIsInstance: function(
+    object: openmw_core.GameObject
+  ): boolean
+  
+  --[[
+    Returns the read-only @{#ContainerRecord} of a container
+  ]]
+  record: function(
+    objectOrRecordId: any
+  ): types.ContainerRecord
+  
+  --[[
+    A read-only list of all @{#ContainerRecord}s in the world database.
+    Implements [iterables#List](iterables.html#List) of #ContainerRecord.
+    local record = types.Container.records['example_recordid']
+  ]]
+  records: { types.ContainerRecord }
+  
 end
 --[[
   Book.SKILL
@@ -157,12 +850,254 @@ global interface BookSKILL
   unarmored: string
   
 end
+global interface ESM4MovableStatic
+end
+global interface DynamicStats
+  --[[
+    Fatigue (returns @{#DynamicStat})
+  ]]
+  fatigue: function(
+    actor: openmw_core.GameObject
+  ): types.DynamicStat
+  
+  --[[
+    Health (returns @{#DynamicStat})
+  ]]
+  health: function(
+    actor: openmw_core.GameObject
+  ): types.DynamicStat
+  
+  --[[
+    Magicka (returns @{#DynamicStat})
+  ]]
+  magicka: function(
+    actor: openmw_core.GameObject
+  ): types.DynamicStat
+  
+end
+global interface ESM4Terminal
+  --[[
+    Whether the object is a ESM4Terminal.
+  ]]
+  objectIsInstance: function(
+    object: openmw_core.GameObject
+  ): boolean
+  
+  --[[
+    Returns the read-only @{#ESM4TerminalRecord} of a terminal
+  ]]
+  record: function(
+    objectOrRecordId: any
+  ): types.ESM4TerminalRecord
+  
+  --[[
+    A read-only list of all @{#ESM4TerminalRecord}s in the world database.
+    Implements [iterables#List](iterables.html#List) of #ESM4TerminalRecord.
+    local record = types.ESM4Terminal.records['example_recordid']
+  ]]
+  records: { types.ESM4TerminalRecord }
+  
+end
+global interface ESM4Activator
+end
+global interface Classes
+  --[[
+    Returns a read-only @{#ClassRecord}
+  ]]
+  record: function(
+    recordId: string
+  ): types.ClassRecord
+  
+  --[[
+    A read-only list of all @{#ClassRecord}s in the world database, may be indexed by recordId.
+    Implements [iterables#List](iterables.html#List) of #ClassRecord.
+    local class = types.NPC.classes.records['class id']  -- get by id
+  ]]
+  records: { types.ClassRecord }
+  
+end
+global interface ESM4Light
+end
+global interface Door is LOCKABLE
+  --[[
+    @{#DoorSTATE}
+    local state = types.Door.STATE["Idle"]
+  ]]
+  STATE: DoorSTATE
+  
+  --[[
+    Opens/Closes the door.
+    Can only be used in global scripts or on self.
+    types.Door.activateDoor(doorObject)
+  ]]
+  activateDoor: function(
+    object: openmw_core.GameObject,
+    openState: boolean
+  )
+  
+  --[[
+    @{#LOCKABLE}
+  ]]
+  baseType: LOCKABLE
+  
+  --[[
+    Creates a @{#DoorRecord} without adding it to the world database.
+    Use @{openmw_world#(world).createRecord} to add the record to the world.
+  ]]
+  createRecordDraft: function(
+    door: types.DoorRecord
+  ): types.DoorRecord
+  
+  --[[
+    Destination cell (only if a teleport door).
+  ]]
+  destCell: function(
+    object: openmw_core.GameObject
+  ): openmw_core.Cell
+  
+  --[[
+    Destination (only if a teleport door).
+  ]]
+  destPosition: function(
+    object: openmw_core.GameObject
+  ): openmw_util.Vector3
+  
+  --[[
+    Destination rotation (only if a teleport door).
+  ]]
+  destRotation: function(
+    object: openmw_core.GameObject
+  ): openmw_util.Transform
+  
+  --[[
+    Gets the state of the door.
+  ]]
+  getDoorState: function(
+    object: openmw_core.GameObject
+  ): DoorSTATE
+  
+  --[[
+    Checks if the door is fully closed.
+    Returns false if the door is currently opening or closing.
+  ]]
+  isClosed: function(
+    object: openmw_core.GameObject
+  ): boolean
+  
+  --[[
+    Checks if the door is fully open.
+    Returns false if the door is currently opening or closing.
+  ]]
+  isOpen: function(
+    object: openmw_core.GameObject
+  ): boolean
+  
+  --[[
+    Whether the door is a teleport.
+  ]]
+  isTeleport: function(
+    object: openmw_core.GameObject
+  ): boolean
+  
+  --[[
+    Whether the object is a Door.
+  ]]
+  objectIsInstance: function(
+    object: openmw_core.GameObject
+  ): boolean
+  
+  --[[
+    Returns the read-only @{#DoorRecord} of a door
+  ]]
+  record: function(
+    objectOrRecordId: any
+  ): types.DoorRecord
+  
+  --[[
+    A read-only list of all @{#DoorRecord}s in the world database.
+    Implements [iterables#List](iterables.html#List) of #DoorRecord.
+    local record = types.Door.records['example_recordid']
+  ]]
+  records: { types.DoorRecord }
+  
+end
+global interface ESM4Door is LOCKABLE
+  --[[
+    @{#LOCKABLE}
+  ]]
+  baseType: LOCKABLE
+  
+  --[[
+    Destination cell (only if a teleport door).
+  ]]
+  destCell: function(
+    object: openmw_core.GameObject
+  ): openmw_core.Cell
+  
+  --[[
+    Destination (only if a teleport door).
+  ]]
+  destPosition: function(
+    object: openmw_core.GameObject
+  ): openmw_util.Vector3
+  
+  --[[
+    Destination rotation (only if a teleport door).
+  ]]
+  destRotation: function(
+    object: openmw_core.GameObject
+  ): openmw_util.Transform
+  
+  --[[
+    Whether the door is a teleport.
+  ]]
+  isTeleport: function(
+    object: openmw_core.GameObject
+  ): boolean
+  
+  --[[
+    Whether the object is a ESM4Door.
+  ]]
+  objectIsInstance: function(
+    object: openmw_core.GameObject
+  ): boolean
+  
+  --[[
+    Returns the read-only @{#ESM4DoorRecord} of a door
+  ]]
+  record: function(
+    objectOrRecordId: any
+  ): types.ESM4DoorRecord
+  
+  --[[
+    A read-only list of all @{#ESM4DoorRecord}s in the world database.
+    Implements [iterables#List](iterables.html#List) of #ESM4DoorRecord.
+    local record = types.ESM4Door.records['example_recordid']
+  ]]
+  records: { types.ESM4DoorRecord }
+  
+end
+global interface ESM4Book
+end
+--[[
+  Creature.TYPE
+]]
+global interface CreatureTYPE
+  Creatures: number
+  
+  Daedra: number
+  
+  Humanoid: number
+  
+  Undead: number
+  
+end
 global interface ActorStats
-  ai: types.AIStats
+  ai: AIStats
   
-  attributes: types.AttributeStats
+  attributes: AttributeStats
   
-  dynamic: types.DynamicStats
+  dynamic: DynamicStats
   
   --[[
     Level (returns @{#LevelStat})
@@ -171,8 +1106,6 @@ global interface ActorStats
     actor: openmw_core.GameObject
   ): types.LevelStat
   
-end
-global interface ESM4Book
 end
 --[[
   Functions for items that can be placed to an inventory or container
@@ -226,289 +1159,85 @@ global interface Item
   )
   
 end
+global interface Armor is Item
+  --[[
+    @{#ArmorTYPE}
+  ]]
+  TYPE: ArmorTYPE
+  
+  --[[
+    @{#Item}
+  ]]
+  baseType: Item
+  
+  --[[
+    Creates an @{#ArmorRecord} without adding it to the world database, for the armor to appear correctly on the body, make sure to use a template as described below.
+    Use @{openmw_world#(world).createRecord} to add the record to the world.
+    local armorTemplate = types.Armor.record('orcish_cuirass')
+    local armorTable = {name = "Better Orcish Cuirass",template = armorTemplate,baseArmor = armorTemplate.baseArmor + 10}
+     --This is the new record we want to create, with a record provided as a template.
+    local recordDraft = types.Armor.createRecordDraft(armorTable)--Need to convert the table into the record draft
+    local newRecord = world.createRecord(recordDraft)--This creates the actual record
+    world.createObject(newRecord.id):moveInto(playerActor)--Create an instance of this object, and move it into the player's inventory
+  ]]
+  createRecordDraft: function(
+    armor: types.ArmorRecord
+  ): types.ArmorRecord
+  
+  --[[
+    Whether the object is an Armor.
+  ]]
+  objectIsInstance: function(
+    object: openmw_core.GameObject
+  ): boolean
+  
+  --[[
+    Returns the read-only @{#ArmorRecord} of an Armor
+  ]]
+  record: function(
+    objectOrRecordId: any
+  ): types.ArmorRecord
+  
+  --[[
+    A read-only list of all @{#ArmorRecord}s in the world database.
+    Implements [iterables#List](iterables.html#List) of #ArmorRecord.
+    local record = types.Armor.records['example_recordid']
+  ]]
+  records: { types.ArmorRecord }
+  
+end
 global interface NpcStats is ActorStats
-  skills: types.SkillStats
+  reputation: ReputationStat
+  
+  skills: SkillStats
   
 end
-global interface Potion is Item
+global interface Repair is Item
   --[[
     @{#Item}
   ]]
   baseType: Item
   
   --[[
-    Creates a @{#PotionRecord} without adding it to the world database.
-    Use @{openmw_world#(world).createRecord} to add the record to the world.
-  ]]
-  createRecordDraft: function(
-    potion: types.PotionRecord
-  ): types.PotionRecord
-  
-  --[[
-    Whether the object is a Potion.
+    Whether the object is a Repair.
   ]]
   objectIsInstance: function(
     object: openmw_core.GameObject
   ): boolean
   
   --[[
-    Returns the read-only @{#PotionRecord} of a potion
+    Returns the read-only @{#RepairRecord} of a repair tool
   ]]
   record: function(
     objectOrRecordId: any
-  ): types.PotionRecord
+  ): types.RepairRecord
   
   --[[
-    A read-only list of all @{#PotionRecord}s in the world database.
-    Implements [iterables#List](iterables.html#List) of #PotionRecord.
-    local record = types.Potion.records['example_recordid']
+    A read-only list of all @{#RepairRecord}s in the world database.
+    Implements [iterables#List](iterables.html#List) of #RepairRecord.
+    local record = types.Repair.records['example_recordid']
   ]]
-  records: { types.PotionRecord }
-  
-end
-global interface Light is Item
-  --[[
-    @{#Item}
-  ]]
-  baseType: Item
-  
-  --[[
-    Creates a @{#LightRecord} without adding it to the world database.
-    Use @{openmw_world#(world).createRecord} to add the record to the world.
-  ]]
-  createRecordDraft: function(
-    light: types.LightRecord
-  ): types.LightRecord
-  
-  --[[
-    Whether the object is a Light.
-  ]]
-  objectIsInstance: function(
-    object: openmw_core.GameObject
-  ): boolean
-  
-  --[[
-    Returns the read-only @{#LightRecord} of a Light
-  ]]
-  record: function(
-    objectOrRecordId: any
-  ): types.LightRecord
-  
-  --[[
-    A read-only list of all @{#LightRecord}s in the world database.
-    Implements [iterables#List](iterables.html#List) of #LightRecord.
-    local record = types.Light.records['example_recordid']
-  ]]
-  records: { types.LightRecord }
-  
-end
---[[
-  Door.STATE
-]]
-global interface DoorSTATE
-  --[[
-    The door is in the process of closing.
-  ]]
-  Closing: number
-  
-  --[[
-    The door is either closed or open (usually closed).
-  ]]
-  Idle: number
-  
-  --[[
-    The door is in the process of opening.
-  ]]
-  Opening: number
-  
-end
-global interface STANCE
-  --[[
-    Default stance
-  ]]
-  Nothing: number
-  
-  --[[
-    Magic stance
-  ]]
-  Spell: number
-  
-  --[[
-    Weapon stance
-  ]]
-  Weapon: number
-  
-end
-global interface ESM4Ingredient
-end
-global interface EQUIPMENT_SLOT
-  Ammunition: number
-  
-  Amulet: number
-  
-  Belt: number
-  
-  Boots: number
-  
-  CarriedLeft: number
-  
-  CarriedRight: number
-  
-  Cuirass: number
-  
-  Greaves: number
-  
-  Helmet: number
-  
-  LeftGauntlet: number
-  
-  LeftPauldron: number
-  
-  LeftRing: number
-  
-  Pants: number
-  
-  RightGauntlet: number
-  
-  RightPauldron: number
-  
-  RightRing: number
-  
-  Robe: number
-  
-  Shirt: number
-  
-  Skirt: number
-  
-end
-global interface Classes
-  --[[
-    Returns a read-only @{#ClassRecord}
-  ]]
-  record: function(
-    recordId: string
-  ): types.ClassRecord
-  
-  --[[
-    A read-only list of all @{#ClassRecord}s in the world database, may be indexed by recordId.
-    Implements [iterables#List](iterables.html#List) of #ClassRecord.
-    local class = types.NPC.classes.records['class id']  -- get by id
-  ]]
-  records: { types.ClassRecord }
-  
-end
---[[
-  Armor.TYPE
-]]
-global interface ArmorTYPE
-  Boots: number
-  
-  Cuirass: number
-  
-  Greaves: number
-  
-  Helmet: number
-  
-  LBracer: number
-  
-  LGauntlet: number
-  
-  LPauldron: number
-  
-  RBracer: number
-  
-  RGauntlet: number
-  
-  RPauldron: number
-  
-  Shield: number
-  
-end
-global interface Activator
-  --[[
-    Creates a @{#ActivatorRecord} without adding it to the world database.
-    Use @{openmw_world#(world).createRecord} to add the record to the world.
-  ]]
-  createRecordDraft: function(
-    activator: types.ActivatorRecord
-  ): types.ActivatorRecord
-  
-  --[[
-    Whether the object is an Activator.
-  ]]
-  objectIsInstance: function(
-    object: openmw_core.GameObject
-  ): boolean
-  
-  --[[
-    Returns the read-only @{#ActivatorRecord} of an activator
-  ]]
-  record: function(
-    objectOrRecordId: any
-  ): types.ActivatorRecord
-  
-  --[[
-    A read-only list of all @{#ActivatorRecord}s in the world database.
-    Implements [iterables#List](iterables.html#List) of #ActivatorRecord.
-    local record = types.Activator.records['example_recordid']
-  ]]
-  records: { types.ActivatorRecord }
-  
-end
---[[
-  Apparatus.TYPE
-]]
-global interface ApparatusTYPE
-  Alembic: number
-  
-  Calcinator: number
-  
-  MortarPestle: number
-  
-  Retort: number
-  
-end
-global interface Races
-  --[[
-    Returns a read-only @{#RaceRecord}
-  ]]
-  record: function(
-    recordId: string
-  ): types.RaceRecord
-  
-  --[[
-    A read-only list of all @{#RaceRecord}s in the world database.
-    Implements [iterables#List](iterables.html#List) of #RaceRecord.
-    local race = types.NPC.races.records['race id']  -- get by id
-  ]]
-  records: { types.RaceRecord }
-  
-end
-global interface ESM4Potion
-end
-global interface ESM4Ammunition
-end
-global interface Static
-  --[[
-    Whether the object is a Static.
-  ]]
-  objectIsInstance: function(
-    object: openmw_core.GameObject
-  ): boolean
-  
-  --[[
-    Returns the read-only @{#StaticRecord} of a Static
-  ]]
-  record: function(
-    objectOrRecordId: any
-  ): types.StaticRecord
-  
-  --[[
-    A read-only list of all @{#StaticRecord}s in the world database.
-    Implements [iterables#List](iterables.html#List) of #StaticRecord.
-    local record = types.Static.records['example_recordid']
-  ]]
-  records: { types.StaticRecord }
+  records: { types.RepairRecord }
   
 end
 global interface Book is Item
@@ -552,352 +1281,40 @@ global interface Book is Item
   records: { types.BookRecord }
   
 end
-global interface ESM4Clothing
-end
-global interface Miscellaneous is Item
+global interface Light is Item
   --[[
     @{#Item}
   ]]
   baseType: Item
   
   --[[
-    Creates a @{#MiscellaneousRecord} without adding it to the world database.
+    Creates a @{#LightRecord} without adding it to the world database.
     Use @{openmw_world#(world).createRecord} to add the record to the world.
   ]]
   createRecordDraft: function(
-    miscellaneous: types.MiscellaneousRecord
-  ): types.MiscellaneousRecord
+    light: types.LightRecord
+  ): types.LightRecord
   
   --[[
-    (DEPRECATED, use itemData(item).soul) Returns the read-only soul of a miscellaneous item
-  ]]
-  getSoul: function(
-    object: openmw_core.GameObject
-  ): string
-  
-  --[[
-    Whether the object is a Miscellaneous.
+    Whether the object is a Light.
   ]]
   objectIsInstance: function(
     object: openmw_core.GameObject
   ): boolean
   
   --[[
-    Returns the read-only @{#MiscellaneousRecord} of a miscellaneous item
+    Returns the read-only @{#LightRecord} of a Light
   ]]
   record: function(
     objectOrRecordId: any
-  ): types.MiscellaneousRecord
+  ): types.LightRecord
   
   --[[
-    A read-only list of all @{#MiscellaneousRecord}s in the world database.
-    Implements [iterables#List](iterables.html#List) of #MiscellaneousRecord.
-    local record = types.Miscellaneous.records['example_recordid']
+    A read-only list of all @{#LightRecord}s in the world database.
+    Implements [iterables#List](iterables.html#List) of #LightRecord.
+    local record = types.Light.records['example_recordid']
   ]]
-  records: { types.MiscellaneousRecord }
-  
-  --[[
-    (DEPRECATED, use itemData(item).soul) Sets the soul of a miscellaneous item, intended for soul gem objects; Must be used in a global script.
-  ]]
-  setSoul: function(
-    object: openmw_core.GameObject,
-    soulId: string
-  )
-  
-end
-global interface Apparatus is Item
-  --[[
-    @{#ApparatusTYPE}
-  ]]
-  TYPE: ApparatusTYPE
-  
-  --[[
-    @{#Item}
-  ]]
-  baseType: Item
-  
-  --[[
-    Whether the object is an Apparatus.
-  ]]
-  objectIsInstance: function(
-    object: openmw_core.GameObject
-  ): boolean
-  
-  --[[
-    Returns the read-only @{#ApparatusRecord} of an apparatus
-  ]]
-  record: function(
-    objectOrRecordId: any
-  ): types.ApparatusRecord
-  
-  --[[
-    A read-only list of all @{#ApparatusRecord}s in the world database.
-    Implements [iterables#List](iterables.html#List) of #ApparatusRecord.
-    local record = types.Apparatus.records['example_recordid']
-  ]]
-  records: { types.ApparatusRecord }
-  
-end
-global interface Armor is Item
-  --[[
-    @{#ArmorTYPE}
-  ]]
-  TYPE: ArmorTYPE
-  
-  --[[
-    @{#Item}
-  ]]
-  baseType: Item
-  
-  --[[
-    Creates a @{#ArmorRecord} without adding it to the world database, for the armor to appear correctly on the body, make sure to use a template as described below.
-    Use @{openmw_world#(world).createRecord} to add the record to the world.
-    local armorTemplate = types.Armor.record('orcish_cuirass')
-    local armorTable = {name = "Better Orcish Cuirass",template = armorTemplate,baseArmor = armorTemplate.baseArmor + 10}
-     --This is the new record we want to create, with a record provided as a template.
-    local recordDraft = types.Armor.createRecordDraft(armorTable)--Need to convert the table into the record draft
-    local newRecord = world.createRecord(recordDraft)--This creates the actual record
-    world.createObject(newRecord.id):moveInto(playerActor)--Create an instance of this object, and move it into the player's inventory
-  ]]
-  createRecordDraft: function(
-    armor: types.ArmorRecord
-  ): types.ArmorRecord
-  
-  --[[
-    Whether the object is an Armor.
-  ]]
-  objectIsInstance: function(
-    object: openmw_core.GameObject
-  ): boolean
-  
-  --[[
-    Returns the read-only @{#ArmorRecord} of an Armor
-  ]]
-  record: function(
-    objectOrRecordId: any
-  ): types.ArmorRecord
-  
-  --[[
-    A read-only list of all @{#ArmorRecord}s in the world database.
-    Implements [iterables#List](iterables.html#List) of #ArmorRecord.
-    local record = types.Armor.records['example_recordid']
-  ]]
-  records: { types.ArmorRecord }
-  
-end
-global interface Probe is Item
-  --[[
-    @{#Item}
-  ]]
-  baseType: Item
-  
-  --[[
-    Whether the object is a Probe.
-  ]]
-  objectIsInstance: function(
-    object: openmw_core.GameObject
-  ): boolean
-  
-  --[[
-    Returns the read-only @{#ProbeRecord} of a probe
-  ]]
-  record: function(
-    objectOrRecordId: any
-  ): types.ProbeRecord
-  
-  --[[
-    A read-only list of all @{#ProbeRecord}s in the world database.
-    Implements [iterables#List](iterables.html#List) of #ProbeRecord.
-    local record = types.Probe.records['example_recordid']
-  ]]
-  records: { types.ProbeRecord }
-  
-end
-global interface ESM4Static
-end
-global interface ESM4Terminal
-  --[[
-    Whether the object is a ESM4Terminal.
-  ]]
-  objectIsInstance: function(
-    object: openmw_core.GameObject
-  ): boolean
-  
-  --[[
-    Returns the read-only @{#ESM4TerminalRecord} of a terminal
-  ]]
-  record: function(
-    objectOrRecordId: any
-  ): types.ESM4TerminalRecord
-  
-  --[[
-    A read-only list of all @{#ESM4TerminalRecord}s in the world database.
-    Implements [iterables#List](iterables.html#List) of #ESM4TerminalRecord.
-    local record = types.ESM4Terminal.records['example_recordid']
-  ]]
-  records: { types.ESM4TerminalRecord }
-  
-end
---[[
-  Weapon.TYPE
-]]
-global interface WeaponTYPE
-  Arrow: number
-  
-  AxeOneHand: number
-  
-  AxeTwoHand: number
-  
-  BluntOneHand: number
-  
-  BluntTwoClose: number
-  
-  BluntTwoWide: number
-  
-  Bolt: number
-  
-  LongBladeOneHand: number
-  
-  LongBladeTwoHand: number
-  
-  MarksmanBow: number
-  
-  MarksmanCrossbow: number
-  
-  MarksmanThrown: number
-  
-  ShortBladeOneHand: number
-  
-  SpearTwoWide: number
-  
-end
-global interface ESM4Activator
-end
-global interface Ingredient is Item
-  --[[
-    @{#Item}
-  ]]
-  baseType: Item
-  
-  --[[
-    Whether the object is an Ingredient.
-  ]]
-  objectIsInstance: function(
-    object: openmw_core.GameObject
-  ): boolean
-  
-  --[[
-    Returns the read-only @{#IngredientRecord} of a Ingredient
-  ]]
-  record: function(
-    objectOrRecordId: any
-  ): types.IngredientRecord
-  
-  --[[
-    A read-only list of all @{#IngredientRecord}s in the world database.
-    Implements [iterables#List](iterables.html#List) of #IngredientRecord.
-    local record = types.Ingredient.records['example_recordid']
-  ]]
-  records: { types.IngredientRecord }
-  
-end
-global interface ESM4Miscellaneous
-end
-global interface LOCKABLE
-  --[[
-    Returns the key record of a lockable object(door, container)
-  ]]
-  getKeyRecord: function(
-    object: openmw_core.GameObject
-  ): types.MiscellaneousRecord
-  
-  --[[
-    Returns the lock level of a lockable object(door, container).
-    Does not determine if an object is locked or not, if an object is locked while this is set above 0, this value will be used if no other value is specified.
-  ]]
-  getLockLevel: function(
-    object: openmw_core.GameObject
-  ): number
-  
-  --[[
-    Returns the trap spell of a lockable object(door, container)
-  ]]
-  getTrapSpell: function(
-    object: openmw_core.GameObject
-  ): openmw_core.Spell
-  
-  --[[
-    Returns true if the lockable object is locked, and false if it is not.
-  ]]
-  isLocked: function(
-    object: openmw_core.GameObject
-  ): boolean
-  
-  --[[
-    Sets the lock level level of a lockable object(door, container);Locks if not already locked; Must be used in a global script.
-  ]]
-  lock: function(
-    object: openmw_core.GameObject,
-    lockLevel: number
-  )
-  
-  --[[
-    Whether the object is a Lockable.
-  ]]
-  objectIsInstance: function(
-    object: openmw_core.GameObject
-  ): boolean
-  
-  --[[
-    Sets the key of a lockable object(door, container); removes it if empty string is provided.
-    Must be used in a global script.
-  ]]
-  setKeyRecord: function(
-    object: openmw_core.GameObject,
-    miscOrId: any
-  )
-  
-  --[[
-    Sets the trap spell of a lockable object(door, container); removes it if empty string is provided.
-    Must be used in a global script.
-  ]]
-  setTrapSpell: function(
-    object: openmw_core.GameObject,
-    spellOrId: any
-  )
-  
-  --[[
-    Unlocks the lockable object.
-    Does not change the lock level, it can be kept for future use.
-  ]]
-  unlock: function(
-    object: openmw_core.GameObject
-  )
-  
-end
---[[
-  Clothing.TYPE
-]]
-global interface ClothingTYPE
-  Amulet: number
-  
-  Belt: number
-  
-  LGlove: number
-  
-  Pants: number
-  
-  RGlove: number
-  
-  Ring: number
-  
-  Robe: number
-  
-  Shirt: number
-  
-  Shoes: number
-  
-  Skirt: number
+  records: { types.LightRecord }
   
 end
 --[[
@@ -939,11 +1356,18 @@ global interface Actor
   ): boolean
   
   --[[
-    Clears the actor's selected castable(spell or enchanted item)
+    Clears the actor's selected castable (spell or enchanted item)
   ]]
   clearSelectedCastable: function(
     actor: openmw_core.GameObject
   )
+  
+  --[[
+    Get the actor's current barter gold.
+  ]]
+  getBarterGold: function(
+    actor: openmw_core.GameObject
+  ): number
   
   --[[
     Get the total weight that the actor can carry.
@@ -1083,6 +1507,15 @@ global interface Actor
   ): boolean
   
   --[[
+    Set the actor's current barter gold.
+    Available in global and local scripts. Can only be used on self in local scripts.
+  ]]
+  setBarterGold: function(
+    actor: openmw_core.GameObject,
+    amount: number
+  )
+  
+  --[[
     Set equipment.
     Keys in the table are equipment slots (see @{#EQUIPMENT_SLOT}). Each
     value can be either a `GameObject` or recordId. Raises an error if
@@ -1135,7 +1568,177 @@ global interface Actor
   stats: ActorStats
   
 end
-global interface ESM4ItemMod
+global interface Apparatus is Item
+  --[[
+    @{#ApparatusTYPE}
+  ]]
+  TYPE: ApparatusTYPE
+  
+  --[[
+    @{#Item}
+  ]]
+  baseType: Item
+  
+  --[[
+    Whether the object is an Apparatus.
+  ]]
+  objectIsInstance: function(
+    object: openmw_core.GameObject
+  ): boolean
+  
+  --[[
+    Returns the read-only @{#ApparatusRecord} of an apparatus
+  ]]
+  record: function(
+    objectOrRecordId: any
+  ): types.ApparatusRecord
+  
+  --[[
+    A read-only list of all @{#ApparatusRecord}s in the world database.
+    Implements [iterables#List](iterables.html#List) of #ApparatusRecord.
+    local record = types.Apparatus.records['example_recordid']
+  ]]
+  records: { types.ApparatusRecord }
+  
+end
+global interface Clothing is Item
+  --[[
+    @{#ClothingTYPE}
+  ]]
+  TYPE: ClothingTYPE
+  
+  --[[
+    @{#Item}
+  ]]
+  baseType: Item
+  
+  --[[
+    Creates a @{#ClothingRecord} without adding it to the world database, for the clothing to appear correctly on the body, make sure to use a template as described below.
+    Use @{openmw_world#(world).createRecord} to add the record to the world.
+    local clothingTemplate = types.Clothing.record('exquisite_robe_01')
+    local clothingTable = {name = "Better Exquisite Robe",template = clothingTemplate,enchantCapacity = clothingTemplate.enchantCapacity + 10}
+     --This is the new record we want to create, with a record provided as a template.
+    local recordDraft = types.Clothing.createRecordDraft(clothingTable)--Need to convert the table into the record draft
+    local newRecord = world.createRecord(recordDraft)--This creates the actual record
+    world.createObject(newRecord.id):moveInto(playerActor)--Create an instance of this object, and move it into the player's inventory
+  ]]
+  createRecordDraft: function(
+    clothing: types.ClothingRecord
+  ): types.ClothingRecord
+  
+  --[[
+    Whether the object is a Clothing.
+  ]]
+  objectIsInstance: function(
+    object: openmw_core.GameObject
+  ): boolean
+  
+  --[[
+    Returns the read-only @{#ClothingRecord} of a Clothing
+  ]]
+  record: function(
+    objectOrRecordId: any
+  ): types.ClothingRecord
+  
+  --[[
+    A read-only list of all @{#ClothingRecord}s in the world database.
+    Implements [iterables#List](iterables.html#List) of #ClothingRecord.
+    local record = types.Clothing.records['example_recordid']
+  ]]
+  records: { types.ClothingRecord }
+  
+end
+global interface Weapon is Item
+  --[[
+    @{#WeaponTYPE}
+  ]]
+  TYPE: WeaponTYPE
+  
+  --[[
+    @{#Item}
+  ]]
+  baseType: Item
+  
+  --[[
+    Creates a @{#WeaponRecord} without adding it to the world database.
+    Use @{openmw_world#(world).createRecord} to add the record to the world.
+  ]]
+  createRecordDraft: function(
+    weapon: types.WeaponRecord
+  ): types.WeaponRecord
+  
+  --[[
+    Whether the object is a Weapon.
+  ]]
+  objectIsInstance: function(
+    object: openmw_core.GameObject
+  ): boolean
+  
+  --[[
+    Returns the read-only @{#WeaponRecord} of a weapon
+  ]]
+  record: function(
+    objectOrRecordId: any
+  ): types.WeaponRecord
+  
+  --[[
+    A read-only list of all @{#WeaponRecord}s in the world database.
+    Implements [iterables#List](iterables.html#List) of #WeaponRecord.
+    local record = types.Weapon.records['example_recordid']
+  ]]
+  records: { types.WeaponRecord }
+  
+end
+global interface Miscellaneous is Item
+  --[[
+    @{#Item}
+  ]]
+  baseType: Item
+  
+  --[[
+    Creates a @{#MiscellaneousRecord} without adding it to the world database.
+    Use @{openmw_world#(world).createRecord} to add the record to the world.
+  ]]
+  createRecordDraft: function(
+    miscellaneous: types.MiscellaneousRecord
+  ): types.MiscellaneousRecord
+  
+  --[[
+    (DEPRECATED, use itemData(item).soul) Returns the read-only soul of a miscellaneous item
+  ]]
+  getSoul: function(
+    object: openmw_core.GameObject
+  ): string
+  
+  --[[
+    Whether the object is a Miscellaneous.
+  ]]
+  objectIsInstance: function(
+    object: openmw_core.GameObject
+  ): boolean
+  
+  --[[
+    Returns the read-only @{#MiscellaneousRecord} of a miscellaneous item
+  ]]
+  record: function(
+    objectOrRecordId: any
+  ): types.MiscellaneousRecord
+  
+  --[[
+    A read-only list of all @{#MiscellaneousRecord}s in the world database.
+    Implements [iterables#List](iterables.html#List) of #MiscellaneousRecord.
+    local record = types.Miscellaneous.records['example_recordid']
+  ]]
+  records: { types.MiscellaneousRecord }
+  
+  --[[
+    (DEPRECATED, use itemData(item).soul) Sets the soul of a miscellaneous item, intended for soul gem objects; Must be used in a global script.
+  ]]
+  setSoul: function(
+    object: openmw_core.GameObject,
+    soulId: string
+  )
+  
 end
 global interface Lockpick is Item
   --[[
@@ -1165,88 +1768,86 @@ global interface Lockpick is Item
   records: { types.LockpickRecord }
   
 end
-global interface Repair is Item
+global interface Potion is Item
   --[[
     @{#Item}
   ]]
   baseType: Item
   
   --[[
-    Whether the object is a Repair.
+    Creates a @{#PotionRecord} without adding it to the world database.
+    Use @{openmw_world#(world).createRecord} to add the record to the world.
+  ]]
+  createRecordDraft: function(
+    potion: types.PotionRecord
+  ): types.PotionRecord
+  
+  --[[
+    Whether the object is a Potion.
   ]]
   objectIsInstance: function(
     object: openmw_core.GameObject
   ): boolean
   
   --[[
-    Returns the read-only @{#RepairRecord} of a repair tool
+    Returns the read-only @{#PotionRecord} of a potion
   ]]
   record: function(
     objectOrRecordId: any
-  ): types.RepairRecord
+  ): types.PotionRecord
   
   --[[
-    A read-only list of all @{#RepairRecord}s in the world database.
-    Implements [iterables#List](iterables.html#List) of #RepairRecord.
-    local record = types.Repair.records['example_recordid']
+    A read-only list of all @{#PotionRecord}s in the world database.
+    Implements [iterables#List](iterables.html#List) of #PotionRecord.
+    local record = types.Potion.records['example_recordid']
   ]]
-  records: { types.RepairRecord }
+  records: { types.PotionRecord }
   
 end
-global interface ESM4Door is LOCKABLE
+global interface Creature is Actor
   --[[
-    @{#LOCKABLE}
+    @{#CreatureTYPE}
   ]]
-  baseType: LOCKABLE
+  TYPE: CreatureTYPE
   
   --[[
-    Destination cell (only if a teleport door).
+    @{#Actor}
   ]]
-  destCell: function(
-    object: openmw_core.GameObject
-  ): openmw_core.Cell
+  baseType: Actor
   
   --[[
-    Destination (only if a teleport door).
+    Creates a @{#CreatureRecord} without adding it to the world database.
+    Use @{openmw_world#(world).createRecord} to add the record to the world.
+    local creatureTemplate = types.Creature.records['mudcrab']
+    local creatureTable = {name = "Epic Mudcrab", template = creatureTemplate, soulValue = 500, isEssential = true}
+    local recordDraft = types.Creature.createRecordDraft(creatureTable)
+    local newRecord = world.createRecord(recordDraft)
+    world.createObject(newRecord.id):teleport(playerCell, playerPosition)
   ]]
-  destPosition: function(
-    object: openmw_core.GameObject
-  ): openmw_util.Vector3
+  createRecordDraft: function(
+    creature: types.CreatureRecord
+  ): types.CreatureRecord
   
   --[[
-    Destination rotation (only if a teleport door).
-  ]]
-  destRotation: function(
-    object: openmw_core.GameObject
-  ): openmw_util.Transform
-  
-  --[[
-    Whether the door is a teleport.
-  ]]
-  isTeleport: function(
-    object: openmw_core.GameObject
-  ): boolean
-  
-  --[[
-    Whether the object is a ESM4Door.
+    Whether the object is a creature.
   ]]
   objectIsInstance: function(
     object: openmw_core.GameObject
   ): boolean
   
   --[[
-    Returns the read-only @{#ESM4DoorRecord} of a door
+    Returns the read-only @{#CreatureRecord} of a creature
   ]]
   record: function(
     objectOrRecordId: any
-  ): types.ESM4DoorRecord
+  ): types.CreatureRecord
   
   --[[
-    A read-only list of all @{#ESM4DoorRecord}s in the world database.
-    Implements [iterables#List](iterables.html#List) of #ESM4DoorRecord.
-    local record = types.ESM4Door.records['example_recordid']
+    A read-only list of all @{#CreatureRecord}s in the world database, may be indexed by recordId.
+    Implements [iterables#List](iterables.html#List) of #CreatureRecord.
+    local creature = types.Creature.records['creature id']  -- get by id
   ]]
-  records: { types.ESM4DoorRecord }
+  records: { types.CreatureRecord }
   
 end
 global interface NPC is Actor
@@ -1282,7 +1883,7 @@ global interface NPC is Actor
   --[[
     Expel NPC from given faction.
     Throws an exception if there is no such faction.
-    Note: expelled NPC still keeps his rank and reputation in faction, he just get an additonal flag for given faction.
+    Note: the expelled NPC still keeps their rank and reputation in the faction, they just get an additional flag for the given faction.
     local NPC = require('openmw.types').NPC;
     NPC.expel(player, "mages guild");
   ]]
@@ -1445,6 +2046,13 @@ global interface NPC is Actor
   ): types.NpcRecord
   
   --[[
+    A read-only list of all @{#NpcRecord}s in the world database, may be indexed by recordId.
+    Implements [iterables#List](iterables.html#List) of #NpcRecord.
+    local npc = types.NPC.records['npc id']  -- get by id
+  ]]
+  records: { types.NpcRecord }
+  
+  --[[
     Set the base disposition of the provided NPC (only in global scripts or on self).
   ]]
   setBaseDisposition: function(
@@ -1478,279 +2086,82 @@ global interface NPC is Actor
     value: number
   )
   
+  --[[
+    Turn an NPC or player into werewolf form or back to normal form.
+    Can only be used in global scripts or on self in local scripts.
+    -- Transform player into werewolf in a global script
+    player.type.setWerewolf(player, true)
+  ]]
+  setWerewolf: function(
+    actor: openmw_core.GameObject, --[[The NPC or player to transform]]
+    werewolf: boolean
+  )
+  
   stats: NpcStats
   
 end
-global interface Clothing is Item
-  --[[
-    @{#ClothingTYPE}
-  ]]
-  TYPE: ClothingTYPE
-  
+global interface Probe is Item
   --[[
     @{#Item}
   ]]
   baseType: Item
   
   --[[
-    Creates a @{#ClothingRecord} without adding it to the world database, for the clothing to appear correctly on the body, make sure to use a template as described below.
+    Creates a @{#ProbeRecord} without adding it to the world database.
     Use @{openmw_world#(world).createRecord} to add the record to the world.
-    local clothingTemplate = types.Clothing.record('exquisite_robe_01')
-    local clothingTable = {name = "Better Exquisite Robe",template = clothingTemplate,enchantCapacity = clothingTemplate.enchantCapacity + 10}
-     --This is the new record we want to create, with a record provided as a template.
-    local recordDraft = types.Clothing.createRecordDraft(clothingTable)--Need to convert the table into the record draft
-    local newRecord = world.createRecord(recordDraft)--This creates the actual record
-    world.createObject(newRecord.id):moveInto(playerActor)--Create an instance of this object, and move it into the player's inventory
   ]]
   createRecordDraft: function(
-    clothing: types.ClothingRecord
-  ): types.ClothingRecord
+    probe: types.ProbeRecord
+  ): types.ProbeRecord
   
   --[[
-    Whether the object is a Clothing.
+    Whether the object is a Probe.
   ]]
   objectIsInstance: function(
     object: openmw_core.GameObject
   ): boolean
   
   --[[
-    Returns the read-only @{#ClothingRecord} of a Clothing
+    Returns the read-only @{#ProbeRecord} of a probe
   ]]
   record: function(
     objectOrRecordId: any
-  ): types.ClothingRecord
+  ): types.ProbeRecord
   
   --[[
-    A read-only list of all @{#ClothingRecord}s in the world database.
-    Implements [iterables#List](iterables.html#List) of #ClothingRecord.
-    local record = types.Clothing.records['example_recordid']
+    A read-only list of all @{#ProbeRecord}s in the world database.
+    Implements [iterables#List](iterables.html#List) of #ProbeRecord.
+    local record = types.Probe.records['example_recordid']
   ]]
-  records: { types.ClothingRecord }
+  records: { types.ProbeRecord }
   
 end
-global interface Creature is Actor
-  --[[
-    @{#CreatureTYPE}
-  ]]
-  TYPE: types.CreatureTYPE
-  
-  --[[
-    @{#Actor}
-  ]]
-  baseType: Actor
-  
-  --[[
-    Whether the object is a creature.
-  ]]
-  objectIsInstance: function(
-    object: openmw_core.GameObject
-  ): boolean
-  
-  --[[
-    Returns the read-only @{#CreatureRecord} of a creature
-  ]]
-  record: function(
-    objectOrRecordId: any
-  ): types.CreatureRecord
-  
-  --[[
-    A read-only list of all @{#CreatureRecord}s in the world database, may be indexed by recordId.
-    Implements [iterables#List](iterables.html#List) of #CreatureRecord.
-    local creature = types.Creature.records['creature id']  -- get by id
-  ]]
-  records: { types.CreatureRecord }
-  
-end
-global interface Weapon is Item
-  --[[
-    @{#WeaponTYPE}
-  ]]
-  TYPE: WeaponTYPE
-  
+global interface Ingredient is Item
   --[[
     @{#Item}
   ]]
   baseType: Item
   
   --[[
-    Creates a @{#WeaponRecord} without adding it to the world database.
-    Use @{openmw_world#(world).createRecord} to add the record to the world.
-  ]]
-  createRecordDraft: function(
-    weapon: types.WeaponRecord
-  ): types.WeaponRecord
-  
-  --[[
-    Whether the object is a Weapon.
+    Whether the object is an Ingredient.
   ]]
   objectIsInstance: function(
     object: openmw_core.GameObject
   ): boolean
   
   --[[
-    Returns the read-only @{#WeaponRecord} of a weapon
+    Returns the read-only @{#IngredientRecord} of a Ingredient
   ]]
   record: function(
     objectOrRecordId: any
-  ): types.WeaponRecord
+  ): types.IngredientRecord
   
   --[[
-    A read-only list of all @{#WeaponRecord}s in the world database.
-    Implements [iterables#List](iterables.html#List) of #WeaponRecord.
-    local record = types.Weapon.records['example_recordid']
+    A read-only list of all @{#IngredientRecord}s in the world database.
+    Implements [iterables#List](iterables.html#List) of #IngredientRecord.
+    local record = types.Ingredient.records['example_recordid']
   ]]
-  records: { types.WeaponRecord }
-  
-end
-global interface Container is LOCKABLE
-  --[[
-    @{#LOCKABLE}
-  ]]
-  baseType: LOCKABLE
-  
-  --[[
-    Container content.
-  ]]
-  content: function(
-    object: openmw_core.GameObject
-  ): openmw_core.Inventory
-  
-  --[[
-    Returns the capacity of a container
-  ]]
-  getCapacity: function(
-    object: openmw_core.GameObject
-  ): number
-  
-  --[[
-    Returns the total weight of everything in a container
-  ]]
-  getEncumbrance: function(
-    object: openmw_core.GameObject
-  ): number
-  
-  --[[
-    Container content (same as `Container.content`, added for consistency with `Actor.inventory`).
-  ]]
-  inventory: function(
-    object: openmw_core.GameObject
-  ): openmw_core.Inventory
-  
-  --[[
-    Whether the object is a Container.
-  ]]
-  objectIsInstance: function(
-    object: openmw_core.GameObject
-  ): boolean
-  
-  --[[
-    Returns the read-only @{#ContainerRecord} of a container
-  ]]
-  record: function(
-    objectOrRecordId: any
-  ): types.ContainerRecord
-  
-  --[[
-    A read-only list of all @{#ContainerRecord}s in the world database.
-    Implements [iterables#List](iterables.html#List) of #ContainerRecord.
-    local record = types.Container.records['example_recordid']
-  ]]
-  records: { types.ContainerRecord }
-  
-end
-global interface Door is LOCKABLE
-  --[[
-    @{#DoorSTATE}
-    local state = types.Door.STATE["Idle"]
-  ]]
-  STATE: DoorSTATE
-  
-  --[[
-    Opens/Closes the door.
-    Can only be used in global scripts or on self.
-    types.Door.activateDoor(doorObject)
-  ]]
-  activateDoor: function(
-    object: openmw_core.GameObject,
-    openState: boolean
-  )
-  
-  --[[
-    @{#LOCKABLE}
-  ]]
-  baseType: LOCKABLE
-  
-  --[[
-    Destination cell (only if a teleport door).
-  ]]
-  destCell: function(
-    object: openmw_core.GameObject
-  ): openmw_core.Cell
-  
-  --[[
-    Destination (only if a teleport door).
-  ]]
-  destPosition: function(
-    object: openmw_core.GameObject
-  ): openmw_util.Vector3
-  
-  --[[
-    Destination rotation (only if a teleport door).
-  ]]
-  destRotation: function(
-    object: openmw_core.GameObject
-  ): openmw_util.Transform
-  
-  --[[
-    Gets the state of the door.
-  ]]
-  getDoorState: function(
-    object: openmw_core.GameObject
-  ): DoorSTATE
-  
-  --[[
-    Checks if the door is fully closed.
-    Returns false if the door is currently opening or closing.
-  ]]
-  isClosed: function(
-    object: openmw_core.GameObject
-  ): boolean
-  
-  --[[
-    Checks if the door is fully open.
-    Returns false if the door is currently opening or closing.
-  ]]
-  isOpen: function(
-    object: openmw_core.GameObject
-  ): boolean
-  
-  --[[
-    Whether the door is a teleport.
-  ]]
-  isTeleport: function(
-    object: openmw_core.GameObject
-  ): boolean
-  
-  --[[
-    Whether the object is a Door.
-  ]]
-  objectIsInstance: function(
-    object: openmw_core.GameObject
-  ): boolean
-  
-  --[[
-    Returns the read-only @{#DoorRecord} of a door
-  ]]
-  record: function(
-    objectOrRecordId: any
-  ): types.DoorRecord
-  
-  --[[
-    A read-only list of all @{#DoorRecord}s in the world database.
-    Implements [iterables#List](iterables.html#List) of #DoorRecord.
-    local record = types.Door.records['example_recordid']
-  ]]
-  records: { types.DoorRecord }
+  records: { types.IngredientRecord }
   
 end
 local record types
@@ -1772,7 +2183,7 @@ local record types
     
   end
   --[[
-    List of spells with additional functions add/remove/clear (modification are allowed only in global scripts or on self).
+    List of spells (modifications are only allowed in global scripts or on self).
     -- print available spells
     local mySpells = types.Actor.spells(self)
     for _, spell in pairs(mySpells) do print(spell.id) end
@@ -1782,6 +2193,15 @@ local record types
       Add spell (only in global scripts or on self).
     ]]
     add: function(
+      self: types.ActorSpells,
+      spellOrId: any
+    )
+    
+    --[[
+      If true, the actor has not used this power in the last 24h.
+      Will return true for powers the actor does not have.
+    ]]
+    canUsePower: function(
       self: types.ActorSpells,
       spellOrId: any
     )
@@ -1821,15 +2241,6 @@ local record types
     add: function(
       self: types.ActorActiveSpells,
       options: table
-    )
-    
-    --[[
-      If true, the actor has not used this power in the last 24h.
-      Will return true for powers the actor does not have.
-    ]]
-    canUsePower: function(
-      self: types.ActorActiveSpells,
-      spellOrId: any
     )
     
     --[[
@@ -1938,7 +2349,7 @@ local record types
     id: string
     
     --[[
-      If true, the actors stats will be automatically calculated based on level and class.
+      If true, the actor's stats will be automatically calculated based on level and class.
     ]]
     isAutocalc: boolean
     
@@ -1987,7 +2398,7 @@ local record types
     --[[
       The services of the creature, in a table. Value is if the service is provided or not, and they are indexed by: Spells, Spellmaking, Enchanting, Training, Repair, Barter, Weapon, Armor, Clothing, Books, Ingredients, Picks, Probes, Lights, Apparatus, RepairItems, Misc, Potions, MagicItems, Travel.
     ]]
-    servicesOffered: { any: boolean }
+    servicesOffered: { string: boolean }
     
     --[[
       The soul value of the creature record
@@ -2008,6 +2419,20 @@ local record types
       The @{#Creature.TYPE} of the creature
     ]]
     type: number
+    
+  end
+  interface OFFENSE_TYPE_IDS
+    Assault: number
+    
+    Murder: number
+    
+    Pickpocket: number
+    
+    SleepingInOwnedBed: number
+    
+    Theft: number
+    
+    Trespassing: number
     
   end
   interface CreatureLevelledListRecord
@@ -2290,7 +2715,8 @@ local record types
     )
     
     --[[
-      (Note that using this function will override and conflict with all other sources of this effect, you probably want to use @{#ActorActiveEffects.modify} instead, this function is provided for mwscript parity only)
+      (Note that using this function will override and conflict with all other sources of this effect.
+      You probably want to use @{#ActorActiveEffects.modify} instead, this function is provided for mwscript parity only)
       Permanently modifies the magnitude of an active effect to be exactly equal to the provided value.
       Note that although the modification is permanent, the magnitude will not stay equal to the value if any active spells with this effects are added/removed.
       Also see the notes on @{#ActorActiveEffects.modify}
@@ -2333,6 +2759,9 @@ local record types
     texture: string
     
   end
+  --[[
+    Value modification is delayed
+  ]]
   interface DynamicStat
     base: number
     
@@ -2356,22 +2785,53 @@ local record types
       Topic name index doesn't have to be lowercase.
       local record = types.Player.journal(player).topics["my trade"]
     ]]
-    topics: { any: types.PlayerJournalTopic }
+    topics: { string: types.PlayerJournalTopic }
+    
+  end
+  interface LockpickRecord
+    --[[
+      VFS path to the icon
+    ]]
+    icon: string
+    
+    --[[
+      The record ID of the lockpick
+    ]]
+    id: string
+    
+    --[[
+      The maximum number of uses of this lockpick
+    ]]
+    maxCondition: number
+    
+    --[[
+      VFS path to the model
+    ]]
+    model: string
+    
+    --[[
+      MWScript on this lockpick (can be nil)
+    ]]
+    mwscript: string
+    
+    --[[
+      The name of the lockpick
+    ]]
+    name: string
+    
+    --[[
+      The quality of the lockpick
+    ]]
+    quality: number
+    
+    value: number
+    
+    weight: number
     
   end
   --[[
-    Creature.TYPE
+    Value modification is delayed
   ]]
-  interface CreatureTYPE
-    Creatures: number
-    
-    Daedra: number
-    
-    Humanoid: number
-    
-    Undead: number
-    
-  end
   interface AIStat
     --[[
       The stat's base value.
@@ -2454,63 +2914,6 @@ local record types
     weight: number
     
   end
-  --[[
-    Race data record
-    -- Get base strength for men
-    strength = types.NPC.races.records[1].attributes.strength.male
-  ]]
-  interface RaceRecord
-    --[[
-      A read-only table of attribute ID to base value
-    ]]
-    attributes: { any: types.GenderedNumber }
-    
-    --[[
-      Race description
-    ]]
-    description: string
-    
-    --[[
-      Height values
-    ]]
-    height: types.GenderedNumber
-    
-    --[[
-      Race id
-    ]]
-    id: string
-    
-    --[[
-      True if this race is a beast race
-    ]]
-    isBeast: boolean
-    
-    --[[
-      True if the player can pick this race in character generation
-    ]]
-    isPlayable: boolean
-    
-    --[[
-      Race name
-    ]]
-    name: string
-    
-    --[[
-      A map of bonus skill points by skill ID
-    ]]
-    skills: { any: number }
-    
-    --[[
-      A read-only list containing the ids of all spells inherent to the race
-    ]]
-    spells: { string }
-    
-    --[[
-      Weight values
-    ]]
-    weight: types.GenderedNumber
-    
-  end
   interface ArmorRecord
     --[[
       The base armor rating of this armor
@@ -2578,7 +2981,30 @@ local record types
       actor: openmw_core.GameObject
     )
     
+    --[[
+      Whether the quest is finished (global and player scripts can change it).
+    ]]
+    finished: boolean
+    
+    --[[
+      The quest id.
+    ]]
+    id: string
+    
+    --[[
+      The quest stage (global and player scripts can change it). Changing the stage starts the quest if it wasn't started.
+    ]]
+    stage: number
+    
+    --[[
+      Whether the quest is started.
+    ]]
+    started: boolean
+    
   end
+  --[[
+    Value modification is delayed
+  ]]
   interface AttributeStat
     --[[
       The actor's base attribute value.
@@ -2637,6 +3063,11 @@ local record types
     id: string
     
     --[[
+      If set, the gold value should be computed based on the effect list rather than read from the value field
+    ]]
+    isAutocalc: boolean
+    
+    --[[
       VFS path to the model
     ]]
     model: string
@@ -2656,115 +3087,80 @@ local record types
     weight: number
     
   end
-  interface AttributeStats
+  interface ItemData
     --[[
-      Agility (returns @{#AttributeStat})
+      The item's current condition. Time remaining for lights (setting this to `-1` will make it last forever). Uses left for repairs, lockpicks and probes. Current health for weapons and armor.
     ]]
-    agility: function(
-      actor: openmw_core.GameObject
-    ): types.AttributeStat
+    condition: number
     
     --[[
-      Endurance (returns @{#AttributeStat})
+      The item's current enchantment charge. Unenchanted items will always return a value of `nil`. Setting this to `nil` will reset the charge of the item.
     ]]
-    endurance: function(
-      actor: openmw_core.GameObject
-    ): types.AttributeStat
+    enchantmentCharge: number
     
     --[[
-      Intelligence (returns @{#AttributeStat})
+      The recordId of the item's current soul. Items without soul will always return a value of `nil`. Setting this to `nil` will remove the soul from the item.
     ]]
-    intelligence: function(
-      actor: openmw_core.GameObject
-    ): types.AttributeStat
-    
-    --[[
-      Luck (returns @{#AttributeStat})
-    ]]
-    luck: function(
-      actor: openmw_core.GameObject
-    ): types.AttributeStat
-    
-    --[[
-      Personality (returns @{#AttributeStat})
-    ]]
-    personality: function(
-      actor: openmw_core.GameObject
-    ): types.AttributeStat
-    
-    --[[
-      Speed (returns @{#AttributeStat})
-    ]]
-    speed: function(
-      actor: openmw_core.GameObject
-    ): types.AttributeStat
-    
-    --[[
-      Strength (returns @{#AttributeStat})
-    ]]
-    strength: function(
-      actor: openmw_core.GameObject
-    ): types.AttributeStat
-    
-    --[[
-      Willpower (returns @{#AttributeStat})
-    ]]
-    willpower: function(
-      actor: openmw_core.GameObject
-    ): types.AttributeStat
+    soul: string
     
   end
-  interface DynamicStats
+  interface ESM4DoorRecord
     --[[
-      Fatigue (returns @{#DynamicStat})
+      FormId of the door closing sound
     ]]
-    fatigue: function(
-      actor: openmw_core.GameObject
-    ): types.DynamicStat
+    closeSound: string
     
     --[[
-      Health (returns @{#DynamicStat})
+      Record id
     ]]
-    health: function(
-      actor: openmw_core.GameObject
-    ): types.DynamicStat
+    id: string
     
     --[[
-      Magicka (returns @{#DynamicStat})
+      VFS path to the model
     ]]
-    magicka: function(
-      actor: openmw_core.GameObject
-    ): types.DynamicStat
+    model: string
+    
+    --[[
+      Human-readable name
+    ]]
+    name: string
+    
+    --[[
+      FormId of the door opening sound
+    ]]
+    openSound: string
     
   end
-  interface AIStats
+  interface ESM4TerminalRecord
     --[[
-      Alarm (returns @{#AIStat})
+      Human-readable ID
     ]]
-    alarm: function(
-      actor: openmw_core.GameObject
-    ): types.AIStat
+    editorId: string
     
     --[[
-      Fight (returns @{#AIStat})
+      Record id (Form ID)
     ]]
-    fight: function(
-      actor: openmw_core.GameObject
-    ): types.AIStat
+    id: string
     
     --[[
-      Flee (returns @{#AIStat})
+      VFS path to the model
     ]]
-    flee: function(
-      actor: openmw_core.GameObject
-    ): types.AIStat
+    model: string
     
     --[[
-      Hello (returns @{#AIStat})
+      Human-readable name
     ]]
-    hello: function(
-      actor: openmw_core.GameObject
-    ): types.AIStat
+    name: string
+    
+    --[[
+      Result text of the terminal record
+    ]]
+    resultText: string
+    
+    --[[
+      Text body of the terminal record
+    ]]
+    text: string
     
   end
   interface MiscellaneousRecord
@@ -2800,33 +3196,6 @@ local record types
     weight: number
     
   end
-  interface ESM4DoorRecord
-    --[[
-      FormId of the door closing sound
-    ]]
-    closeSound: string
-    
-    --[[
-      Record id
-    ]]
-    id: string
-    
-    --[[
-      VFS path to the model
-    ]]
-    model: string
-    
-    --[[
-      Human-readable name
-    ]]
-    name: string
-    
-    --[[
-      FormId of the door opening sound
-    ]]
-    openSound: string
-    
-  end
   interface NpcRecord
     --[[
       NPC's starting disposition
@@ -2849,12 +3218,12 @@ local record types
     class: string
     
     --[[
-      Path to the hair body part model
+      ID of the hair body part
     ]]
     hair: string
     
     --[[
-      Path to the head body part model
+      ID of the head body part
     ]]
     head: string
     
@@ -2862,6 +3231,11 @@ local record types
       The record ID of the NPC
     ]]
     id: string
+    
+    --[[
+      If true, the actor's stats will be automatically calculated based on level and class.
+    ]]
+    isAutocalc: boolean
     
     --[[
       whether the NPC is essential
@@ -2895,7 +3269,7 @@ local record types
     --[[
       The services of the NPC, in a table. Value is if the service is provided or not, and they are indexed by: Spells, Spellmaking, Enchanting, Training, Repair, Barter, Weapon, Armor, Clothing, Books, Ingredients, Picks, Probes, Lights, Apparatus, RepairItems, Misc, Potions, MagicItems, Travel.
     ]]
-    servicesOffered: { any: boolean }
+    servicesOffered: { string: boolean }
     
     --[[
       A list of @{#TravelDestination}s for this NPC.
@@ -2903,48 +3277,16 @@ local record types
     travelDestinations: { types.TravelDestination }
     
   end
-  interface ESM4TerminalRecord
+  interface LevelledListItem
     --[[
-      Human-readable ID
-    ]]
-    editorId: string
-    
-    --[[
-      Record id (Form ID)
+      Item id
     ]]
     id: string
     
     --[[
-      VFS path to the model
+      The minimum player level at which this item can occur
     ]]
-    model: string
-    
-    --[[
-      Human-readable name
-    ]]
-    name: string
-    
-    --[[
-      Result text of the terminal record
-    ]]
-    resultText: string
-    
-    --[[
-      Text body of the terminal record
-    ]]
-    text: string
-    
-  end
-  interface CreatureAttack
-    --[[
-      Maximum attack damage.
-    ]]
-    maxDamage: number
-    
-    --[[
-      Minimum attack damage.
-    ]]
-    minDamage: number
+    level: number
     
   end
   interface CreatureLevelledList
@@ -2970,6 +3312,51 @@ local record types
     records: { types.CreatureLevelledListRecord }
     
   end
+  --[[
+    Class data record
+  ]]
+  interface ClassRecord
+    --[[
+      A read-only list containing the specialized attributes of the class.
+    ]]
+    attributes: { string }
+    
+    --[[
+      Class description
+    ]]
+    description: string
+    
+    --[[
+      Class id
+    ]]
+    id: string
+    
+    --[[
+      True if the player can play as this class
+    ]]
+    isPlayable: boolean
+    
+    --[[
+      A read-only list containing the major skills of the class.
+    ]]
+    majorSkills: { string }
+    
+    --[[
+      A read-only list containing the minor skills of the class.
+    ]]
+    minorSkills: { string }
+    
+    --[[
+      Class name
+    ]]
+    name: string
+    
+    --[[
+      Class specialization. Either combat, magic, or stealth.
+    ]]
+    specialization: string
+    
+  end
   interface StaticRecord
     --[[
       Record id
@@ -2982,26 +3369,16 @@ local record types
     model: string
     
   end
-  interface ActivatorRecord
+  interface CreatureAttack
     --[[
-      Record id
+      Maximum attack damage.
     ]]
-    id: string
+    maxDamage: number
     
     --[[
-      VFS path to the model
+      Minimum attack damage.
     ]]
-    model: string
-    
-    --[[
-      MWScript on this activator (can be nil)
-    ]]
-    mwscript: string
-    
-    --[[
-      Human-readable name
-    ]]
-    name: string
+    minDamage: number
     
   end
   interface DoorRecord
@@ -3034,6 +3411,28 @@ local record types
       The sound id for door opening
     ]]
     openSound: string
+    
+  end
+  interface ActivatorRecord
+    --[[
+      Record id
+    ]]
+    id: string
+    
+    --[[
+      VFS path to the model
+    ]]
+    model: string
+    
+    --[[
+      MWScript on this activator (can be nil)
+    ]]
+    mwscript: string
+    
+    --[[
+      Human-readable name
+    ]]
+    name: string
     
   end
   interface ContainerRecord
@@ -3091,209 +3490,6 @@ local record types
       Number of contributions to stealth specialization for the next level up.
     ]]
     stealth: number
-    
-  end
-  interface LevelledListItem
-    --[[
-      Item id
-    ]]
-    id: string
-    
-    --[[
-      The minimum player level at which this item can occur
-    ]]
-    level: number
-    
-  end
-  interface SkillStats
-    --[[
-      Acrobatics (returns @{#SkillStat})
-    ]]
-    acrobatics: function(
-      actor: openmw_core.GameObject
-    ): types.SkillStat
-    
-    --[[
-      Alchemy (returns @{#SkillStat})
-    ]]
-    alchemy: function(
-      actor: openmw_core.GameObject
-    ): types.SkillStat
-    
-    --[[
-      Alteration (returns @{#SkillStat})
-    ]]
-    alteration: function(
-      actor: openmw_core.GameObject
-    ): types.SkillStat
-    
-    --[[
-      Armorer (returns @{#SkillStat})
-    ]]
-    armorer: function(
-      actor: openmw_core.GameObject
-    ): types.SkillStat
-    
-    --[[
-      Athletics (returns @{#SkillStat})
-    ]]
-    athletics: function(
-      actor: openmw_core.GameObject
-    ): types.SkillStat
-    
-    --[[
-      Axe (returns @{#SkillStat})
-    ]]
-    axe: function(
-      actor: openmw_core.GameObject
-    ): types.SkillStat
-    
-    --[[
-      Block (returns @{#SkillStat})
-    ]]
-    block: function(
-      actor: openmw_core.GameObject
-    ): types.SkillStat
-    
-    --[[
-      Blunt Weapon (returns @{#SkillStat})
-    ]]
-    bluntweapon: function(
-      actor: openmw_core.GameObject
-    ): types.SkillStat
-    
-    --[[
-      Conjuration (returns @{#SkillStat})
-    ]]
-    conjuration: function(
-      actor: openmw_core.GameObject
-    ): types.SkillStat
-    
-    --[[
-      Destruction (returns @{#SkillStat})
-    ]]
-    destruction: function(
-      actor: openmw_core.GameObject
-    ): types.SkillStat
-    
-    --[[
-      Enchant (returns @{#SkillStat})
-    ]]
-    enchant: function(
-      actor: openmw_core.GameObject
-    ): types.SkillStat
-    
-    --[[
-      Hand To Hand (returns @{#SkillStat})
-    ]]
-    handtohand: function(
-      actor: openmw_core.GameObject
-    ): types.SkillStat
-    
-    --[[
-      Heavy Armor (returns @{#SkillStat})
-    ]]
-    heavyarmor: function(
-      actor: openmw_core.GameObject
-    ): types.SkillStat
-    
-    --[[
-      Illusion (returns @{#SkillStat})
-    ]]
-    illusion: function(
-      actor: openmw_core.GameObject
-    ): types.SkillStat
-    
-    --[[
-      Light Armor (returns @{#SkillStat})
-    ]]
-    lightarmor: function(
-      actor: openmw_core.GameObject
-    ): types.SkillStat
-    
-    --[[
-      Long Blade (returns @{#SkillStat})
-    ]]
-    longblade: function(
-      actor: openmw_core.GameObject
-    ): types.SkillStat
-    
-    --[[
-      Marksman (returns @{#SkillStat})
-    ]]
-    marksman: function(
-      actor: openmw_core.GameObject
-    ): types.SkillStat
-    
-    --[[
-      Medium Armor (returns @{#SkillStat})
-    ]]
-    mediumarmor: function(
-      actor: openmw_core.GameObject
-    ): types.SkillStat
-    
-    --[[
-      Mercantile (returns @{#SkillStat})
-    ]]
-    mercantile: function(
-      actor: openmw_core.GameObject
-    ): types.SkillStat
-    
-    --[[
-      Mysticism (returns @{#SkillStat})
-    ]]
-    mysticism: function(
-      actor: openmw_core.GameObject
-    ): types.SkillStat
-    
-    --[[
-      Restoration (returns @{#SkillStat})
-    ]]
-    restoration: function(
-      actor: openmw_core.GameObject
-    ): types.SkillStat
-    
-    --[[
-      Security (returns @{#SkillStat})
-    ]]
-    security: function(
-      actor: openmw_core.GameObject
-    ): types.SkillStat
-    
-    --[[
-      Short Blade (returns @{#SkillStat})
-    ]]
-    shortblade: function(
-      actor: openmw_core.GameObject
-    ): types.SkillStat
-    
-    --[[
-      Sneak (returns @{#SkillStat})
-    ]]
-    sneak: function(
-      actor: openmw_core.GameObject
-    ): types.SkillStat
-    
-    --[[
-      Spear (returns @{#SkillStat})
-    ]]
-    spear: function(
-      actor: openmw_core.GameObject
-    ): types.SkillStat
-    
-    --[[
-      Speechcraft (returns @{#SkillStat})
-    ]]
-    speechcraft: function(
-      actor: openmw_core.GameObject
-    ): types.SkillStat
-    
-    --[[
-      Unarmored (returns @{#SkillStat})
-    ]]
-    unarmored: function(
-      actor: openmw_core.GameObject
-    ): types.SkillStat
     
   end
   interface LightRecord
@@ -3412,88 +3608,6 @@ local record types
     weight: number
     
   end
-  interface LockpickRecord
-    --[[
-      VFS path to the icon
-    ]]
-    icon: string
-    
-    --[[
-      The record ID of the lockpick
-    ]]
-    id: string
-    
-    --[[
-      The maximum number of uses of this lockpick
-    ]]
-    maxCondition: number
-    
-    --[[
-      VFS path to the model
-    ]]
-    model: string
-    
-    --[[
-      MWScript on this lockpick (can be nil)
-    ]]
-    mwscript: string
-    
-    --[[
-      The name of the lockpick
-    ]]
-    name: string
-    
-    --[[
-      The quality of the lockpick
-    ]]
-    quality: number
-    
-    value: number
-    
-    weight: number
-    
-  end
-  interface ApparatusRecord
-    --[[
-      VFS path to the icon
-    ]]
-    icon: string
-    
-    --[[
-      The record ID of the apparatus
-    ]]
-    id: string
-    
-    --[[
-      VFS path to the model
-    ]]
-    model: string
-    
-    --[[
-      MWScript on this apparatus (can be nil)
-    ]]
-    mwscript: string
-    
-    --[[
-      The name of the apparatus
-    ]]
-    name: string
-    
-    --[[
-      The quality of the apparatus
-    ]]
-    quality: number
-    
-    --[[
-      The type of apparatus. See @{#Apparatus.TYPE}
-    ]]
-    type: number
-    
-    value: number
-    
-    weight: number
-    
-  end
   --[[
     Values affect how much each attribute can be increased at level up, and are all reset to 0 upon level up.
   ]]
@@ -3539,68 +3653,6 @@ local record types
     willpower: number
     
   end
-  interface ItemData
-    --[[
-      The item's current condition. Time remaining for lights. Uses left for repairs, lockpicks and probes. Current health for weapons and armor.
-    ]]
-    condition: number
-    
-    --[[
-      The item's current enchantment charge. Unenchanted items will always return a value of `nil`. Setting this to `nil` will reset the charge of the item.
-    ]]
-    enchantmentCharge: number
-    
-    --[[
-      The recordId of the item's current soul. Items without soul will always return a value of `nil`. Setting this to `nil` will remove the soul from the item.
-    ]]
-    soul: string
-    
-  end
-  --[[
-    Class data record
-  ]]
-  interface ClassRecord
-    --[[
-      A read-only list containing the specialized attributes of the class.
-    ]]
-    attributes: { string }
-    
-    --[[
-      Class description
-    ]]
-    description: string
-    
-    --[[
-      Class id
-    ]]
-    id: string
-    
-    --[[
-      True if the player can play as this class
-    ]]
-    isPlayable: boolean
-    
-    --[[
-      A read-only list containing the major skills of the class.
-    ]]
-    majorSkills: { string }
-    
-    --[[
-      A read-only list containing the minor skills of the class.
-    ]]
-    minorSkills: { string }
-    
-    --[[
-      Class name
-    ]]
-    name: string
-    
-    --[[
-      Class specialization. Either combat, magic, or stealth.
-    ]]
-    specialization: string
-    
-  end
   interface ClothingRecord
     --[[
       The enchantment ID of this clothing (can be nil)
@@ -3644,6 +3696,9 @@ local record types
     weight: number
     
   end
+  --[[
+    Value modification is delayed
+  ]]
   interface SkillStat
     --[[
       The NPC's base skill value.
@@ -3671,42 +3726,107 @@ local record types
     progress: number
     
   end
-  interface OFFENSE_TYPE_IDS
-    Assault: number
-    
-    Murder: number
-    
-    Pickpocket: number
-    
-    SleepingInOwnedBed: number
-    
-    Theft: number
-    
-    Trespassing: number
-    
-  end
-  interface PlayerQuest
+  interface ApparatusRecord
     --[[
-      Whether the quest is finished (global and player scripts can change it).
+      VFS path to the icon
     ]]
-    finished: boolean
+    icon: string
     
     --[[
-      The quest id.
+      The record ID of the apparatus
     ]]
     id: string
     
     --[[
-      The quest stage (global and player scripts can change it). Changing the stage starts the quest if it wasn't started.
+      VFS path to the model
     ]]
-    stage: number
+    model: string
     
     --[[
-      Whether the quest is started.
+      MWScript on this apparatus (can be nil)
     ]]
-    started: boolean
+    mwscript: string
+    
+    --[[
+      The name of the apparatus
+    ]]
+    name: string
+    
+    --[[
+      The quality of the apparatus
+    ]]
+    quality: number
+    
+    --[[
+      The type of apparatus. See @{#Apparatus.TYPE}
+    ]]
+    type: number
+    
+    value: number
+    
+    weight: number
     
   end
+  --[[
+    Race data record
+    -- Get base strength for men
+    strength = types.NPC.races.records[1].attributes.strength.male
+  ]]
+  interface RaceRecord
+    --[[
+      A read-only table of attribute ID to base value
+    ]]
+    attributes: { string: types.GenderedNumber }
+    
+    --[[
+      Race description
+    ]]
+    description: string
+    
+    --[[
+      Height values
+    ]]
+    height: types.GenderedNumber
+    
+    --[[
+      Race id
+    ]]
+    id: string
+    
+    --[[
+      True if this race is a beast race
+    ]]
+    isBeast: boolean
+    
+    --[[
+      True if the player can pick this race in character generation
+    ]]
+    isPlayable: boolean
+    
+    --[[
+      Race name
+    ]]
+    name: string
+    
+    --[[
+      A map of bonus skill points by skill ID
+    ]]
+    skills: { string: number }
+    
+    --[[
+      A read-only list containing the ids of all spells inherent to the race
+    ]]
+    spells: { string }
+    
+    --[[
+      Weight values
+    ]]
+    weight: types.GenderedNumber
+    
+  end
+  --[[
+    Value modification is delayed
+  ]]
   interface LevelStat
     --[[
       The actor's current level.

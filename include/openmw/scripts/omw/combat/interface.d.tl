@@ -1,6 +1,6 @@
 --[[
   Basic combat interface
-  require('openmw.interfaces').Combat
+  local I = require('openmw.interfaces')
   
   I.Combat.addOnHitHandler(function(attack)
      -- Adds fatigue loss when hit by draining fatigue when taking health damage
@@ -16,10 +16,20 @@
 ]]
 
 local type openmw_core = require("openmw.core")
-local type openmw_self = require("openmw.self")
 local type openmw_types = require("openmw.types")
 local type openmw_util = require("openmw.util")
 local record Combat
+  --[[
+    Table of possible attack types
+  ]]
+  interface AttackType
+    Chop: number
+    
+    Slash: number
+    
+    Thrust: number
+    
+  end
   --[[
     Table of possible attack source types
   ]]
@@ -45,7 +55,7 @@ local record Combat
     attacker: openmw_types.Actor
     
     --[[
-      A table mapping stat name (health, fatigue, or magicka) to number. For example, {health = 50, fatigue = 10} will cause 50 damage to health and 10 to fatigue (before adjusting for armor and difficulty). This field is ignored for failed attacks.
+      A table mapping a stat name (health, fatigue, or magicka) to a number. For example, {health = 50, fatigue = 10} will cause 50 damage to health and 10 to fatigue (before adjusting for armor and difficulty). This field is ignored for failed attacks.
     ]]
     damage: table
     
@@ -72,7 +82,7 @@ local record Combat
     --[[
       (Optional) Attack variant if applicable. For melee attacks this represents chop vs thrust vs slash. For unarmed creatures this implies which of its 3 possible attacks were used. For other attacks this field can be ignored.
     ]]
-    type: openmw_self.ATTACK_TYPE
+    type: Combat.AttackType
     
     --[[
       (Optional) Attacking weapon
@@ -88,10 +98,15 @@ local record Combat
   ATTACK_SOURCE_TYPES: Combat.AttackSourceType
   
   --[[
+    @{#AttackType}
+  ]]
+  ATTACK_TYPES: Combat.AttackType
+  
+  --[[
     Add new onHit handler for this actor
     If `handler(attack)` returns false, other handlers for
     the call will be skipped.
-    where attack is the same @{#AttackInfo} passed to #Combat.onHit
+    Where attack is the same @{#AttackInfo} passed to #Combat.onHit
   ]]
   addOnHitHandler: function(
     handler: function
@@ -108,7 +123,7 @@ local record Combat
   ): number
   
   --[[
-    Calculates a difficulty multiplier based on current difficulty settings
+    Calculates a difficulty multiplier based on the current difficulty settings
     and adjusts damage accordingly.
     Has no effect if both this actor and the
     attacker are NPCs, or if both are Players.
@@ -138,7 +153,7 @@ local record Combat
   ): number
   
   --[[
-    Computes this character's armor rating.
+    Computes this item's armor skill.
     You can override this to return any skill you wish (including non-armor skills, if you so wish).
     Note that this interface function is read by the engine to update the UI.
     This function can still be overridden same as any other interface, but must not call any functions or interfaces that modify anything.

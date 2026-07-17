@@ -4,15 +4,6 @@
 ]]
 
 --[[
-  Navigation mesh rendering modes
-]]
-global interface NAV_MESH_RENDER_MODE
-  AreaType: number
-  
-  UpdateFrequency: number
-  
-end
---[[
   Rendering modes
 ]]
 global interface RENDER_MODE
@@ -31,6 +22,15 @@ global interface RENDER_MODE
   Water: number
   
   Wireframe: number
+  
+end
+--[[
+  Navigation mesh rendering modes
+]]
+global interface NAV_MESH_RENDER_MODE
+  AreaType: number
+  
+  UpdateFrequency: number
   
 end
 local record Debug
