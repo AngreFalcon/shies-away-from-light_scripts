@@ -1,3 +1,0 @@
-GLOBAL: scripts/caf/global.lua
-
-PLAYER, NPC: scripts/caf/npc.lua

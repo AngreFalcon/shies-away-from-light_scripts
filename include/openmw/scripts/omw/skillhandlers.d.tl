@@ -32,33 +32,7 @@
 
 local record SkillProgression
   --[[
-    Table of all existing sources for skill increases.
-    Any sources not listed below will be treated as equal to Trainer.
-  ]]
-  interface SkillLevelUpSource
-    --[[
-      book
-    ]]
-    Book: string
-    
-    --[[
-      jail
-    ]]
-    Jail: string
-    
-    --[[
-      trainer
-    ]]
-    Trainer: string
-    
-    --[[
-      usage
-    ]]
-    Usage: string
-    
-  end
-  --[[
-    Table of skill use types defined by Morrowind.
+    Table of skill use types defined by morrowind.
     Each entry corresponds to an index into the available skill gain values
     of a @{openmw.core#SkillRecord}
   ]]
@@ -180,6 +154,32 @@ local record SkillProgression
     
   end
   --[[
+    Table of all existing sources for skill increases.
+    Any sources not listed below will be treated as equal to Trainer.
+  ]]
+  interface SkillLevelUpSource
+    --[[
+      book
+    ]]
+    Book: string
+    
+    --[[
+      jail
+    ]]
+    Jail: string
+    
+    --[[
+      trainer
+    ]]
+    Trainer: string
+    
+    --[[
+      usage
+    ]]
+    Usage: string
+    
+  end
+  --[[
     @{#SkillLevelUpSource}
   ]]
   SKILL_INCREASE_SOURCES: SkillProgression.SkillLevelUpSource
@@ -195,7 +195,7 @@ local record SkillProgression
     If `handler(skillid, source, options)` returns false, other handlers (including the default skill level up handler) 
     will be skipped. Where skillid and source are the parameters passed to @{#SkillProgression.skillLevelUp}, and options is
     a modifiable table of skill level up values, and can be modified to change the behavior of later handlers. 
-    These values are calculated based on vanilla mechanics. Setting any value to nil will cause that mechanic to be skipped. By default it contains these values:
+    These values are calculated based on vanilla mechanics. Setting any value to nil will cause that mechanic to be skipped. By default contains these values:
     
       * `skillIncreaseValue` - The numeric amount of skill levels gained. By default this is 1, except when the source is jail in which case it will instead be -1 for all skills except sneak and security.
       * `levelUpProgress` - The numeric amount of level up progress gained.
@@ -221,14 +221,6 @@ local record SkillProgression
   )
   
   --[[
-    Construct a table of skill level up options
-  ]]
-  getSkillLevelUpOptions: function(
-    skillid: string, --[[The id of the skill to level up]]
-    source: SkillProgression.SkillLevelUpSource
-  ): table
-  
-  --[[
     Compute the total skill gain required to level up a skill based on its current level, and other modifying factors such as major skills and specialization.
   ]]
   getSkillProgressRequirement: function(
@@ -247,7 +239,7 @@ local record SkillProgression
     Trigger a skill use, activating relevant handlers
   ]]
   skillUsed: function(
-    skillid: string, --[[The ID of the skill that was used]]
+    skillid: string, --[[The if of the skill that was used]]
     options: any
   )
   

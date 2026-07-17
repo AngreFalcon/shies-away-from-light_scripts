@@ -33,7 +33,7 @@ local record ItemUsage
   )
   
   --[[
-    Add new use action handler for a type of object.
+    Add new use action handler for a type of objects.
     If `handler(object, actor, options)` returns false, other handlers for
     the same object (including type handlers) will be skipped.
   ]]

@@ -11,7 +11,7 @@ local record Crimes
   ]]
   interface CommitCrimeInputs
     --[[
-      The amount to increase the player bounty by if the crime type is theft. Ignored otherwise (optional, defaults to 0)
+      The amount to increase the player bounty by, if the crime type is theft. Ignored otherwise (optional, defaults to 0)
     ]]
     arg: number
     

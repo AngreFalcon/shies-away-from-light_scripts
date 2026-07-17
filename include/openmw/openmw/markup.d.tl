@@ -5,7 +5,7 @@
 
 local record markup
   --[[
-    Convert YAML data to a Lua object
+    Convert YAML data to Lua object
     local result = markup.decodeYaml('{ "x": 1 }');
     -- prints 1
     print(result["x"])
@@ -15,7 +15,7 @@ local record markup
   ): any
   
   --[[
-    Load a YAML file from the VFS to Lua object.
+    Load YAML file from VFS to Lua object.
     Conventions are the same as in @{#markup.decodeYaml}.
     -- file contains '{ "x": 1 }' data
     local result = markup.loadYaml('test.yaml');

@@ -32,9 +32,60 @@
 local type openmw_async = require("openmw.async")
 local type openmw_util = require("openmw.util")
 --[[
-  Numeric id of a @{#KEY}
+  Ids of game controller axises.
+  Used as an argument in getAxisValue.
 ]]
-global interface KeyCode
+global interface CONTROLLER_AXIS
+  --[[
+    Left stick horizontal axis (from -1 to 1)
+  ]]
+  LeftX: number
+  
+  --[[
+    Left stick vertical axis (from -1 to 1)
+  ]]
+  LeftY: number
+  
+  --[[
+    (DEPRECATED, use the LookLeftRight action) View direction horizontal axis (RightX by default, can be mapped to another axis in Options/Controls menu)
+  ]]
+  LookLeftRight: number
+  
+  --[[
+    (DEPRECATED, use the LookUpDown action) View direction vertical axis (RightY by default, can be mapped to another axis in Options/Controls menu)
+  ]]
+  LookUpDown: number
+  
+  --[[
+    (DEPRECATED, use the MoveForwardBackward action) Movement forward/backward (LeftY by default, can be mapped to another axis in Options/Controls menu)
+  ]]
+  MoveForwardBackward: number
+  
+  --[[
+    (DEPRECATED, use the MoveLeftRight action) Side movement (LeftX by default, can be mapped to another axis in Options/Controls menu)
+  ]]
+  MoveLeftRight: number
+  
+  --[[
+    Right stick horizontal axis (from -1 to 1)
+  ]]
+  RightX: number
+  
+  --[[
+    Right stick vertical axis (from -1 to 1)
+  ]]
+  RightY: number
+  
+  --[[
+    Left trigger (from 0 to 1)
+  ]]
+  TriggerLeft: number
+  
+  --[[
+    Right trigger (from 0 to 1)
+  ]]
+  TriggerRight: number
+  
 end
 --[[
   (DEPRECATED, use actions with matching keys)
@@ -125,11 +176,6 @@ global interface ACTION
   ZoomOut: number
   
 end
---[[
-  String id of a @{#CONTROL_SWITCH}
-]]
-global interface ControlSwitch
-end
 global interface CONTROLLER_BUTTON
   A: number
   
@@ -151,84 +197,45 @@ global interface CONTROLLER_BUTTON
   
   LeftStick: number
   
-  Misc1: number
-  
-  Paddle1: number
-  
-  Paddle2: number
-  
-  Paddle3: number
-  
-  Paddle4: number
-  
   RightShoulder: number
   
   RightStick: number
   
   Start: number
   
-  Touchpad: number
-  
   X: number
   
   Y: number
   
 end
+global interface ActionType
+end
 --[[
-  Ids of game controller axises.
-  Used as an argument in getAxisValue.
+  String id of a @{#CONTROL_SWITCH}
 ]]
-global interface CONTROLLER_AXIS
+global interface ControlSwitch
+end
+global interface ACTION_TYPE
   --[[
-    Left stick horizontal axis (from -1 to 1)
+    Input action with value of true or false
   ]]
-  LeftX: number
+  Boolean: ActionType
   
   --[[
-    Left stick vertical axis (from -1 to 1)
+    Input action with a numeric value
   ]]
-  LeftY: number
+  Number: ActionType
   
   --[[
-    (DEPRECATED, use the LookLeftRight action) View direction horizontal axis (RightX by default, can be mapped to another axis in Options/Controls menu)
+    Input action with a numeric value between 0 and 1 (inclusive)
   ]]
-  LookLeftRight: number
+  Range: ActionType
   
-  --[[
-    (DEPRECATED, use the LookUpDown action) View direction vertical axis (RightY by default, can be mapped to another axis in Options/Controls menu)
-  ]]
-  LookUpDown: number
-  
-  --[[
-    (DEPRECATED, use the MoveForwardBackward action) Movement forward/backward (LeftY by default, can be mapped to another axis in Options/Controls menu)
-  ]]
-  MoveForwardBackward: number
-  
-  --[[
-    (DEPRECATED, use the MoveLeftRight action) Side movement (LeftX by default, can be mapped to another axis in Options/Controls menu)
-  ]]
-  MoveLeftRight: number
-  
-  --[[
-    Right stick horizontal axis (from -1 to 1)
-  ]]
-  RightX: number
-  
-  --[[
-    Right stick vertical axis (from -1 to 1)
-  ]]
-  RightY: number
-  
-  --[[
-    Left trigger (from 0 to 1)
-  ]]
-  TriggerLeft: number
-  
-  --[[
-    Right trigger (from 0 to 1)
-  ]]
-  TriggerRight: number
-  
+end
+--[[
+  Numeric id of a @{#KEY}
+]]
+global interface KeyCode
 end
 global interface KEY
   A: KeyCode
@@ -463,7 +470,7 @@ global interface CONTROL_SWITCH
   Magic: ControlSwitch
   
   --[[
-    Vanity view if the player doesn't touch controls for a long time
+    Vanity view if player doesn't touch controls for a long time
   ]]
   VanityMode: ControlSwitch
   
@@ -471,25 +478,6 @@ global interface CONTROL_SWITCH
     Ability to toggle 1st/3rd person view
   ]]
   ViewMode: ControlSwitch
-  
-end
-global interface ActionType
-end
-global interface ACTION_TYPE
-  --[[
-    Input action with value of true or false
-  ]]
-  Boolean: ActionType
-  
-  --[[
-    Input action with a numeric value
-  ]]
-  Number: ActionType
-  
-  --[[
-    Input action with a numeric value between 0 and 1 (inclusive)
-  ]]
-  Range: ActionType
   
 end
 local record input
@@ -631,7 +619,7 @@ local record input
   --[[
     Map of all currently registered actions
   ]]
-  actions: { string: input.ActionInfo }
+  actions: { any: input.ActionInfo }
   
   --[[
     Activates the trigger with the given key
@@ -675,7 +663,7 @@ local record input
   
   --[[
     [Deprecated, moved to types.Player] Get state of a control switch.
-    I.e. is the player able to move/fight/jump/etc.
+    I.e. is player able to move/fight/jump/etc.
   ]]
   getControlSwitch: function(
     key: ControlSwitch
@@ -713,7 +701,7 @@ local record input
   ): number
   
   --[[
-    (DEPRECATED, use getBooleanActionValue) Input bindings can be changed in-game using Options/Controls menu.
+    (DEPRECATED, use getBooleanActionValue) Input bindings can be changed ingame using Options/Controls menu.
   ]]
   isActionPressed: function(
     actionId: number
@@ -737,7 +725,7 @@ local record input
   isCtrlPressed: function(): boolean
   
   --[[
-    Is the player idle.
+    Is player idle.
   ]]
   isIdle: function(): boolean
   
@@ -799,7 +787,7 @@ local record input
   
   --[[
     [Deprecated, moved to types.Player] Set state of a control switch.
-    I.e. forbid or allow the player to move/fight/jump/etc.
+    I.e. forbid or allow player to move/fight/jump/etc.
   ]]
   setControlSwitch: function(
     key: ControlSwitch, --[[Control type (see @{openmw.input#CONTROL_SWITCH})]]
@@ -809,7 +797,7 @@ local record input
   --[[
     Map of all currently registered triggers
   ]]
-  triggers: { string: input.TriggerInfo }
+  triggers: { any: input.TriggerInfo }
   
 end
 return input

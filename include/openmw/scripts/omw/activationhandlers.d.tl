@@ -5,7 +5,7 @@
 local type openmw_core = require("openmw.core")
 local record Activation
   --[[
-    Add a new activation handler for a specific object.
+    Add new activation handler for a specific object.
     If `handler(object, actor)` returns false, other handlers for
     the same object (including type handlers) will be skipped.
   ]]
@@ -15,7 +15,7 @@ local record Activation
   )
   
   --[[
-    Add a new activation handler for a type of object.
+    Add new activation handler for a type of objects.
     If `handler(object, actor)` returns false, other handlers for
     the same object (including type handlers) will be skipped.
   ]]

@@ -6,6 +6,18 @@
 local type openmw_core = require("openmw.core")
 local type openmw_util = require("openmw.util")
 --[[
+  Alignment values (details depend on the specific property).
+  For horizontal alignment the order is left to right, for vertical alignment the order is top to bottom.
+]]
+global interface ALIGNMENT
+  Center: any
+  
+  End: any
+  
+  Start: any
+  
+end
+--[[
   All available widget types
 ]]
 global interface TYPE
@@ -56,18 +68,6 @@ global interface CONSOLE_COLOR
   Info: openmw_util.Color
   
   Success: openmw_util.Color
-  
-end
---[[
-  Alignment values (details depend on the specific property).
-  For horizontal alignment the order is left to right, for vertical alignment the order is top to bottom.
-]]
-global interface ALIGNMENT
-  Center: any
-  
-  End: any
-  
-  Start: any
   
 end
 local record ui
@@ -356,8 +356,7 @@ local record ui
     Creates a UI element from the given layout table
   ]]
   create: function(
-    layout: ui.Layout,
-    options: table
+    layout: ui.Layout
   ): ui.Element
   
   --[[
