@@ -436,13 +436,7 @@ function utility.resetDialogueVars(self: Follower) -- This function sets all dia
 		["locationThoughts"] = self.mwBool.FALSE,
 		["npcThoughts"] = self.mwBool.FALSE,
 		["mainquestThoughts"] = self.mwBool.FALSE,
-		["magequestThoughts"] = self.mwBool.FALSE,
-		["moragquestThoughts"] = self.mwBool.FALSE,
-		["thiefquestThoughts"] = self.mwBool.FALSE,
-		["fighterquestThoughts"] = self.mwBool.FALSE,
-		["legionquestThoughts"] = self.mwBool.FALSE,
-		["cultquestThoughts"] = self.mwBool.FALSE,
-		["templequestThoughts"] = self.mwBool.FALSE,
+		["guildquestThoughts"] = self.mwBool.FALSE,
 		["housequestThoughts"] = self.mwBool.FALSE,
 	}
 	self:updateMWVars(vars)
